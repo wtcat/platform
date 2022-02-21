@@ -14,63 +14,110 @@
 
 #include <drvmgr/drvmgr.h>
 
+#define RES_NAME_SIZE 32
 
 static const struct bus_resource *platform_resources;
 
+static void rname_get(char *buf, size_t maxsz, const char *prefix, 
+	int index) {
+	snprintf(buf, maxsz, "%s%d", prefix, index);
+}
 
-static int reg_resource_get(struct drvmgr_key *keys, unsigned int *reg) {
-	union drvmgr_key_value *v;
-	v = drvmgr_key_val_get(keys, "REG0", DRVMGR_KT_INT);
-	if (v == NULL)
-		v = drvmgr_key_val_get(keys, "REG", DRVMGR_KT_INT);
-	if (v) {
-		*reg = v->i;
+const struct bus_resource *platform_res_get(void) {
+	return platform_resources;
+}
+
+int platform_res_register(const struct bus_resource *r) {
+	if (platform_resources == NULL) {
+		platform_resources = r;
 		return 0;
 	}
-	return DRVMGR_ENORES;
+	return -DRVMGR_EBUSY;
 }
 
-static int irq_resource_get(struct drvmgr_key *keys, struct irq_res *irqres) {
-	union drvmgr_key_value *v;
-	char name[5] = {"IRQ0"};
-	for (irqres-> = 0; i < MAX_IRQRES_NR; i++) {
-		name[3] = '0' + i;
-		v = drvmgr_key_val_get(keys, name, DRVMGR_KT_INT);
-		if (v == NULL)
-			continue;
-		irqres->irqs = (unsigned short)v->i;
-		irqres->nr++;
+int platform_res_count_get(struct drvmgr_key *keys, 
+	const char *name, size_t len) {
+	struct drvmgr_key *key = keys;
+	if (!keys)
+		return 0;
+	int count = 0;
+	while (key->key_type != DRVMGR_KT_NONE) {
+		if (strncmp(name, key->key_name, len) == 0)
+			count++;
+		key++;
 	}
-	return (irqres->nr == 0)? DRVMGR_ENORES: 0;
+	return count;
 }
 
-static int platform_irq_map(struct drvmgr_dev *dev, int index) {
-	struct dev_private *priv;
-	if (!dev)
-		return -DRVMGR_EINVAL;
-	priv = dev->businfo;
-	if (index >= priv->irqres.nr)
-		return -DRVMGR_EINVAL;
-	if (index >= 0) 
-		return priv->irqres.irqs[index];
-	return -index;
+int platform_reg_resource_get(struct drvmgr_key *keys, int index,
+	unsigned int *reg) {
+	char name[RES_NAME_SIZE];
+	union drvmgr_key_value *v;
+	rname_get(name, RES_NAME_SIZE-1, "REG", index);
+	v = drvmgr_key_val_get(keys, name, DRVMGR_KT_INT);
+	if (v == NULL) {
+		if (index == 0) {
+			v = drvmgr_key_val_get(keys, "REG", DRVMGR_KT_INT);
+			if (v == NULL)
+				return -DRVMGR_ENORES;
+		}
+		return -DRVMGR_ENORES;
+	}
+	*reg = v->i;
+	return 0;
 }
 
-static int platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev) {
+int platform_irq_resource_get(struct drvmgr_key *keys, int index,
+	unsigned int *oirq) {
+	char name[RES_NAME_SIZE];
+	union drvmgr_key_value *v;
+	rname_get(name, RES_NAME_SIZE-1, "IRQ", index);
+	v = drvmgr_key_val_get(keys, name, DRVMGR_KT_INT);
+	if (v == NULL) {
+		if (index == 0) {
+			v = drvmgr_key_val_get(keys, "IRQ", DRVMGR_KT_INT);
+			if (v == NULL)
+				return -DRVMGR_ENORES;
+		}
+		return -DRVMGR_ENORES;
+
+	}
+	*oirq = v->i;
+	return 0;
+}
+
+int platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev, 
+	int bustype) {
 	if (!drv || !dev || !dev->parent || !dev->businfo)
 		return 0;
-	if (drv->bus_type != DRVMGR_BUS_TYPE_PLATFORM ||
-		dev->parent->bus_type != DRVMGR_BUS_TYPE_PLATFORM)
+	if (drv->bus_type != bustype ||
+		dev->parent->bus_type != bustype)
 		return 0;
 	
 	struct dev_driver *ddrv = RTEMS_CONTAINER_OF(drv, struct dev_driver, ids);
 	struct dev_private *priv = (struct dev_private *)dev->businfo;
 	while (ddrv->ids) {
-		if (!strcmp(priv->compatible, ddrv->ids->compatible))
+		if (!strcmp(priv->res->compatible, ddrv->ids->compatible))
 			return 1;
 		ddrv->ids++;
 	}
 	return 0;
+}
+	
+int platform_irq_map(struct drvmgr_dev *dev, int index) {
+	struct dev_private *priv;
+	if (!dev)
+		return -DRVMGR_EINVAL;
+	priv = dev->businfo;
+	if (index >= (int)priv->nirq)
+		return -DRVMGR_EINVAL;
+	if (index >= 0) 
+		return priv->irqs[index];
+	return -index;
+}
+
+static int platform_bus_unite(struct drvmgr_drv *drv, struct drvmgr_dev *dev) {
+	return platform_bus_match(drv, dev, DRVMGR_BUS_TYPE_PLATFORM);
 }
 
 static int platform_bus_intr_register(struct drvmgr_dev *dev, int index, 
@@ -129,35 +176,30 @@ static int platform_bus_get_freq(struct drvmgr_dev *dev, int no,
 	return DRVMGR_FAIL;
 }
 
-int platform_res_register(const struct bus_resource *r) {
-	if (platform_resources == NULL) {
-		platform_resources = r;
-		return 0;
-	}
-	return DRVMGR_EBUSY;
-}
-
-const struct bus_resource *platform_res_get(void) {
-	return platform_resources;
-}
-
-
 int platform_dev_register(struct drvmgr_bus *parent,
 	const struct bus_resource *r) {
 	struct drvmgr_dev *dev;
-	drvmgr_alloc_dev(&dev, sizeof(struct dev_private));
+	int nr = platform_irq_count_get(r->keys);
+	drvmgr_alloc_dev(&dev, sizeof(struct dev_private) + nr * sizeof(short));
 	struct dev_private *priv = (struct dev_private *)(dev + 1);
-	priv->compatible = r->comatible;
-	if (irq_resource_get((struct drvmgr_key *)r->keys, &priv->irqres)) {
-		printk(DRVMGR_WARN "Not found \"irq\" resource(%s)\n", 
-			r->name?:r->comatible);
-	}
-	if (reg_resource_get((struct drvmgr_key *)r->keys, &priv->regbase)) {
-		printk(DRVMGR_WARN "Not found \"reg\" resource(%s)\n", 
-			r->name?:r->comatible);
+	if (platform_reg_resource_get((struct drvmgr_key *)r->keys, 0, &priv->base)) {
+		printk(DRVMGR_WARN "%s not found \"REG(0)\" resource(%s)\n", 
+			r->name?: r->compatible);
 		free(dev);
-		return DRVMGR_ENORES;
+		return -DRVMGR_ENORES;
 	}
+	for (int i = 0; i < nr; i++) {
+		unsigned int irqno;
+		if (platform_irq_resource_get((struct drvmgr_key *)r->keys, i, &irqno)) {
+			printk(DRVMGR_WARN "%s not found \"IRQ%d\" resource(%s)\n", 
+				r->name?: r->compatible, i);
+			free(dev);
+			return -DRVMGR_ENORES;
+		}
+		priv->irqs[i] = (unsigned short)irqno;
+	}
+	priv->res = r;
+	priv->nirq = nr;
 	dev->next = NULL;
 	dev->parent = parent;
 	dev->minor_drv = 0;
@@ -172,12 +214,17 @@ int platform_dev_register(struct drvmgr_bus *parent,
 	return 0;
 }
 
-static int platform_bus_populate(struct drvmgr_bus *bus) {
-	const struct bus_resource *r = platform_resources;
+int platform_dev_populate_on_bus(struct drvmgr_bus *bus,
+	const struct bus_resource *r) {
+	int ret;
 	if (r == NULL)
 		return DRVMGR_FAIL;
-	while (r->comatible) {
-		platform_dev_register(bus, platform_resources);
+	while (r->compatible || r->name) {
+		if (r->parent_bus != bus->bus_type)
+			continue;
+		ret = platform_dev_register(bus, r);
+		if (ret)
+			return ret;
 		r++;
 	}
 	return DRVMGR_OK;
@@ -188,7 +235,7 @@ static struct drvmgr_bus_ops platform_bus_ops = {
 		platform_bus_populate,
 	},
 	.remove         = NULL,
-	.unite		    = platform_bus_match,
+	.unite		    = platform_bus_unite,
 	.int_register	= platform_bus_intr_register,
 	.int_unregister	= platform_bus_intr_unregister,
 	.int_clear	    = platform_bus_intr_clear,
@@ -213,7 +260,7 @@ static int platform_bus_device_register(struct drvmgr_dev *dev) {
 	dev->bus->reslist = NULL;
 	dev->bus->maps_up = NULL;
 	dev->bus->maps_down = NULL;
-	dev->name = "root-device";
+	dev->name = dev->name;
 	dev->priv = NULL;
 	return drvmgr_bus_register(dev->bus);
 }
