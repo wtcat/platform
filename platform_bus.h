@@ -112,6 +112,8 @@ int platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev,
 	int bustype);
 int platform_dev_populate_on_bus(struct drvmgr_bus *bus,
 	const struct bus_resource *r);
+int platform_bus_device_register(struct drvmgr_dev *dev,
+	struct drvmgr_bus_ops *bus_ops, int bustype);
 int platform_irq_map(struct drvmgr_dev *dev, int index);
 
 

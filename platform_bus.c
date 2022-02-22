@@ -18,11 +18,6 @@
 
 static const struct bus_resource *platform_resources;
 
-static void rname_get(char *buf, size_t maxsz, const char *prefix, 
-	int index) {
-	snprintf(buf, maxsz, "%s%d", prefix, index);
-}
-
 const struct bus_resource *platform_res_get(void) {
 	return platform_resources;
 }
@@ -51,9 +46,10 @@ int platform_res_count_get(struct drvmgr_key *keys,
 
 int platform_reg_resource_get(struct drvmgr_key *keys, int index,
 	unsigned int *reg) {
-	char name[RES_NAME_SIZE];
 	union drvmgr_key_value *v;
-	rname_get(name, RES_NAME_SIZE-1, "REG", index);
+	char name[RES_NAME_SIZE];
+	
+	snprintf(name, RES_NAME_SIZE-1, "REG%d", index);
 	v = drvmgr_key_val_get(keys, name, DRVMGR_KT_INT);
 	if (v == NULL) {
 		if (index == 0) {
@@ -69,9 +65,10 @@ int platform_reg_resource_get(struct drvmgr_key *keys, int index,
 
 int platform_irq_resource_get(struct drvmgr_key *keys, int index,
 	unsigned int *oirq) {
-	char name[RES_NAME_SIZE];
 	union drvmgr_key_value *v;
-	rname_get(name, RES_NAME_SIZE-1, "IRQ", index);
+	char name[RES_NAME_SIZE];
+	
+	snprintf(name, RES_NAME_SIZE-1, "IRQ%d", index);
 	v = drvmgr_key_val_get(keys, name, DRVMGR_KT_INT);
 	if (v == NULL) {
 		if (index == 0) {
@@ -80,7 +77,6 @@ int platform_irq_resource_get(struct drvmgr_key *keys, int index,
 				return -DRVMGR_ENORES;
 		}
 		return -DRVMGR_ENORES;
-
 	}
 	*oirq = v->i;
 	return 0;
@@ -160,8 +156,8 @@ static int platform_bus_intr_unmask(struct drvmgr_dev *dev, int index) {
 }
 
 #ifdef RTEMS_SMP
-static int platform_bus_intr_set_affinity(struct drvmgr_dev *dev, int index,
-	const Processor_mask *cpus) {
+static int platform_bus_intr_set_affinity(struct drvmgr_dev *dev, 
+	int index, const Processor_mask *cpus) {
 	return DRVMGR_FAIL;
 }
 #endif
@@ -230,6 +226,26 @@ int platform_dev_populate_on_bus(struct drvmgr_bus *bus,
 	return DRVMGR_OK;
 }
 
+int platform_bus_device_register(struct drvmgr_dev *dev,
+	struct drvmgr_bus_ops *bus_ops, int bustype) {
+	if (!dev->name)
+		return -DRVMGR_EINVAL;
+	drvmgr_alloc_bus(&dev->bus, 0);
+	dev->bus->bus_type = bustype;
+	dev->bus->next = NULL;
+	dev->bus->dev = dev;
+	dev->bus->priv = NULL;
+	dev->bus->children = NULL;
+	dev->bus->ops = bus_ops;
+	dev->bus->dev_cnt = 0;
+	dev->bus->reslist = NULL;
+	dev->bus->maps_up = NULL;
+	dev->bus->maps_down = NULL;
+	dev->name = dev->name;
+	dev->priv = NULL;
+	return drvmgr_bus_register(dev->bus);
+}
+
 static struct drvmgr_bus_ops platform_bus_ops = {
 	.init = {
 		platform_bus_populate,
@@ -248,26 +264,14 @@ static struct drvmgr_bus_ops platform_bus_ops = {
 	.get_freq       = platform_bus_get_freq
 };
 
-static int platform_bus_device_register(struct drvmgr_dev *dev) {
-	drvmgr_alloc_bus(&dev->bus, 0);
-	dev->bus->bus_type = DRVMGR_BUS_TYPE_PLATFORM;
-	dev->bus->next = NULL;
-	dev->bus->dev = dev;
-	dev->bus->priv = NULL;
-	dev->bus->children = NULL;
-	dev->bus->ops = &platform_bus_ops;
-	dev->bus->dev_cnt = 0;
-	dev->bus->reslist = NULL;
-	dev->bus->maps_up = NULL;
-	dev->bus->maps_down = NULL;
-	dev->name = dev->name;
-	dev->priv = NULL;
-	return drvmgr_bus_register(dev->bus);
+static int platform_bus_init(struct drvmgr_dev *dev) {
+	return platform_bus_device_register(dev, &platform_bus_ops, 
+		DRVMGR_BUS_TYPE_PLATFORM);
 }
 
 static struct drvmgr_drv_ops platform_driver_ops {
 	.init = {
-		platform_bus_device_register,
+		platform_bus_init,
 		},
 	.remove = NULL,
 	.info = NULL
