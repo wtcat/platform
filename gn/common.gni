@@ -1,0 +1,9 @@
+#Common arguments declare
+
+declare_args() {
+  #Generate binary file
+  use_bin = false
+  
+  #Generate uboot image
+  use_uboot = false
+}

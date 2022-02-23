@@ -1,0 +1,42 @@
+import("//gn/common.gni")
+
+template("mkimage") {
+    assert(defined(invoker.loadaddr), "Not found load address")
+    loadaddr = invoker.loadaddr
+    if (defined(invoker.arch)) {
+        arch = invoker.arch
+    } else {
+        arch = "arm"
+    }
+    if (defined(invoker.os)) {
+        os = invoker.os
+    } else {
+        os = "rtems"
+    }
+    if (defined(invoker.comp)) {
+        comp = invoker.comp
+    } else {
+        comp = "none"
+    }
+    if (defined(invoker.entryaddr)) {
+        entryaddr = invoker.entryaddr
+    } else {
+        entryaddr = loadaddr
+    }
+    action(target_name) {
+        script = "//tools/scripts/mkimage.py"
+        sources = ["$root_out_dir/kernel.bin"]
+        outputs = ["$root_out_dir/kernel.img"]
+        args = [
+            "--arch", "${arch}",
+            "--os", "${os}",
+            "--image","kernel",
+            "--compression","${comp}",
+            "--loadaddr", "${loadaddr}",
+            "--entryaddr", "${entryaddr}",
+            "--name", "${os}",
+            "--binfile", rebase_path("$root_out_dir/kernel.bin")
+        ]
+        deps = invoker.deps
+    }
+}

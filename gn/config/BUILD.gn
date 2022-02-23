@@ -1,0 +1,60 @@
+# Copyright (c) 2013 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+
+config("feature_flags") {
+  defines = []
+}
+
+# Debug/release ----------------------------------------------------------------
+config("debug") {
+  defines = []
+}
+
+config("release") {
+  defines = [ "NDEBUG" ]
+}
+
+# Default libraries ------------------------------------------------------------
+config("default_libs") {
+  libs = []
+}
+
+group("common_deps") {
+  visibility = [
+    ":executable_deps",
+    ":loadable_module_deps",
+    ":shared_library_deps",
+  ]
+
+  # WARNING: This group is a dependency of **every executable and shared
+  # library**.  Please be careful adding new dependencies here.
+  public_deps = []
+}
+
+# Only the executable template in BUILDCONFIG.gn should reference this.
+group("executable_deps") {
+  public_deps = [ ":common_deps" ]
+}
+
+# Only the loadable_module template in BUILDCONFIG.gn should reference this.
+group("loadable_module_deps") {
+  public_deps = [ ":common_deps" ]
+}
+
+# Only the shared_library template in BUILDCONFIG.gn should reference this.
+group("shared_library_deps") {
+  public_deps = [ ":common_deps" ]
+}
+
+# Executable configs -----------------------------------------------------------
+config("executable_config") {
+  configs = []
+}
+
+# Shared library configs -------------------------------------------------------
+config("shared_library_config") {
+  configs = []
+}
+

@@ -1,0 +1,11 @@
+defines = -D__KERNEL__
+include_dirs =
+cflags = -Og -g
+cflags_c = -Wall -Og -g
+label_name = init
+target_out_dir = obj
+target_output_name = init
+
+build obj/init/main.o: cc ../main.c
+
+build obj/init.stamp: stamp obj/init/main.o

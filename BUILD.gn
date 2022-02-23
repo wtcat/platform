@@ -1,0 +1,43 @@
+import("//gn/common.gni")
+
+# Top-level project target
+group("project") {
+  deps = [
+ #   "//arch:preprocess",
+    ":kernel"
+  ]
+  if (use_bin) {
+    deps += ["//arch:binary"]
+  }
+  if (use_uboot) {
+    deps += ["//arch:image"]
+  }
+}
+
+# Global include directories
+config("include_dirs") {
+  include_dirs = [
+ #   "//arch/${target_cpu}/include",
+ #   "//include",
+   ]
+}
+
+# Generate executable target
+executable("kernel") {
+  deps = [
+    ":init",
+  ]
+}
+
+component("init") {
+  cflags_c = ["-Wall", "-Og", "-g"]
+  sources = [
+    "main.c"
+  ]
+}
+
+path = rebase_path("${root_build_dir}")
+print("root_build_dir: ${path}")
+print("root_out_dir: ${root_out_dir}")
+print("root_gen_dir: ${root_gen_dir}")
+print("target_out_dir: ${target_out_dir}")

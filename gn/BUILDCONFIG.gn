@@ -1,0 +1,124 @@
+import("//gn/custom_toolchain.gni")
+
+if (target_os == "") {
+  target_os = "rtems"
+}
+
+if (host_os == "") {
+  host_os = "linux"
+}
+
+# =============================================================================
+# BUILD FLAGS
+# =============================================================================
+declare_args() {
+  is_debug = true
+  is_component_build = false
+}
+
+
+# ==============================================================================
+# TOOLCHAIN SETUP
+# ==============================================================================
+if (host_os == "linux") {
+  _default_toolchain = "//gn/toolchain/$target_os:$target_cpu"
+} else {
+  assert(false, "Unsupported host_os: $host_os")
+}
+
+if (custom_toolchain != "") {
+  set_default_toolchain(custom_toolchain)
+} else if (_default_toolchain != "") {
+  set_default_toolchain(_default_toolchain)
+}
+
+# =============================================================================
+# TARGET DEFAULTS
+# =============================================================================
+default_compiler_configs = [
+  "//gn/config:feature_flags",
+  "//gn:compiler",
+  "//gn:optimize",
+  "//gn:no_exceptions",
+  "//gn:no_rtti",
+  "//gn:global_defines"
+]
+
+if (target_os == "rtems") {
+  default_compiler_configs += [
+    "//gn/toolchain/rtems:include",
+    "//:include_dirs"
+  ]
+}
+
+_linker_configs = []
+
+# =============================================================================
+# Debug/release-related defines.
+# =============================================================================
+if (is_debug) {
+  default_compiler_configs += [ "//gn/config:debug" ]
+} else {
+  default_compiler_configs += [ "//gn/config:release" ]
+}
+
+
+# =============================================================================
+# Static libraries and source sets use only the compiler ones.
+# =============================================================================
+set_defaults("static_library") {
+  configs = default_compiler_configs
+}
+set_defaults("source_set") {
+  configs = default_compiler_configs
+}
+
+# =============================================================================
+# Executable defaults.
+# =============================================================================
+default_executable_configs = default_compiler_configs
+default_executable_configs += ["//gn/config:default_libs",
+                               "//gn/config:executable_config"
+                             ]
+default_executable_configs += _linker_configs
+
+set_defaults("executable") {
+  configs = default_executable_configs
+}
+
+# =============================================================================
+# Shared library and loadable module defaults (also for components in component
+# mode).
+# =============================================================================
+default_shared_library_configs = default_compiler_configs
+default_shared_library_configs += ["//gn/config:default_libs",
+                                   "//gn/config:shared_library_config"
+                                 ]        
+default_shared_library_configs += _linker_configs
+set_defaults("shared_library") {
+  configs = default_shared_library_configs
+} 
+
+# ==============================================================================
+# COMPONENT SETUP
+# ==============================================================================
+template("component") {
+  if (is_component_build) {
+    _component_mode = "shared_library"
+  } else if (defined(invoker.component_type)) {
+    assert(invoker.component_type == "static_library" ||
+           invoker.component_type == "source_set")
+    _component_mode = invoker.component_type
+    output_dir = "$root_out_dir"
+  } else {
+    # When there are no sources defined, use a source set to avoid creating
+    # an empty static library (which generally don't work).
+    _component_mode = "source_set"
+  }
+  target(_component_mode, target_name) {
+    forward_variables_from(invoker, "*", ["configs"])
+    if (defined(invoker.configs)) {
+      configs += invoker.configs
+    }
+  }
+}

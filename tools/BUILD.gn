@@ -1,0 +1,67 @@
+
+import("//gn/toolchain/rtems/rtems.gni")
+import("//arch/common.gni")
+
+_tool_prefix = "arm-rtems${rtems_version}-"
+_build_dir = rebase_path("$root_build_dir")
+
+if (rtems_bsp == "") {
+  _target_path = "$target_cpu/$target_soc/$target_board"
+} else {
+  _target_path = "$target_cpu/$rtems_bsp"
+}
+
+#====================
+# Help information
+#====================
+group("help") {
+  metadata = {
+    content = [
+
+    ]
+  }
+}
+
+#====================
+# GDB debug
+#====================
+group("gdbinit") {
+  gdbinit_path = "${_build_dir}/../arch/$_target_path/gdb.init"
+  metadata = {
+    content = []
+    content += [ 
+      "gdb: ",
+      "	${_tool_prefix}gdb -x $gdbinit_path ${_build_dir}/kernel.elf",
+      ".PHONY : gdb"
+    ]
+    content += [ 
+      "gdbserver: ",
+      "	sh " + "${_build_dir}/../arch/$_target_path/gdbserver.sh ${_build_dir}/kernel.elf",
+      ".PHONY : gdbserver"
+    ]
+    content += [ 
+      "a2l: ",
+      "	${_tool_prefix}addr2line -p -f -a \$(lr) -e ${_build_dir}/kernel.elf",
+      ".PHONY : a2l"
+    ]
+  }
+}
+
+#====================
+# User debug
+#====================
+group("info") {
+  metadata = {
+    content = []
+    content += [ 
+      "sysinit: ",
+      "	rtems-exeinfo -I ${_build_dir}/kernel.elf",
+      ".PHONY : sysinit"
+    ]
+    content += [ 
+      "objdump: ",
+      "	${_tool_prefix}objdump -S ${_build_dir}/kernel.elf > ${_build_dir}/kernel.S",
+      ".PHONY : objdump"
+    ]
+  }
+}

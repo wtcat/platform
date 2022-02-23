@@ -1,0 +1,57 @@
+#rtems arguments
+declare_args() {
+  #rtems library install path
+  rtems_tools = ""
+
+  rtems_bsp = ""
+  
+  #rtems major version 
+  rtems_version = 6
+}
+
+#rtems module
+declare_args() {
+  use_console = true
+  use_simple_console = false
+  use_clock = true
+  use_shell = false
+  use_bdbuf = false
+  use_net = false
+
+  #Libbsd
+  use_libbsd = false
+
+  #Bsp stack allocator
+  use_stack_allocator = true
+
+  #Enable sysinit_verbose
+  use_verbose = false
+  
+  #Enable device tree
+  use_devicetree = false
+
+  #Media service
+  use_media = false
+}
+
+declare_args () {
+  # 
+  # Opimize level
+  # 
+  # optimize debug -> Og
+  # optimize size  -> Os
+  # optimize level -> On [n = 0, 1, 2, 3]
+  #
+
+  optimize_level = "Og"
+
+}
+
+assert(optimize_level == "Og" ||
+       optimize_level == "Os" ||
+       optimize_level == "O0" ||
+       optimize_level == "O1" ||
+       optimize_level == "O2" ||
+       optimize_level == "O3", "Invalid optimize level")
+assert(!(use_console && use_simple_console), "Console configurate conflicted!")
+assert(!(use_net && use_libbsd), "Net stack configurate conflicted!")

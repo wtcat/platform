@@ -1,0 +1,1 @@
+build.ninja: ../.gn ../BUILD.gn ../gn/BUILD.gn ../gn/BUILDCONFIG.gn ../gn/common.gni ../gn/config/BUILD.gn ../gn/custom_toolchain.gni ../gn/toolchain/gcc_toolchain.gni ../gn/toolchain/linux/BUILD.gn ../gn/toolchain/rtems/rtems.gni ./args.gn

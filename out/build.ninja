@@ -1,0 +1,38 @@
+ninja_required_version = 1.7.2
+
+rule gn
+  command = ../../../../usr/bin/gn --root=./.. -q --regeneration gen .
+  pool = console
+  description = Regenerating ninja files
+
+build build.ninja: gn
+  generator = 1
+  depfile = build.ninja.d
+
+subninja toolchain.ninja
+
+build init: phony obj/init.stamp
+build kernel: phony ./kernel.elf
+build project: phony obj/project.stamp
+build common_deps: phony obj/gn/config/common_deps.stamp
+build executable_deps: phony obj/gn/config/executable_deps.stamp
+build loadable_module_deps: phony obj/gn/config/loadable_module_deps.stamp
+build shared_library_deps: phony obj/gn/config/shared_library_deps.stamp
+build $:init: phony obj/init.stamp
+build $:kernel: phony ./kernel.elf
+build $:project: phony obj/project.stamp
+build gn/config$:common_deps: phony obj/gn/config/common_deps.stamp
+build gn/config$:executable_deps: phony obj/gn/config/executable_deps.stamp
+build gn/config$:loadable_module_deps: phony obj/gn/config/loadable_module_deps.stamp
+build gn/config$:shared_library_deps: phony obj/gn/config/shared_library_deps.stamp
+
+build all: phony $
+    obj/init.stamp $
+    ./kernel.elf $
+    obj/project.stamp $
+    obj/gn/config/common_deps.stamp $
+    obj/gn/config/executable_deps.stamp $
+    obj/gn/config/loadable_module_deps.stamp $
+    obj/gn/config/shared_library_deps.stamp
+
+default all

@@ -1,0 +1,55 @@
+# Copyright 2013 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//gn/toolchain/gcc_toolchain.gni")
+import("//gn/toolchain/rtems/rtems.gni")
+import("//arch/common.gni")
+
+
+_rtems_rootdir = "${rtems_tools}/${rtems_version}/${target_cpu}-rtems${rtems_version}"
+if (rtems_bsp == "") {
+  _rtems_path = "${_rtems_rootdir}/${target_board}/lib"
+} else {
+  _rtems_path = "${_rtems_rootdir}/${rtems_bsp}/lib"
+}
+
+gcc_toolchain("arm") {
+  toolprefix = "arm-rtems${rtems_version}-"
+
+  spec_flags = "-B${_rtems_path} -qrtems "
+  common_flags = "-Wall -Wimplicit-function-declaration -Wstrict-prototypes -fno-common -fdata-sections -ffunction-sections"
+  extra_cppflags = spec_flags + common_flags
+  extra_cflags = "-std=gnu17"
+  extra_cxxflags = "-std=c++17"
+  extra_asmflags = "-x assembler-with-cpp"
+  extra_ldflags = spec_flags + "-Wl,--gc-sections -Wl,-Bstatic -Wl,-Bdynamic"
+
+  cc = "${toolprefix}gcc"
+  cxx = "${toolprefix}g++"
+  ar = "${toolprefix}ar"
+  ld = cxx
+  size = "${toolprefix}size"
+  if (use_rtl) {
+    syms = "rtems-syms"
+  }
+  # if (use_bin) {
+  #   objcopy = "${toolprefix}objcopy"
+  # }
+
+  # Output linker map files for binary size analysis.
+  enable_linker_map = true
+  executable_extension = ".elf"
+  
+  toolchain_args = {
+    current_cpu = "arm"
+    current_os = "rtems"
+  }
+}
+
+assert(target_cpu == "arm", "Unsupported cpu architecture!")
+config("include") {
+    include_dirs = ["${_rtems_path}/include"]
+
+}
+

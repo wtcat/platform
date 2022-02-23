@@ -1,0 +1,45 @@
+rule cxx
+  command = g++ -MMD -MF ${out}.d ${defines} ${include_dirs} ${cflags} ${cflags_cc} -c ${in} -o ${out}
+  description = CXX ${out}
+  depfile = ${out}.d
+  deps = gcc
+rule alink
+  command = rm -f ${out} && "ar" ${arflags} -r -c -s -D ${out} @"${out}.rsp"
+  description = AR ${out}
+  rspfile = ${out}.rsp
+  rspfile_content = ${in}
+rule link
+  command = python "../gn/toolchain/gcc_link_wrapper.py" --output="${output_dir}/${target_output_name}${output_extension}"   -- g++ ${ldflags} -o ${output_dir}/${target_output_name}${output_extension} -Wl,--start-group @${output_dir}/${target_output_name}${output_extension}.rsp ${solibs} ${libs} -Wl,--end-group 
+  description = LINK ${output_dir}/${target_output_name}${output_extension}
+  rspfile = ${output_dir}/${target_output_name}${output_extension}.rsp
+  rspfile_content = -Wl,--whole-archive ${in} -Wl,--no-whole-archive
+rule solink
+  command = g++ -shared -Wl,-soname=${target_output_name}${output_extension} ${ldflags} -o ${output_dir}/${target_output_name}${output_extension} @${output_dir}/${target_output_name}${output_extension}.rsp
+  description = SOLINK ${output_dir}/${target_output_name}${output_extension}
+  rspfile = ${output_dir}/${target_output_name}${output_extension}.rsp
+  rspfile_content = -Wl,--whole-archive ${in} ${solibs} -Wl,--no-whole-archive ${libs}
+  restat = 1
+rule stamp
+  command = touch ${out}
+  description = STAMP ${out}
+rule asm
+  command = gcc -MMD -MF ${out}.d ${defines} ${include_dirs} ${asmflags} -c ${in} -o ${out}
+  description = ASM ${out}
+  depfile = ${out}.d
+  deps = gcc
+rule cc
+  command = gcc -MMD -MF ${out}.d ${defines} ${include_dirs} ${cflags} ${cflags_c} -c ${in} -o ${out}
+  description = CC ${out}
+  depfile = ${out}.d
+  deps = gcc
+rule copy
+  command = cp -af ${in} ${out}
+  description = COPY ${in} ${out}
+
+subninja obj/init.ninja
+subninja obj/kernel.ninja
+build obj/project.stamp: stamp ./kernel.elf
+build obj/gn/config/common_deps.stamp: stamp
+build obj/gn/config/executable_deps.stamp: stamp obj/gn/config/common_deps.stamp
+build obj/gn/config/loadable_module_deps.stamp: stamp obj/gn/config/common_deps.stamp
+build obj/gn/config/shared_library_deps.stamp: stamp obj/gn/config/common_deps.stamp

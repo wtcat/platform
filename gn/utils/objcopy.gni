@@ -1,0 +1,20 @@
+import("//gn/toolchain/rtems/rtems.gni")
+
+template("objcopy") {
+    if (defined(invoker.format)) {
+        format = invoker.format
+    } else {
+        format = "binary"
+    }
+    action(target_name) {
+        script = "//tools/scripts/generate_bin.py"
+        sources = ["$root_out_dir/kernel.elf"]
+        outputs = ["$root_out_dir/kernel.bin"]
+        args = [
+            "--objcopy", "${target_cpu}-${target_os}${rtems_version}-objcopy",
+            "--output_format","${format}",
+            "--input_file",rebase_path("$root_out_dir/kernel.elf")
+        ]
+        deps = invoker.deps
+    }
+}
