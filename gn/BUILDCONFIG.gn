@@ -21,7 +21,7 @@ declare_args() {
 # TOOLCHAIN SETUP
 # ==============================================================================
 if (host_os == "linux") {
-  _default_toolchain = "//gn/toolchain/$target_os:$target_cpu"
+  _default_toolchain = "//gn/toolchain/${target_os}:${target_cpu}"
 } else {
   assert(false, "Unsupported host_os: $host_os")
 }
@@ -41,13 +41,13 @@ default_compiler_configs = [
   "//gn:optimize",
   "//gn:no_exceptions",
   "//gn:no_rtti",
-  "//gn:global_defines"
+  "//gn:global_defines",
+  "//:settings"
 ]
 
 if (target_os == "rtems") {
   default_compiler_configs += [
     "//gn/toolchain/rtems:include",
-    "//:include_dirs"
   ]
 }
 

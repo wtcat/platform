@@ -1,4 +1,4 @@
-import("//gn/toolchain/rtems/rtems.gni")
+import("//gn/common.gni")
 
 template("objcopy") {
     if (defined(invoker.format)) {
@@ -7,13 +7,13 @@ template("objcopy") {
         format = "binary"
     }
     action(target_name) {
-        script = "//tools/scripts/generate_bin.py"
+        script = "//tools/scripts/objcopy.py"
         sources = ["$root_out_dir/kernel.elf"]
         outputs = ["$root_out_dir/kernel.bin"]
         args = [
-            "--objcopy", "${target_cpu}-${target_os}${rtems_version}-objcopy",
+            "--objcopy", "${toolchain_prefix}objcopy",
             "--output_format","${format}",
-            "--input_file",rebase_path("$root_out_dir/kernel.elf")
+            "--input_file",rebase_path("${root_out_dir}/kernel.elf")
         ]
         deps = invoker.deps
     }

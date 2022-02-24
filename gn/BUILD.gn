@@ -1,6 +1,5 @@
 import("//gn/toolchain/rtems/rtems.gni")
 
-
 is_rtems = target_os == "rtems"
 
 if (is_rtems) {
@@ -12,7 +11,7 @@ if (is_rtems) {
 #========================
 config("global_defines") {
   defines = [
-    "__KERNEL__"
+
   ]
   if (use_libbsd) {
     defines += ["__rtems_libbsd__"]

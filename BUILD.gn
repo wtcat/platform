@@ -15,11 +15,19 @@ group("project") {
 }
 
 # Global include directories
-config("include_dirs") {
-  include_dirs = [
- #   "//arch/${target_cpu}/include",
- #   "//include",
-   ]
+config("settings") {
+  include_dirs = []
+  cflags = [
+     "-Wall", 
+     "-Og", 
+     "-g"
+  ]
+  cflags_c = [
+     "-std=gnu11"
+  ]
+  cflags_cc = [
+     "-std=c++17"
+  ]
 }
 
 # Generate executable target
@@ -30,14 +38,8 @@ executable("kernel") {
 }
 
 component("init") {
-  cflags_c = ["-Wall", "-Og", "-g"]
   sources = [
     "main.c"
   ]
 }
 
-path = rebase_path("${root_build_dir}")
-print("root_build_dir: ${path}")
-print("root_out_dir: ${root_out_dir}")
-print("root_gen_dir: ${root_gen_dir}")
-print("target_out_dir: ${target_out_dir}")

@@ -25,8 +25,8 @@ template("mkimage") {
     }
     action(target_name) {
         script = "//tools/scripts/mkimage.py"
-        sources = ["$root_out_dir/kernel.bin"]
-        outputs = ["$root_out_dir/kernel.img"]
+        sources = ["${root_out_dir}/kernel.bin"]
+        outputs = ["${root_out_dir}/kernel.img"]
         args = [
             "--arch", "${arch}",
             "--os", "${os}",
@@ -35,7 +35,7 @@ template("mkimage") {
             "--loadaddr", "${loadaddr}",
             "--entryaddr", "${entryaddr}",
             "--name", "${os}",
-            "--binfile", rebase_path("$root_out_dir/kernel.bin")
+            "--binfile", rebase_path("${root_out_dir}/kernel.bin")
         ]
         deps = invoker.deps
     }

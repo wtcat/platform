@@ -4,8 +4,6 @@
 
 import("//gn/toolchain/gcc_toolchain.gni")
 import("//gn/toolchain/rtems/rtems.gni")
-import("//arch/common.gni")
-
 
 _rtems_rootdir = "${rtems_tools}/${rtems_version}/${target_cpu}-rtems${rtems_version}"
 if (rtems_bsp == "") {
