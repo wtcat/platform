@@ -21,7 +21,7 @@ gcc_toolchain("arm") {
   extra_cflags = "-std=gnu17"
   extra_cxxflags = "-std=c++17"
   extra_asmflags = "-x assembler-with-cpp"
-  extra_ldflags = spec_flags + "-Wl,--gc-sections -Wl,-Bstatic -Wl,-Bdynamic"
+  extra_ldflags = spec_flags + "-Wl,--gc-sections"
 
   cc = "${toolprefix}gcc"
   cxx = "${toolprefix}g++"
