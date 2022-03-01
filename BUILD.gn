@@ -1,7 +1,12 @@
 import("//gn/common.gni")
+import("//gn/toolchain/pkg_config.gni")
+
 
 # Top-level project target
 group("project") {
+  nlist = string_split("arm-rtems6", "-")
+  print(nlist[0])
+  print(nlist[1])
   deps = [
  #   "//arch:preprocess",
     ":kernel"
@@ -32,12 +37,6 @@ config("settings") {
 
 # Generate executable target
 executable("kernel") {
-  deps = [
-    ":init",
-  ]
-}
-
-component("init") {
   sources = [
     "main.c"
   ]
@@ -45,6 +44,5 @@ component("init") {
 
 pkg_config("cpu_abi") {
   packages = [ "arm-rtems6-realview_pbx_a9_qemu" ]
-#  extra_args = ["--variable", "RTEMS_ARCH"]
   ignore_libs = true
 }

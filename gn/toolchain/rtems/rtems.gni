@@ -1,9 +1,17 @@
 #rtems arguments
+
+declare_args() {
+  # Rtems toolchain path
+  rtems_toolchain_dirs = ""
+  # Rtems bsp name(eg: arm/stm32f4)
+  rtems_bsp = ""
+
+  rtems_pkgname = ""
+}
+
 declare_args() {
   #rtems library install path
   rtems_tools = ""
-
-  rtems_bsp = ""
   
   #rtems major version 
   rtems_version = 6
@@ -11,13 +19,8 @@ declare_args() {
 
 #rtems module
 declare_args() {
-  use_console = true
-  use_simple_console = false
-  use_clock = true
-  use_shell = false
-  use_bdbuf = false
   use_net = false
-
+  
   #Libbsd
   use_libbsd = false
 
@@ -53,5 +56,4 @@ assert(optimize_level == "Og" ||
        optimize_level == "O1" ||
        optimize_level == "O2" ||
        optimize_level == "O3", "Invalid optimize level")
-assert(!(use_console && use_simple_console), "Console configurate conflicted!")
 assert(!(use_net && use_libbsd), "Net stack configurate conflicted!")

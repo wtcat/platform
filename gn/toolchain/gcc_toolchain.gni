@@ -265,7 +265,6 @@ template("gcc_toolchain") {
       description = "STAMP {{output}}"
     }
 
-
     forward_variables_from(invoker, [ "deps" ])
   }
 }

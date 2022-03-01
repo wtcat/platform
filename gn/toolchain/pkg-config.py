@@ -128,6 +128,7 @@ def main():
   parser.add_option('--dridriverdir', action='store_true', dest='dridriverdir')
   parser.add_option('--version-as-components', action='store_true',
                     dest='version_as_components')
+  parser.add_option('--key', action='store_false')
   (options, args) = parser.parse_args()
 
   # Make a list of regular expressions to strip out.
@@ -194,6 +195,8 @@ def main():
   if options.debug:
     sys.stderr.write('Running: %s\n' % ' '.join(cmd))
 
+  if options.key:
+    cmd += "--variable=" + options.key
   try:
     flag_string = subprocess.check_output(cmd).decode('utf-8')
   except:

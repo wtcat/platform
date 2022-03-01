@@ -37,11 +37,8 @@ if (custom_toolchain != "") {
 # =============================================================================
 default_compiler_configs = [
   "//gn/config:feature_flags",
-  "//gn:compiler",
   "//gn:optimize",
-  "//gn:no_exceptions",
-  "//gn:no_rtti",
-  "//gn:global_defines",
+  "//gn:cc_options",
   "//:settings"
 ]
 

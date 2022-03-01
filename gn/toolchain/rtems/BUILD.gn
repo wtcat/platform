@@ -5,16 +5,25 @@
 import("//gn/toolchain/gcc_toolchain.gni")
 import("//gn/toolchain/rtems/rtems.gni")
 
-_rtems_rootdir = "${rtems_tools}/${rtems_version}/${target_cpu}-rtems${rtems_version}"
-if (rtems_bsp == "") {
-  _rtems_path = "${_rtems_rootdir}/${target_board}/lib"
-} else {
-  _rtems_path = "${_rtems_rootdir}/${rtems_bsp}/lib"
+declare_args() {
+  rtems_toolchain_prefix = ""
+
 }
 
-gcc_toolchain("arm") {
-  toolprefix = "arm-rtems${rtems_version}-"
+_path_split_list = string_split(rtems_toolchain_dirs)
+foreach(token, _path_split_list) {
+  if (token == "rtems") {
 
+  }
+
+}
+
+rtems_toolchain_prefix = "${target_cpu}-rtems${rtems_version}-"
+rtems_pkgname = "${rtems_toolchain_prefix}${rtems_bsp}"
+
+
+gcc_toolchain("rtems") {
+  toolchain_prefix = rtems_toolchain_prefix
   spec_flags = "-B${_rtems_path} -qrtems "
   common_flags = "-Wall -Wimplicit-function-declaration -Wstrict-prototypes -fno-common -fdata-sections -ffunction-sections"
   extra_cppflags = spec_flags + common_flags
@@ -23,31 +32,25 @@ gcc_toolchain("arm") {
   extra_asmflags = "-x assembler-with-cpp"
   extra_ldflags = spec_flags + "-Wl,--gc-sections"
 
-  cc = "${toolprefix}gcc"
-  cxx = "${toolprefix}g++"
-  ar = "${toolprefix}ar"
+  cc = "${toolchain_prefix}gcc"
+  cxx = "${toolchain_prefix}g++"
+  ar = "${toolchain_prefix}ar"
   ld = cxx
-  size = "${toolprefix}size"
+  size = "${toolchain_prefix}size"
   if (use_rtl) {
     syms = "rtems-syms"
   }
-  # if (use_bin) {
-  #   objcopy = "${toolprefix}objcopy"
-  # }
 
   # Output linker map files for binary size analysis.
   enable_linker_map = true
   executable_extension = ".elf"
-  
   toolchain_args = {
-    current_cpu = "arm"
+    current_cpu = target_cpu
     current_os = "rtems"
   }
 }
 
-assert(target_cpu == "arm", "Unsupported cpu architecture!")
 config("include") {
     include_dirs = ["${_rtems_path}/include"]
-
 }
 
