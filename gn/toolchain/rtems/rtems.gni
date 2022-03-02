@@ -7,6 +7,7 @@ declare_args() {
   rtems_bsp = ""
 
   rtems_pkgname = ""
+  rtems_pkgpath = ""
 }
 
 declare_args() {
@@ -35,25 +36,11 @@ declare_args() {
 
   #Media service
   use_media = false
+
+  use_rtl = false
 }
 
-declare_args () {
-  # 
-  # Opimize level
-  # 
-  # optimize debug -> Og
-  # optimize size  -> Os
-  # optimize level -> On [n = 0, 1, 2, 3]
-  #
-
-  optimize_level = "Og"
+declare_args() {
+  rtems_toolchain_prefix = ""
 
 }
-
-assert(optimize_level == "Og" ||
-       optimize_level == "Os" ||
-       optimize_level == "O0" ||
-       optimize_level == "O1" ||
-       optimize_level == "O2" ||
-       optimize_level == "O3", "Invalid optimize level")
-assert(!(use_net && use_libbsd), "Net stack configurate conflicted!")

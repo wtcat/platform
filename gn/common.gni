@@ -2,6 +2,8 @@
 
 declare_args() {
   toolchain_prefix = ""
+
+  pkg_config_script = "//gn/toolchain/pkg-config.py"
 }
 
 declare_args() {
@@ -11,3 +13,21 @@ declare_args() {
   #Generate uboot image
   use_uboot = false
 }
+
+
+declare_args () {
+  # 
+  # Opimize level
+  # 
+  # optimize debug -> Og
+  # optimize size  -> Os
+  # optimize level -> On [n = 0, 1, 2, 3]
+  #
+  optimize_level = "Og"
+}
+assert(optimize_level == "Og" ||
+       optimize_level == "Os" ||
+       optimize_level == "O0" ||
+       optimize_level == "O1" ||
+       optimize_level == "O2" ||
+       optimize_level == "O3", "Invalid optimize level")

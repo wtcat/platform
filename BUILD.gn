@@ -1,12 +1,16 @@
 import("//gn/common.gni")
 import("//gn/toolchain/pkg_config.gni")
 
+pkgargs = [
+  "arm-rtems6-realview_pbx_a9_qemu",
+  "--path","/home/wt/development/rtems/6/arm-rtems6/realview_pbx_a9_qemu"
+]
+
+pkgresult = exec_script("//gn/toolchain/rtems/finder.py", pkgargs, "value")
+print("Result: ${pkgresult}")
 
 # Top-level project target
 group("project") {
-  nlist = string_split("arm-rtems6", "-")
-  print(nlist[0])
-  print(nlist[1])
   deps = [
  #   "//arch:preprocess",
     ":kernel"
@@ -42,7 +46,9 @@ executable("kernel") {
   ]
 }
 
-pkg_config("cpu_abi") {
-  packages = [ "arm-rtems6-realview_pbx_a9_qemu" ]
-  ignore_libs = true
-}
+# pkg_config("cpu_abi") {
+#   packages = [ "arm-rtems6-realview_pbx_a9_qemu" ]
+#   ignore_libs = true
+
+  
+# }

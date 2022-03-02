@@ -128,7 +128,7 @@ def main():
   parser.add_option('--dridriverdir', action='store_true', dest='dridriverdir')
   parser.add_option('--version-as-components', action='store_true',
                     dest='version_as_components')
-  parser.add_option('--key', action='store_false')
+  parser.add_option('--rtems', action='store_true')
   (options, args) = parser.parse_args()
 
   # Make a list of regular expressions to strip out.
@@ -195,18 +195,17 @@ def main():
   if options.debug:
     sys.stderr.write('Running: %s\n' % ' '.join(cmd))
 
-  if options.key:
-    cmd += "--variable=" + options.key
   try:
     flag_string = subprocess.check_output(cmd).decode('utf-8')
   except:
     sys.stderr.write('Could not run pkg-config.\n')
     return 1
-
+  print(flag_string)
   # For now just split on spaces to get the args out. This will break if
   # pkgconfig returns quoted things with spaces in them, but that doesn't seem
   # to happen in practice.
   all_flags = flag_string.strip().split(' ')
+  
 
 
   sysroot = options.sysroot
@@ -224,7 +223,7 @@ def main():
 
     if flag[:2] == '-l':
       libs.append(RewritePath(flag[2:], prefix, sysroot))
-    elif flag[:2] == '-L':
+    elif flag[:2] == '-L' or flag[:2] == '-B':
       lib_dirs.append(RewritePath(flag[2:], prefix, sysroot))
     elif flag[:2] == '-I':
       includes.append(RewritePath(flag[2:], prefix, sysroot))

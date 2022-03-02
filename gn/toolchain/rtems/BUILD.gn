@@ -5,38 +5,47 @@
 import("//gn/toolchain/gcc_toolchain.gni")
 import("//gn/toolchain/rtems/rtems.gni")
 
-declare_args() {
-  rtems_toolchain_prefix = ""
+# rtems_compile_options = [
+#   '--variable=prefix',
+#   '--variable=includedir',
+#   '--variable=libdir',
+#   '--variable=ABI_FLAGS',
+#   '--libs-only-other',
+#   '--variable=RTEMS_ARCH',
+#   '--variable=RTEMS_BSP',
+#   '--variable=RTEMS_MAJOR'
+# ]
 
-}
+pkgargs = [
+  "${rtems_pkgname}",
+  "--path", "${rtems_pkgpath}"
+]
 
-_path_split_list = string_split(rtems_toolchain_dirs)
-foreach(token, _path_split_list) {
-  if (token == "rtems") {
+pkgresult = exec_script("//gn/toolchain/rtems/finder.py", pkgargs, "value")
+#INSTALL_PREFIX = pkgresult[0]
+INCLUDE_DIR    = pkgresult[1]
+ABI_FLAGS      = pkgresult[2]
+LD_FLAGS       = pkgresult[3]
+target_cpu     = pkgresult[4]
+#RTEMS_BSP      = pkgresult[5]
+RTEMS_MAJOR    = pkgresult[6]
 
-  }
-
-}
-
-rtems_toolchain_prefix = "${target_cpu}-rtems${rtems_version}-"
-rtems_pkgname = "${rtems_toolchain_prefix}${rtems_bsp}"
-
+rtems_toolchain_prefix = "${target_cpu}-rtems${RTEMS_MAJOR}-"
 
 gcc_toolchain("rtems") {
-  toolchain_prefix = rtems_toolchain_prefix
-  spec_flags = "-B${_rtems_path} -qrtems "
+  spec_flags = "${LD_FLAGS}"
   common_flags = "-Wall -Wimplicit-function-declaration -Wstrict-prototypes -fno-common -fdata-sections -ffunction-sections"
   extra_cppflags = spec_flags + common_flags
   extra_cflags = "-std=gnu17"
   extra_cxxflags = "-std=c++17"
   extra_asmflags = "-x assembler-with-cpp"
-  extra_ldflags = spec_flags + "-Wl,--gc-sections"
+  extra_ldflags = spec_flags
 
-  cc = "${toolchain_prefix}gcc"
-  cxx = "${toolchain_prefix}g++"
-  ar = "${toolchain_prefix}ar"
-  ld = cxx
-  size = "${toolchain_prefix}size"
+  cc  = "${rtems_toolchain_prefix}gcc"
+  cxx = "${rtems_toolchain_prefix}g++"
+  ar  = "${rtems_toolchain_prefix}ar"
+  ld  = cxx
+  size = "${rtems_toolchain_prefix}size"
   if (use_rtl) {
     syms = "rtems-syms"
   }
@@ -50,7 +59,7 @@ gcc_toolchain("rtems") {
   }
 }
 
-config("include") {
-    include_dirs = ["${_rtems_path}/include"]
+config("rtems_config") {
+    include_dirs = ["${INCLUDE_DIR}"]
+    cflags = ["${ABI_FLAGS}"]
 }
-
