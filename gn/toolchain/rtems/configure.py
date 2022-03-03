@@ -81,6 +81,7 @@ def main():
   if options.path:
     pkgname = find_package_name(options.path)
     if not pkgname:
+      print('Error***: Not found', options.path)
       return -1
     os.environ['PKG_CONFIG_PATH'] = options.path
     base_cmd.append(options.pkg_config)
