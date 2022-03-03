@@ -1,22 +1,14 @@
 import("//gn/common.gni")
 
 #========================
-# CC options
+# User Compiler Options
 #========================
 config("cc_options") {
-  cflags_cc = [ 
+  cflags = string_split(compiler_cflags)
+  cflags_c = string_split(compiler_cflags_c)
+  cflags_cc = string_split(compiler_cflags_cc)
+  cflags_cc += [ 
     "-fno-rtti",
     "-fno-exceptions"
   ]
-}
-
-#========================
-# Optimize
-#========================
-config("optimize") {
-
-  cflags = ["-${optimize_level}"]
-  if (is_debug) {
-    cflags += ["-g"]
-  }
 }

@@ -1,13 +1,5 @@
 import("//gn/common.gni")
-import("//gn/toolchain/pkg_config.gni")
-
-pkgargs = [
-  "arm-rtems6-realview_pbx_a9_qemu",
-  "--path","/home/wt/development/rtems/6/arm-rtems6/realview_pbx_a9_qemu"
-]
-
-pkgresult = exec_script("//gn/toolchain/rtems/finder.py", pkgargs, "value")
-print("Result: ${pkgresult}")
+import("//gn/utils/pkg_config.gni")
 
 # Top-level project target
 group("project") {
@@ -23,26 +15,10 @@ group("project") {
   }
 }
 
-# Global include directories
-config("settings") {
-  include_dirs = []
-  cflags = [
-     "-Wall", 
-     "-Og", 
-     "-g"
-  ]
-  cflags_c = [
-     "-std=gnu11"
-  ]
-  cflags_cc = [
-     "-std=c++17"
-  ]
-}
-
 # Generate executable target
 executable("kernel") {
   sources = [
-    "main.c"
+    "init.c"
   ]
 }
 

@@ -7,7 +7,7 @@ template("objcopy") {
         format = "binary"
     }
     action(target_name) {
-        script = "//tools/scripts/objcopy.py"
+        script = "//gn/utils/objcopy.py"
         sources = ["$root_out_dir/kernel.elf"]
         outputs = ["$root_out_dir/kernel.bin"]
         args = [

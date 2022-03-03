@@ -1,21 +1,6 @@
 #rtems arguments
-
 declare_args() {
-  # Rtems toolchain path
-  rtems_toolchain_dirs = ""
-  # Rtems bsp name(eg: arm/stm32f4)
-  rtems_bsp = ""
-
-  rtems_pkgname = ""
-  rtems_pkgpath = ""
-}
-
-declare_args() {
-  #rtems library install path
-  rtems_tools = ""
-  
-  #rtems major version 
-  rtems_version = 6
+  rtems_package_path = ""
 }
 
 #rtems module
@@ -41,6 +26,6 @@ declare_args() {
 }
 
 declare_args() {
-  rtems_toolchain_prefix = ""
-
+  # Auto generate
+  rtems_bsp = ""
 }

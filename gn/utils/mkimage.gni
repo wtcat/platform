@@ -24,7 +24,7 @@ template("mkimage") {
         entryaddr = loadaddr
     }
     action(target_name) {
-        script = "//tools/scripts/mkimage.py"
+        script = "//gn/utils/mkimage.py"
         sources = ["${root_out_dir}/kernel.bin"]
         outputs = ["${root_out_dir}/kernel.img"]
         args = [

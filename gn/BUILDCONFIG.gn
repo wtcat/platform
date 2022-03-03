@@ -1,9 +1,8 @@
-import("//gn/custom_toolchain.gni")
+import("//gn/common.gni")
 
 if (target_os == "") {
   target_os = "rtems"
 }
-
 if (host_os == "") {
   host_os = "linux"
 }
@@ -37,9 +36,7 @@ if (custom_toolchain != "") {
 # =============================================================================
 default_compiler_configs = [
   "//gn/config:feature_flags",
-  "//gn:optimize",
   "//gn:cc_options",
-  "//:settings"
 ]
 
 if (target_os == "rtems") {

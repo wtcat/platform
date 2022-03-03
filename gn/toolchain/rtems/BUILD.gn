@@ -1,36 +1,26 @@
-# Copyright 2013 The Chromium Authors. All rights reserved.
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
+# Copyright(c) 2022 wtcat
 
 import("//gn/toolchain/gcc_toolchain.gni")
 import("//gn/toolchain/rtems/rtems.gni")
 
 # rtems_compile_options = [
-#   '--variable=prefix',
-#   '--variable=includedir',
-#   '--variable=libdir',
-#   '--variable=ABI_FLAGS',
+#   '--cflags',
 #   '--libs-only-other',
+#   '--variable=prefix',
 #   '--variable=RTEMS_ARCH',
 #   '--variable=RTEMS_BSP',
 #   '--variable=RTEMS_MAJOR'
 # ]
-
-pkgargs = [
-  "${rtems_pkgname}",
-  "--path", "${rtems_pkgpath}"
-]
-
-pkgresult = exec_script("//gn/toolchain/rtems/finder.py", pkgargs, "value")
+pkgargs = ["--path", "${rtems_package_path}"]
+pkgresult = exec_script("//gn/toolchain/rtems/configure.py", pkgargs, "value")
+CC_FLAGS     = pkgresult[0]
+LD_FLAGS     = pkgresult[1]
 #INSTALL_PREFIX = pkgresult[0]
-INCLUDE_DIR    = pkgresult[1]
-ABI_FLAGS      = pkgresult[2]
-LD_FLAGS       = pkgresult[3]
-target_cpu     = pkgresult[4]
-#RTEMS_BSP      = pkgresult[5]
-RTEMS_MAJOR    = pkgresult[6]
+target_cpu     = pkgresult[3]
+rtems_bsp      = pkgresult[4]
+RTEMS_MAJOR    = pkgresult[5]
 
-rtems_toolchain_prefix = "${target_cpu}-rtems${RTEMS_MAJOR}-"
+toolchain_prefix = "${target_cpu}-rtems${RTEMS_MAJOR}-"
 
 gcc_toolchain("rtems") {
   spec_flags = "${LD_FLAGS}"
@@ -41,11 +31,11 @@ gcc_toolchain("rtems") {
   extra_asmflags = "-x assembler-with-cpp"
   extra_ldflags = spec_flags
 
-  cc  = "${rtems_toolchain_prefix}gcc"
-  cxx = "${rtems_toolchain_prefix}g++"
-  ar  = "${rtems_toolchain_prefix}ar"
+  cc  = "${toolchain_prefix}gcc"
+  cxx = "${toolchain_prefix}g++"
+  ar  = "${toolchain_prefix}ar"
   ld  = cxx
-  size = "${rtems_toolchain_prefix}size"
+  size = "${toolchain_prefix}size"
   if (use_rtl) {
     syms = "rtems-syms"
   }
@@ -60,6 +50,7 @@ gcc_toolchain("rtems") {
 }
 
 config("rtems_config") {
-    include_dirs = ["${INCLUDE_DIR}"]
-    cflags = ["${ABI_FLAGS}"]
+    include_dirs = []
+    cflags = CC_FLAGS
+    ldflags = CC_FLAGS
 }

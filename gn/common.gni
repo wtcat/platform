@@ -1,12 +1,6 @@
 #Common arguments declare
 
 declare_args() {
-  toolchain_prefix = ""
-
-  pkg_config_script = "//gn/toolchain/pkg-config.py"
-}
-
-declare_args() {
   #Generate binary file
   use_bin = false
   
@@ -14,20 +8,18 @@ declare_args() {
   use_uboot = false
 }
 
-
 declare_args () {
+  toolchain_prefix = ""
+  custom_toolchain = ""
   # 
-  # Opimize level
+  # Compiler options
   # 
-  # optimize debug -> Og
-  # optimize size  -> Os
-  # optimize level -> On [n = 0, 1, 2, 3]
+  # compiler_cflags: common options
+  # compiler_cflags_c: c options
+  # compiler_cflags_cc: c++ options
   #
-  optimize_level = "Og"
+  compiler_cflags = ""
+  compiler_cflags_c = ""
+  compiler_cflags_cc = ""
+  compiler_ldflags = ""
 }
-assert(optimize_level == "Og" ||
-       optimize_level == "Os" ||
-       optimize_level == "O0" ||
-       optimize_level == "O1" ||
-       optimize_level == "O2" ||
-       optimize_level == "O3", "Invalid optimize level")
