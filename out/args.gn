@@ -2,6 +2,7 @@
 # target_os = "rtems"
 # target_cpu = "arm"
 target_os = "rtems"
-rtems_package_path = "/home/wt/development/rtems/6/arm-rtems6/realview_pbx_a9_qemu"
+rtems_package_path = "/home/wt/development/rtems/6/arm-rtems6/am437x_idk_evm"
+#rtems_package_path = "/home/wt/development/rtems/6/arm-rtems6/realview_pbx_a9_qemu"
 
 use_bin = true

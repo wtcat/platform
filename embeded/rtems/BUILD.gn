@@ -4,9 +4,7 @@ import("//gn/utils/mkimage.gni")
 
 # Top-level project target
 group("all") {
-  deps = [
-    ":rtems"
-  ]
+  deps = [":rtems"]
   if (use_bin) {
     deps += ["//gn/toolchain/rtems:binary"]
   }
@@ -21,6 +19,7 @@ executable("rtems") {
     "main.c"
   ]
   deps = [
-    "bsps/shared"
+    "//gn/toolchain/rtems:preprocess",
+    "//embeded/rtems/bsps/shared"
   ]
 }

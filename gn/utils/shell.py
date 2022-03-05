@@ -11,6 +11,7 @@ def main():
                       help='Executable command')
   args = parser.parse_args()
   for cmd in args.command:
+    print("***", cmd)
     ret = subprocess.call(cmd, shell=True)
     if ret != 0:
       return ret;

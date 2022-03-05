@@ -49,7 +49,7 @@ gcc_toolchain("rtems") {
 }
 
 config("rtems_config") {
-    include_dirs = ["//embeded/${target_os}/include"]
+    include_dirs = ["//embeded/rtems/include"]
     cflags = CC_FLAGS
     ldflags = CC_FLAGS
 }
@@ -73,4 +73,16 @@ if (use_bin) {
       deps = [":binary"]
     }
   }
+}
+
+# Build pre-precess action
+group("preprocess") {
+  basepath = rebase_path("//embeded/rtems")
+  srcpath = "${basepath}/bsps/${target_cpu}/${rtems_bsp}/include/asm"
+  dstpath = "${basepath}/include/asm"
+  inputargs = [
+    "rm -rf ${dstpath}",
+    "ln -s  ${srcpath} ${dstpath}"
+  ]
+  exec_script("//gn/utils/shell.py", inputargs)
 }
