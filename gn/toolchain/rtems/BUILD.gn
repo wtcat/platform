@@ -6,7 +6,6 @@ import("//gn/toolchain/rtems/rtems.gni")
 # rtems_compile_options = [
 #   '--cflags',
 #   '--libs-only-other',
-#   '--variable=prefix',
 #   '--variable=RTEMS_ARCH',
 #   '--variable=RTEMS_BSP',
 #   '--variable=RTEMS_MAJOR'
@@ -15,10 +14,9 @@ pkgargs = ["--path", "${rtems_package_path}"]
 pkgresult = exec_script("//gn/toolchain/rtems/configure.py", pkgargs, "value")
 CC_FLAGS     = pkgresult[0]
 LD_FLAGS     = pkgresult[1]
-#INSTALL_PREFIX = pkgresult[0]
-target_cpu     = pkgresult[3]
-rtems_bsp      = pkgresult[4]
-RTEMS_MAJOR    = pkgresult[5]
+target_cpu   = pkgresult[2]
+rtems_bsp    = pkgresult[3]
+RTEMS_MAJOR  = pkgresult[4]
 
 toolchain_prefix = "${target_cpu}-rtems${RTEMS_MAJOR}-"
 

@@ -46,7 +46,6 @@ from optparse import OptionParser
 rtems_compile_options = [
   '--cflags',
   '--libs-only-other',
-  '--variable=prefix',
   '--variable=RTEMS_ARCH',
   '--variable=RTEMS_BSP',
   '--variable=RTEMS_MAJOR'
@@ -111,8 +110,7 @@ def main():
     flag_string[1].strip().split('\n')[0], 
     flag_string[2].strip().split('\n')[0], 
     flag_string[3].strip().split('\n')[0], 
-    flag_string[4].strip().split('\n')[0], 
-    flag_string[5].strip().split('\n')[0]])
+    flag_string[4].strip().split('\n')[0]])
     )
   return 0
 

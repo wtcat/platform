@@ -2,26 +2,6 @@
 import("//gn/toolchain/rtems/rtems.gni")
 import("//arch/common.gni")
 
-_tool_prefix = "arm-rtems${rtems_version}-"
-_build_dir = rebase_path("$root_build_dir")
-
-if (rtems_bsp == "") {
-  _target_path = "$target_cpu/$target_soc/$target_board"
-} else {
-  _target_path = "$target_cpu/$rtems_bsp"
-}
-
-#====================
-# Help information
-#====================
-group("help") {
-  metadata = {
-    content = [
-
-    ]
-  }
-}
-
 #====================
 # GDB debug
 #====================

@@ -71,8 +71,7 @@ set_defaults("source_set") {
 # Executable defaults.
 # =============================================================================
 default_executable_configs = default_compiler_configs
-default_executable_configs += ["//gn/config:default_libs",
-                               "//gn/config:executable_config"
+default_executable_configs += ["//gn/config:default_libs"
                              ]
 default_executable_configs += _linker_configs
 

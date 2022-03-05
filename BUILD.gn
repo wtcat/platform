@@ -21,10 +21,3 @@ executable("kernel") {
     "init.c"
   ]
 }
-
-# pkg_config("cpu_abi") {
-#   packages = [ "arm-rtems6-realview_pbx_a9_qemu" ]
-#   ignore_libs = true
-
-  
-# }
