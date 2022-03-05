@@ -1,4 +1,13 @@
-import("//gn/common.gni")
+
+declare_args() {
+    # Uboot load address
+    uboot_ldaddr = 0
+
+    # Uboot entry_address
+    # The entry_address is equal to load_address when 
+    # entry_address is -1.
+    uboot_enaddr = 0 
+}
 
 template("mkimage") {
     assert(defined(invoker.loadaddr), "Not found load address")

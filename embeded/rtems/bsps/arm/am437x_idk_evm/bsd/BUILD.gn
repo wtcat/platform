@@ -1,0 +1,22 @@
+import("//gn/toolchain/rtems/rtems.gni")
+import("//lib/featrues.gni")
+import("//arch/common.gni")
+
+#=========================
+# BSD Drivers
+#=========================
+component("drivers") {
+  sources = [
+    "ti_sdhci.c",
+    "ti_scm.c",
+    "cpsw/if_cpsw.c",
+  ]
+  include_dirs = [
+    "cpsw/",
+    ".",
+  ]
+  defines = [
+    "CONFIG_AM43XX"
+  ]
+}
+

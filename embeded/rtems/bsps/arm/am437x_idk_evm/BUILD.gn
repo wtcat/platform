@@ -1,0 +1,21 @@
+
+component("board") {
+  sources = [
+    "am43xx.c",
+    "clock.c",
+    "clock_am43xx.c"
+  ]
+  defines = [
+    "CONFIG_AM43XX"
+  ]
+  deps = [
+    "//embeded/rtems/bsps/arm/shared/lib"
+  ]
+  if (use_libbsd) {
+    deps += [
+      "bsd:drivers"
+    ]
+    defines += ["__rtems_libbsd__"]
+  }
+}
+

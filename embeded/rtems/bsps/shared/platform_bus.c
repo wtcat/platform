@@ -175,7 +175,7 @@ static int platform_bus_get_freq(struct drvmgr_dev *dev, int no,
 int platform_dev_register(struct drvmgr_bus *parent,
 	const struct bus_resource *r) {
 	struct drvmgr_dev *dev;
-	int nr = platform_irq_count_get(r->keys);
+	int nr = platform_irq_count_get((struct drvmgr_key *)r->keys);
 	drvmgr_alloc_dev(&dev, sizeof(struct dev_private) + nr * sizeof(short));
 	struct dev_private *priv = (struct dev_private *)(dev + 1);
 	if (platform_reg_resource_get((struct drvmgr_key *)r->keys, 0, &priv->base)) {
@@ -269,7 +269,7 @@ static int platform_bus_init(struct drvmgr_dev *dev) {
 		DRVMGR_BUS_TYPE_PLATFORM);
 }
 
-static struct drvmgr_drv_ops platform_driver_ops {
+static struct drvmgr_drv_ops platform_driver_ops = {
 	.init = {
 		platform_bus_init,
 		},
@@ -294,4 +294,3 @@ RTEMS_SYSINIT_ITEM(platform_bus_driver_register,
 	RTEMS_SYSINIT_BSP_PRE_DRIVERS,
 	RTEMS_SYSINIT_ORDER_MIDDLE
 );
-

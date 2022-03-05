@@ -10,7 +10,6 @@ declare_args() {
 
 declare_args () {
   custom_toolchain = ""
-  toolchain_prefix = ""
   
   # 
   # Compiler options

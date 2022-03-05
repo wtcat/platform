@@ -131,12 +131,14 @@ static inline int platform_bus_populate(struct drvmgr_bus *bus) {
 
 static inline int device_reg_get(struct dev_private *priv, int index, 
 	unsigned int *reg) {
-	return platform_reg_resource_get(priv->res->keys, index, reg);
+	return platform_reg_resource_get(
+		(struct drvmgr_key *)priv->res->keys, index, reg);
 }
 
 static inline int device_irq_get(struct dev_private *priv, int index, 
 	unsigned int *oirq) {
-	return platform_irq_resource_get(priv->res->keys, index, oirq);
+	return platform_irq_resource_get(
+		(struct drvmgr_key *)priv->res->keys, index, oirq);
 }
 
 

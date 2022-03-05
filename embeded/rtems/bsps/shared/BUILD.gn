@@ -1,0 +1,5 @@
+component("shared") {
+    sources = [
+        "platform_bus.c"
+    ]
+}

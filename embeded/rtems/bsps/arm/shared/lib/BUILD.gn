@@ -1,0 +1,28 @@
+
+#============================
+# Optimized library function
+#============================
+component("libc") {
+  sources = [
+    "memcpy.S",
+    "memset.S",
+    "strchr.S",
+    "strrchr.S",
+    "changebit.S",
+    "clearbit.S",
+    "setbit.S",
+  ]
+  defines = [
+    "CONFIG_SYS_THUMB_BUILD=1",
+    "CONFIG_THUMB2_KERNEL=1",
+    "CONFIG_ARM_ASM_UNIFIED=1",
+    "__ASSEMBLY__",
+  ]
+  asmflags = [
+    "-Wa,-mimplicit-it=always",
+    "-mthumb-interwork"
+  ]
+  include_dirs = ["."]
+}
+
+

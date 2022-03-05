@@ -1,23 +1,7 @@
-import("//gn/common.gni")
-import("//gn/utils/pkg_config.gni")
 
 # Top-level project target
 group("project") {
   deps = [
- #   "//arch:preprocess",
-    ":kernel"
-  ]
-  if (use_bin) {
-    deps += ["//arch:binary"]
-  }
-  if (use_uboot) {
-    deps += ["//arch:image"]
-  }
-}
-
-# Generate executable target
-executable("kernel") {
-  sources = [
-    "init.c"
+    "//embeded/${target_os}"
   ]
 }

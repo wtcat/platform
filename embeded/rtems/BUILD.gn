@@ -1,0 +1,26 @@
+import("//gn/common.gni")
+import("//gn/utils/objcopy.gni")
+import("//gn/utils/mkimage.gni")
+
+# Top-level project target
+group("all") {
+  deps = [
+    ":rtems"
+  ]
+  if (use_bin) {
+    deps += ["//gn/toolchain/rtems:binary"]
+  }
+  if (use_uboot) {
+    deps += ["//gn/toolchain/rtems:image"]
+  }
+}
+
+# Generate executable target
+executable("rtems") {
+  sources = [
+    "main.c"
+  ]
+  deps = [
+    "bsps/shared"
+  ]
+}

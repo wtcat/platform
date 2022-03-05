@@ -2,6 +2,7 @@
 
 import("//gn/toolchain/gcc_toolchain.gni")
 import("//gn/toolchain/rtems/rtems.gni")
+import("//gn/utils/objcopy.gni")
 
 # rtems_compile_options = [
 #   '--cflags',
@@ -48,7 +49,28 @@ gcc_toolchain("rtems") {
 }
 
 config("rtems_config") {
-    include_dirs = []
+    include_dirs = ["//embeded/${target_os}/include"]
     cflags = CC_FLAGS
     ldflags = CC_FLAGS
+}
+
+# Binary and uboot image generate
+if (use_bin) {
+  objcopy("binary") {
+    format = "binary"
+    toolchain_prefix = toolchain_prefix
+    input = "rtems"
+    deps = ["//embeded/rtems"]
+  }
+  if (use_uboot) {
+    mkimage("image") {
+      loadaddr = uboot_ldaddr
+      if (uboot_enaddr != -1) {
+        entryaddr = uboot_enaddr
+      }
+      comp = "none"
+      arch = target_cpu
+      deps = [":binary"]
+    }
+  }
 }

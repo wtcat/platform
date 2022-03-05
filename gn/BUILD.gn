@@ -4,8 +4,8 @@ import("//gn/common.gni")
 # User Compiler Options
 #========================
 config("cc_options") {
-  cflags = string_split(compiler_cflags)
-  cflags_c = string_split(compiler_cflags_c)
+  cflags    = string_split(compiler_cflags)
+  cflags_c  = string_split(compiler_cflags_c)
   cflags_cc = string_split(compiler_cflags_cc)
   cflags_cc += [ 
     "-fno-rtti",
