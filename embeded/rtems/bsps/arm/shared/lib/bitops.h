@@ -2,7 +2,7 @@
 #ifndef ASM_BITOPS_H_
 #define ASM_BITOPS_H_
 
-#include <asm/assembler.h>
+#include "asm/assembler.h"
 
 #if !defined(__rtems__)
 #include <asm/unwind.h>

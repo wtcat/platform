@@ -7,8 +7,8 @@
  *  Copyright:	MontaVista Software, Inc.
  */
 
-#include <linux/linkage.h>
-#include <asm/assembler.h>
+#include "linux/linkage.h"
+#include "asm/assembler.h"
 
 #define LDR1W_SHIFT	0
 #define STR1W_SHIFT	0

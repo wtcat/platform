@@ -26,6 +26,6 @@ declare_args() {
 }
 
 declare_args() {
-  # Auto generate
-  rtems_bsp = ""
+  target_board = ""
+  target_version = 5
 }

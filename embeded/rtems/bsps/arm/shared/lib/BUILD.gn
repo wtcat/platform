@@ -7,10 +7,7 @@ component("libc") {
     "memcpy.S",
     "memset.S",
     "strchr.S",
-    "strrchr.S",
-    "changebit.S",
-    "clearbit.S",
-    "setbit.S",
+    "strrchr.S"
   ]
   defines = [
     "CONFIG_SYS_THUMB_BUILD=1",

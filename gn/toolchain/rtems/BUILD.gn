@@ -2,24 +2,17 @@
 
 import("//gn/toolchain/gcc_toolchain.gni")
 import("//gn/toolchain/rtems/rtems.gni")
-import("//gn/utils/objcopy.gni")
 
 # rtems_compile_options = [
 #   '--cflags',
 #   '--libs-only-other',
-#   '--variable=RTEMS_ARCH',
-#   '--variable=RTEMS_BSP',
-#   '--variable=RTEMS_MAJOR'
 # ]
 pkgargs = ["--path", "${rtems_package_path}"]
 pkgresult = exec_script("//gn/toolchain/rtems/configure.py", pkgargs, "value")
-CC_FLAGS     = pkgresult[0]
-LD_FLAGS     = pkgresult[1]
-target_cpu   = pkgresult[2]
-rtems_bsp    = pkgresult[3]
-RTEMS_MAJOR  = pkgresult[4]
+CC_FLAGS  = pkgresult[0]
+LD_FLAGS  = pkgresult[1]
 
-toolchain_prefix = "${target_cpu}-rtems${RTEMS_MAJOR}-"
+toolchain_prefix = "${target_cpu}-rtems${target_version}-"
 
 gcc_toolchain("rtems") {
   spec_flags = "${LD_FLAGS}"
@@ -52,37 +45,5 @@ config("rtems_config") {
     include_dirs = ["//embeded/rtems/include"]
     cflags = CC_FLAGS
     ldflags = CC_FLAGS
-}
-
-# Binary and uboot image generate
-if (use_bin) {
-  objcopy("binary") {
-    format = "binary"
-    toolchain_prefix = toolchain_prefix
-    input = "rtems"
-    deps = ["//embeded/rtems"]
-  }
-  if (use_uboot) {
-    mkimage("image") {
-      loadaddr = uboot_ldaddr
-      if (uboot_enaddr != -1) {
-        entryaddr = uboot_enaddr
-      }
-      comp = "none"
-      arch = target_cpu
-      deps = [":binary"]
-    }
-  }
-}
-
-# Build pre-precess action
-group("preprocess") {
-  basepath = rebase_path("//embeded/rtems")
-  srcpath = "${basepath}/bsps/${target_cpu}/${rtems_bsp}/include/asm"
-  dstpath = "${basepath}/include/asm"
-  inputargs = [
-    "rm -rf ${dstpath}",
-    "ln -s  ${srcpath} ${dstpath}"
-  ]
-  exec_script("//gn/utils/shell.py", inputargs)
+    asmflags = CC_FLAGS
 }

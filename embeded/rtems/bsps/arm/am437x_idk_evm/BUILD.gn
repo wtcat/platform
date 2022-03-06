@@ -1,15 +1,19 @@
+import("//gn/toolchain/rtems/rtems.gni")
 
 component("board") {
+  include_dirs = [
+    "include"
+  ]
   sources = [
     "am43xx.c",
-    "clock.c",
-    "clock_am43xx.c"
+    # "clock.c",
+    # "clock_am43xx.c"
   ]
   defines = [
     "CONFIG_AM43XX"
   ]
   deps = [
-    "//embeded/rtems/bsps/arm/shared/lib"
+    "//embeded/rtems/bsps/arm/shared/lib:libc"
   ]
   if (use_libbsd) {
     deps += [

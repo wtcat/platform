@@ -45,10 +45,10 @@ from optparse import OptionParser
 
 rtems_compile_options = [
   '--cflags',
-  '--libs-only-other',
-  '--variable=RTEMS_ARCH',
-  '--variable=RTEMS_BSP',
-  '--variable=RTEMS_MAJOR'
+  '--libs-only-other'
+  # '--variable=RTEMS_ARCH',
+  # '--variable=RTEMS_BSP',
+  # '--variable=RTEMS_MAJOR'
 ]
 
 def find_package_name(path):
@@ -107,10 +107,7 @@ def main():
   # JSON formatter prints GN compatible lists when everything is a list of
   # strings.
   print(json.dumps([flag_string[0].strip().split(' '), 
-    flag_string[1].strip().split('\n')[0], 
-    flag_string[2].strip().split('\n')[0], 
-    flag_string[3].strip().split('\n')[0], 
-    flag_string[4].strip().split('\n')[0]])
+    flag_string[1].strip().split('\n')[0]])
     )
   return 0
 

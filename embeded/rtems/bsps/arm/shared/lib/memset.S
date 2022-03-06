@@ -6,8 +6,8 @@
  *
  *  ASM optimised string functions
  */
-#include <linux/linkage.h>
-#include <asm/assembler.h>
+#include "linux/linkage.h"
+#include "asm/assembler.h"
 
 	.text
 	.align	5

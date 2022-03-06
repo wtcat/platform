@@ -1,15 +1,18 @@
+import("//gn/toolchain/rtems/rtems.gni")
 import("//gn/common.gni")
 import("//gn/utils/objcopy.gni")
 import("//gn/utils/mkimage.gni")
+
+toolchain_prefix = "${target_cpu}-rtems${target_version}-"
 
 # Top-level project target
 group("all") {
   deps = [":rtems"]
   if (use_bin) {
-    deps += ["//gn/toolchain/rtems:binary"]
+    deps += [":binary"]
   }
   if (use_uboot) {
-    deps += ["//gn/toolchain/rtems:image"]
+    deps += [":image"]
   }
 }
 
@@ -19,7 +22,41 @@ executable("rtems") {
     "main.c"
   ]
   deps = [
-    "//gn/toolchain/rtems:preprocess",
-    "//embeded/rtems/bsps/shared"
+    ":preprocess",
+    "bsps/shared",
+    "bsps/${target_cpu}/${target_board}:board"
   ]
+}
+
+# Binary and uboot image generate
+if (use_bin) {
+  objcopy("binary") {
+    format = "binary"
+    toolchain_prefix = toolchain_prefix
+    input = "rtems"
+    deps = [":rtems"]
+  }
+  if (use_uboot) {
+    mkimage("image") {
+      loadaddr = uboot_ldaddr
+      if (uboot_enaddr != -1) {
+        entryaddr = uboot_enaddr
+      }
+      comp = "none"
+      arch = target_cpu
+      deps = [":binary"]
+    }
+  }
+}
+
+# Build pre-precess action
+group("preprocess") {
+  basepath = rebase_path("//embeded/rtems")
+  srcpath = "${basepath}/bsps/${target_cpu}/${target_board}/include/asm"
+  dstpath = "${basepath}/include/bsp/asm"
+  inputargs = [
+    "rm -rf ${dstpath}",
+    "ln -s  ${srcpath} ${dstpath}"
+  ]
+  exec_script("//gn/utils/shell.py", inputargs)
 }
