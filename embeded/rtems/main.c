@@ -1,6 +1,20 @@
 #include <rtems.h>
 #include <rtems/bspIo.h>
 
+#include "bsp/platform_bus.h"
+
+PLATFORM_DRIVER(null_driver) = {
+    .drv = {
+        .obj_type = DRVMGR_OBJ_DRV,
+        .drv_id   = DRIVER_PLATFORM_ID,
+        .name     = "serial",
+        .bus_type = DRVMGR_BUS_TYPE_ROOT,
+        .ops      = NULL
+    },
+    .ids = NULL
+};
+
+
 static rtems_task Init(
   rtems_task_argument ignored
 )
