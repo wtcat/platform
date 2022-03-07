@@ -1,7 +1,12 @@
+#include <stdlib.h>
+
 #include <rtems/console.h>
 #include <rtems/termiostypes.h>
+#include <rtems/bspIo.h>
+#include <rtems/malloc.h>
 
 #include "bsp/platform_bus.h"
+#include "bsp/io.h"
 
 struct ns16550_info {
     uint32_t fifo_size;
@@ -124,6 +129,7 @@ struct ns16550_priv {
 #define SP_LSR_EFIFO  0x80
 
 static int _reg_shift;
+static struct drvmgr_dev *stdout_path;
 
 
 static inline int ns16550_tx_empty(struct ns16550_priv *platdata) {
@@ -137,18 +143,6 @@ static inline ssize_t ns16550_fifo_write(struct ns16550_priv *platdata,
     for (size_t i = 0; i < out; ++i)
         writeb(buf[i], platdata->port + NS16550_TRANSMIT_BUFFER);
     return out;
-}
-
-static int ns16550_putc_poll(struct udevice *dev, const char ch)
-{
-    struct ns16550_platdata *platdata = dev_get_plat(dev);
-    uint32_t status;
-
-    do {
-        status = readb(platdata->port + NS16550_LINE_STATUS);
-    } while (!(status & SP_LSR_THOLD));
-    writeb(ch, platdata->port + NS16550_TRANSMIT_BUFFER);
-    return 0;
 }
 
 static uint32_t ns16550_baud_divisor_get(struct ns16550_priv *platdata, 
@@ -224,8 +218,7 @@ static void ns16550_isr(void *arg) {
                 platdata->current = ns16550_fifo_write(platdata, platdata->buf, 
                     platdata->remaining);
             } else {
-                ret = rtems_termios_dequeue_characters(platdata->tty, 
-                    platdata->total);
+                rtems_termios_dequeue_characters(platdata->tty, platdata->total);
                 platdata->total = 0;
             }
         }
@@ -256,7 +249,7 @@ static bool ns16550_open(struct rtems_termios_tty *tty,
     struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
         struct ns16550_priv, base);
     platdata->tty = tty;
-    rtems_termios_set_initial_baud(tty, SERIAL_DEFAULT_BDR); // class default baudrate
+    rtems_termios_set_initial_baud(tty, NS16550_DEFAULT_BDR); // class default baudrate
     writeb(NS16550_ENABLE_ALL_INTR_EXCEPT_TX, 
     platdata->port + NS16550_INTERRUPT_ENABLE);
     return 0;
@@ -272,15 +265,16 @@ static void ns16550_close(struct rtems_termios_tty *tty,
 }
 
 static void ns16550_putc_poll(rtems_termios_device_context *base, 
-    char out) {
+    char ch) {
     struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
         struct ns16550_priv, base);
-    ns16550_txintr_disable(platdata, ops);
+    uint32_t status;
+    ns16550_txintr_disable(platdata);
     do {
         status = readb(platdata->port + NS16550_LINE_STATUS);
     } while (!(status & SP_LSR_THOLD));
     writeb(ch, platdata->port + NS16550_TRANSMIT_BUFFER);
-    ns16550_txintr_enable(platdata, ops);
+    ns16550_txintr_enable(platdata);
 }
 
 static void ns16550_flowctrl_starttx(rtems_termios_device_context *base) {
@@ -305,8 +299,8 @@ static void ns16550_flowctrl_stoptx(rtems_termios_device_context *base) {
 
 static bool ns16550_set_termios(rtems_termios_device_context *base, 
     const struct termios *t) {
-    struct ns16550_platdata *platdata = RTEMS_CONTAINER_OF(base, 
-        struct ns16550_platdata, base);
+    struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
+        struct ns16550_priv, base);
     uint32_t ulBaudDivisor;
     uint8_t ucLineControl;
     uint32_t baud_requested;
@@ -396,7 +390,7 @@ static void ns16550_xmit_start(rtems_termios_device_context *base,
     }
 }
 
-static const rtems_termios_device_flow ns16550_flowctrl_ops = {
+static const rtems_termios_device_flow ns16550_flowctrl_ops RTEMS_UNUSED = {
     .stop_remote_tx  = ns16550_flowctrl_stoptx,
     .start_remote_tx = ns16550_flowctrl_starttx
 };
@@ -409,34 +403,28 @@ static const rtems_termios_device_handler ns16550_ops = {
     .mode           = TERMIOS_IRQ_DRIVEN
 };
 
-static void ns16550_console_putc(char c) {
-    struct serial_class *platdata = 
-        dev_get_uclass_plat(serial_console);
-    ns16550_putc_poll(&platdata->base, c);
-}
-
 static int ns16550_serial_preprobe(struct drvmgr_dev *dev) {
-    struct ns16550_priv *priv;
+    struct ns16550_priv *platdata;
     struct dev_private *devp;
     rtems_status_code sc;
-    int ret = ;
 
-    priv = rtems_calloc(1, sizeof(struct ns16550_priv));
-    if (priv == NULL) 
+    platdata = rtems_calloc(1, sizeof(struct ns16550_priv));
+    if (platdata == NULL) 
         return -DRVMGR_NOMEM;
     devp = device_get_private(dev);
-    priv->port = devp->base;
+    platdata->port = devp->base;
     rtems_termios_device_context_initialize(&platdata->base, "UART");
     sc = rtems_termios_device_install(dev->name, &ns16550_ops, 
-        NULL, &priv->base);
+        NULL, &platdata->base);
     if (sc != RTEMS_SUCCESSFUL) {
-        printk("UART(%s) register failed: %s\n", name, 
+        printk("UART(%s) register failed: %s\n", dev->name, 
             rtems_status_text(sc));
-        ret = rtems_status_code_to_errno(sc);
-        free(priv);
-        return ret;
+        free(platdata);
+        return rtems_status_code_to_errno(sc);
     }
-    dev->priv = priv;
+    _reg_shift = 2;
+    platdata->clock = 48000000;
+    dev->priv = platdata;
     return 0;
 }
 
@@ -508,9 +496,18 @@ static int ns16550_serial_probe(struct drvmgr_dev *dev) {
     return 0;
 }
 
-static int ns16550_serial_post(struct drvmgr_dev *dev) {
+static void ns16550_console_putc(char c) {
+    if (stdout_path) {
+        struct ns16550_priv *platdata = stdout_path->priv;
+        ns16550_putc_poll(&platdata->base, c);
+    }
+}
 
-    BSP_output_char = ns16550_console_putc;
+static int ns16550_serial_post(struct drvmgr_dev *dev) {
+    if (devcie_has_property(dev, "stdout")) {
+        stdout_path = dev;
+        BSP_output_char = ns16550_console_putc;
+    }
     return 0;
 }
 
@@ -524,12 +521,13 @@ static const struct dev_id id_table[] = {
     {.compatible = "ti,am4372-uart", NULL},
     {.compatible = "ti,omap2-uart", NULL},
     {NULL, NULL}
-}
+};
 
 static struct drvmgr_drv_ops serial_driver_ops = {
 	.init = {
 		ns16550_serial_preprobe,
-        ns16550_serial_probe
+        ns16550_serial_probe,
+        ns16550_serial_post
 	},
 	.remove = ns16550_remove,
 };

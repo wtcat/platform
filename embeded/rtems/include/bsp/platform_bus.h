@@ -57,9 +57,7 @@ extern "C"{
 
 #define TEMPLATE_RESOURCES_REGISTER(_name, ...) \
 	static void platform_resource_##_name##_register(void) { \
-		static const void *_name[] = { \
-			__VA_ARGS__, {NULL} \
-		}; \
+		static const struct bus_resource *const _name[] = {__VA_ARGS__}; \
 		platform_res_register((const struct bus_resource *)_name); \
 	}	\
 	RTEMS_SYSINIT_ITEM(platform_resource_##_name##_register, \
@@ -107,9 +105,11 @@ struct dev_private {
 const struct bus_resource *platform_res_get(void);
 int platform_res_count_get(struct drvmgr_key *keys, 
 	const char *name, size_t len);
-int __platform_reg_resource_get(struct drvmgr_key *keys, int index,
+void *platform_resource_get(struct drvmgr_key *keys, enum drvmgr_kt key_type, 
+	const char *fmt, ...);
+int platform_reg_resource_get(struct drvmgr_key *keys, int index,
 	unsigned int *reg);
-int __platform_irq_resource_get(struct drvmgr_key *keys, int index,
+int platform_irq_resource_get(struct drvmgr_key *keys, int index,
 	unsigned int *oirq);
 int platform_res_register(const struct bus_resource *r);
 int platform_dev_register(struct drvmgr_bus *parent,
@@ -139,18 +139,24 @@ static inline int platform_bus_populate(struct drvmgr_bus *bus) {
 	return platform_dev_populate_on_bus(bus, platform_res_get());
 }
 
-static inline int platform_reg_resource_get(struct drvmgr_dev *dev,
+static inline int platform_reg_get(struct drvmgr_dev *dev,
 	int index, unsigned int *reg) {
 	struct dev_private *priv = device_get_private(dev);
-	return __platform_reg_resource_get((struct drvmgr_key *)priv->res->keys, 
+	return platform_reg_resource_get((struct drvmgr_key *)priv->res->keys, 
 		index, reg);
 }
 	
-static inline int platform_irq_resource_get(struct drvmgr_dev *dev,
+static inline int platform_irq_get(struct drvmgr_dev *dev,
 	int index, unsigned int *oirq) {
 	struct dev_private *priv = device_get_private(dev);
-	return __platform_irq_resource_get((struct drvmgr_key *)priv->res->keys, 
+	return platform_irq_resource_get((struct drvmgr_key *)priv->res->keys, 
 		index, oirq);
+}
+
+static inline bool devcie_has_property(struct drvmgr_dev *dev, const char *prop) {
+	struct dev_private *priv = device_get_private(dev);
+	return drvmgr_key_val_get((struct drvmgr_key *)priv->res->keys, 
+		(char *)prop, DRVMGR_KT_ANY) != NULL;
 }
 
 #define platform_driver_init(drv) \

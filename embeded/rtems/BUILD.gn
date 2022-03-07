@@ -42,6 +42,7 @@ if (use_bin) {
       if (uboot_enaddr != -1) {
         entryaddr = uboot_enaddr
       }
+      input = "rtems"
       comp = "none"
       arch = target_cpu
       deps = [":binary"]

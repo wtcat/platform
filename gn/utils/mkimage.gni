@@ -6,11 +6,12 @@ declare_args() {
     # Uboot entry_address
     # The entry_address is equal to load_address when 
     # entry_address is -1.
-    uboot_enaddr = 0 
+    uboot_enaddr = -1 
 }
 
 template("mkimage") {
-    assert(defined(invoker.loadaddr), "Not found load address")
+    assert(defined(invoker.loadaddr), "Not defined load address")
+    assert(defined(invoker.input), "Not defined input file")
     loadaddr = invoker.loadaddr
     if (defined(invoker.arch)) {
         arch = invoker.arch
@@ -32,10 +33,11 @@ template("mkimage") {
     } else {
         entryaddr = loadaddr
     }
+    input = invoker.input
     action(target_name) {
         script = "//gn/utils/mkimage.py"
-        sources = ["${root_out_dir}/kernel.bin"]
-        outputs = ["${root_out_dir}/kernel.img"]
+        sources = ["${root_out_dir}/${input}.bin"]
+        outputs = ["${root_out_dir}/${input}.img"]
         args = [
             "--arch", "${arch}",
             "--os", "${os}",
@@ -44,7 +46,7 @@ template("mkimage") {
             "--loadaddr", "${loadaddr}",
             "--entryaddr", "${entryaddr}",
             "--name", "${os}",
-            "--binfile", rebase_path("${root_out_dir}/kernel.bin")
+            "--binfile", rebase_path("${root_out_dir}/${input}.bin")
         ]
         deps = invoker.deps
     }

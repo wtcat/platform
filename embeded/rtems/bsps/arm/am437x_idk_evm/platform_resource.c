@@ -29,4 +29,5 @@ TEMPLATE_RESOURCE(uart4, "ti,am4372-uart", "uart5", DRVMGR_BUS_TYPE_PLATFORM,
 
 TEMPLATE_RESOURCES_REGISTER(platform_resources,
     RN(uart0), RN(uart1), RN(uart2), RN(uart3), RN(uart4), 
+	NULL
 );

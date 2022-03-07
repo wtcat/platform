@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include <rtems/sysinit.h>
 #include <rtems/bspIo.h>
@@ -44,19 +45,20 @@ int platform_res_count_get(struct drvmgr_key *keys,
 	return count;
 }
 
-union drvmgr_key_value *v __platform_resource_get(
-	struct drvmgr_key *keys, enum drvmgr_kt key_type,
-	const char *nm, int index) {
+void *platform_resource_get(struct drvmgr_key *keys, enum drvmgr_kt key_type, 
+	const char *fmt, ...) {
 	char name[RES_NAME_SIZE];
-	struct drvmgr_key *key_match;
-	snprintf(name, RES_NAME_SIZE-1, "%s%d", nm, index);
+	va_list ap;
+	va_start(ap, fmt) ;
+	vsnprintf(name, RES_NAME_SIZE-1, fmt, ap);
+	va_end(ap);
 	return drvmgr_key_val_get(keys, name, key_type);
 }
 
-int __platform_reg_resource_get(struct drvmgr_key *keys, int index,
+int platform_reg_resource_get(struct drvmgr_key *keys, int index,
 	unsigned int *reg) {
-	union drvmgr_key_value *v;
-	v = __platform_resource_get(keys, DRVMGR_KT_INT, "REG", 0);
+	union drvmgr_key_value *v = platform_resource_get(keys, 
+		DRVMGR_KT_INT, "REG%d", index);
 	if (!v) {
 		if (index == 0) {
 			v = drvmgr_key_val_get(keys, "REG", DRVMGR_KT_INT);
@@ -69,10 +71,10 @@ int __platform_reg_resource_get(struct drvmgr_key *keys, int index,
 	return 0;
 }
 
-int __platform_irq_resource_get(struct drvmgr_key *keys, int index,
+int platform_irq_resource_get(struct drvmgr_key *keys, int index,
 	unsigned int *oirq) {
-	union drvmgr_key_value *v;
-	v = __platform_resource_get(keys, DRVMGR_KT_INT, "IRQ", 0);
+	union drvmgr_key_value *v = platform_resource_get(keys, 
+		DRVMGR_KT_INT, "IRQ%d", index);
 	if (!v) {
 		if (index == 0) {
 			v = drvmgr_key_val_get(keys, "IRQ", DRVMGR_KT_INT);
@@ -181,7 +183,7 @@ int platform_dev_register(struct drvmgr_bus *parent,
 	int nr = platform_irq_count_get((struct drvmgr_key *)r->keys);
 	drvmgr_alloc_dev(&dev, sizeof(struct dev_private) + nr * sizeof(short));
 	struct dev_private *priv = device_get_private(dev);
-	if (__platform_reg_resource_get((struct drvmgr_key *)r->keys, 0, &priv->base)) {
+	if (platform_reg_resource_get((struct drvmgr_key *)r->keys, 0, &priv->base)) {
 		printk(DRVMGR_WARN "%s not found \"REG(0)\" resource(%s)\n", 
 			r->name?: r->compatible);
 		free(dev);
@@ -189,7 +191,7 @@ int platform_dev_register(struct drvmgr_bus *parent,
 	}
 	for (int i = 0; i < nr; i++) {
 		unsigned int irqno;
-		if (__platform_irq_resource_get((struct drvmgr_key *)r->keys, i, &irqno)) {
+		if (platform_irq_resource_get((struct drvmgr_key *)r->keys, i, &irqno)) {
 			printk(DRVMGR_WARN "%s not found \"IRQ%d\" resource(%s)\n", 
 				r->name?: r->compatible, i);
 			free(dev);
