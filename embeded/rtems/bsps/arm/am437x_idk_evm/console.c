@@ -10,7 +10,7 @@ struct ns16550_info {
 };
 
 struct ns16550_priv {
-   rtems_termios_device_context base;
+    rtems_termios_device_context base;
     rtems_termios_tty *tty;
     struct drvmgr_dev *dev;
     const char *buf;
@@ -131,86 +131,12 @@ static inline int ns16550_tx_empty(struct ns16550_priv *platdata) {
     return status & SP_LSR_THOLD;
 }
 
-static ssize_t ns16550_fifo_write(struct ns16550_priv *platdata, 
+static inline ssize_t ns16550_fifo_write(struct ns16550_priv *platdata, 
     const char *buf, size_t size) {
     size_t out = size > SP_FIFO_SIZE? SP_FIFO_SIZE: size;
     for (size_t i = 0; i < out; ++i)
         writeb(buf[i], platdata->port + NS16550_TRANSMIT_BUFFER);
     return out;
-}
-
-static int ns16550_set_termios(struct udevice *dev, const struct termios *t)
-{
-    struct ns16550_platdata *platdata = dev_get_plat(dev);
-    uint32_t ulBaudDivisor;
-    uint8_t ucLineControl;
-    uint32_t baud_requested;
-
-    /*
-    *  Calculate the baud rate divisor
-    *  Assert ensures there is no division by 0.
-    */
-    baud_requested = rtems_termios_baud_to_number(t->c_ospeed);
-    _Assert( baud_requested != 0 );
-    ulBaudDivisor = ns16550_baud_divisor_get(platdata, baud_requested);
-    ucLineControl = 0;
-
-    /* Parity */
-    if (t->c_cflag & PARENB) {
-        ucLineControl |= SP_LINE_PAR;
-        if (!(t->c_cflag & PARODD))
-            ucLineControl |= SP_LINE_ODD;
-    }
-    /*  Character Size */
-    if (t->c_cflag & CSIZE) {
-        switch (t->c_cflag & CSIZE) {
-        case CS5:
-            ucLineControl |= FIVE_BITS;
-            break;
-        case CS6:
-            ucLineControl |= SIX_BITS;
-            break;
-        case CS7:
-            ucLineControl |= SEVEN_BITS;
-            break;
-        case CS8:
-            ucLineControl |= EIGHT_BITS;
-            break;
-        }
-    } else {
-        ucLineControl |= EIGHT_BITS;
-    }
-
-    /* Stop Bits */
-    if (t->c_cflag & CSTOPB) 
-        ucLineControl |= SP_LINE_STOP; /* 2 stop bits */
-
-    /* Now actually set the chip */
-    if (ulBaudDivisor != platdata->baud_divisor || ucLineControl != platdata->line_control) {
-        platdata->baud_divisor = ulBaudDivisor;
-        platdata->line_control = ucLineControl;
-
-        /*
-        *  Set the baud rate
-        *
-        *  NOTE: When the Divisor Latch Access Bit (DLAB) is set to 1,
-        *        the transmit buffer and interrupt enable registers
-        *        turn into the LSB and MSB divisor latch registers.
-        */
-        writeb(SP_LINE_DLAB, platdata->port + NS16550_LINE_CONTROL);
-        writeb(ulBaudDivisor & 0xff, platdata->port + NS16550_DIVISOR_LATCH_L);
-        writeb((ulBaudDivisor >> 8) & 0xff, platdata->port + NS16550_DIVISOR_LATCH_M);
-
-        /* Now write the line control */
-        if (platdata->has_precision_clock_synthesizer) {
-            writeb((uint8_t)(ulBaudDivisor >> 24), platdata->port + NS16550_SCRATCH_PAD);
-            writeb(ucLineControl, platdata->port + NS16550_LINE_CONTROL);
-            writeb((uint8_t)(ulBaudDivisor >> 16), platdata->port + NS16550_SCRATCH_PAD);
-        } else {
-            writeb(ucLineControl, platdata->port + NS16550_LINE_CONTROL);
-        }
-    }
-    return 0;
 }
 
 static int ns16550_putc_poll(struct udevice *dev, const char ch)
@@ -224,9 +150,6 @@ static int ns16550_putc_poll(struct udevice *dev, const char ch)
     writeb(ch, platdata->port + NS16550_TRANSMIT_BUFFER);
     return 0;
 }
-
-
-
 
 static uint32_t ns16550_baud_divisor_get(struct ns16550_priv *platdata, 
     uint32_t baud) {
@@ -309,7 +232,7 @@ static void ns16550_isr(void *arg) {
     } while (!(readb(platdata->port + NS16550_INTERRUPT_ID) & SP_IID_0));
 }
 
-static void serial_class_txintr_enable(struct ns16550_priv *platdata) {
+static void ns16550_txintr_enable(struct ns16550_priv *platdata) {
     rtems_interrupt_lock_context ctx;
     rtems_termios_device_lock_acquire(&platdata->base, &ctx);
     writeb(SP_INT_TX_ENABLE, platdata->port + NS16550_INTERRUPT_ENABLE);
@@ -317,7 +240,7 @@ static void serial_class_txintr_enable(struct ns16550_priv *platdata) {
     rtems_termios_device_lock_release(&platdata->base, &ctx);
 }
 
-static void serial_class_txintr_disable(struct ns16550_priv *platdata) {
+static void ns16550_txintr_disable(struct ns16550_priv *platdata) {
     rtems_interrupt_lock_context ctx;
     rtems_termios_device_lock_acquire(&platdata->base, &ctx);
     writeb(NS16550_ENABLE_ALL_INTR_EXCEPT_TX, 
@@ -326,7 +249,7 @@ static void serial_class_txintr_disable(struct ns16550_priv *platdata) {
     rtems_termios_device_lock_release(&platdata->base, &ctx);
 }
 
-static bool serial_class_open(struct rtems_termios_tty *tty,
+static bool ns16550_open(struct rtems_termios_tty *tty,
     rtems_termios_device_context *base,
     struct termios *term,
     rtems_libio_open_close_args_t *args) {
@@ -334,104 +257,165 @@ static bool serial_class_open(struct rtems_termios_tty *tty,
         struct ns16550_priv, base);
     platdata->tty = tty;
     rtems_termios_set_initial_baud(tty, SERIAL_DEFAULT_BDR); // class default baudrate
-   writeb(NS16550_ENABLE_ALL_INTR_EXCEPT_TX, 
-        platdata->port + NS16550_INTERRUPT_ENABLE);
+    writeb(NS16550_ENABLE_ALL_INTR_EXCEPT_TX, 
+    platdata->port + NS16550_INTERRUPT_ENABLE);
     return 0;
 }
 
-static void serial_class_close(struct rtems_termios_tty *tty,
-                            rtems_termios_device_context *base,
-                            rtems_libio_open_close_args_t *args
-)
-{
-    struct serial_class *platdata = container_of(base, 
-        struct serial_class, base);
-    const struct dm_serial_ops *ops = serial_get_ops(platdata->dev);
-
-    ops->release(platdata->dev);
+static void ns16550_close(struct rtems_termios_tty *tty,
+    rtems_termios_device_context *base,
+    rtems_libio_open_close_args_t *args) {
+    struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
+        struct ns16550_priv, base);
+    writeb(NS16550_DISABLE_ALL_INTR, 
+        platdata->port + NS16550_INTERRUPT_ENABLE);
 }
 
-static void serial_class_putc_poll(rtems_termios_device_context *base, 
-    char out)
-{
-    struct serial_class *platdata = container_of(base, 
-        struct serial_class, base);
-    const struct dm_serial_ops *ops = serial_get_ops(platdata->dev);
-    bool enabled;
-
-    enabled = serial_class_txintr_disable(platdata, ops);
-    ops->putc_poll(platdata->dev, out);
-     if (enabled)
-        serial_class_txintr_enable(platdata, ops);
+static void ns16550_putc_poll(rtems_termios_device_context *base, 
+    char out) {
+    struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
+        struct ns16550_priv, base);
+    ns16550_txintr_disable(platdata, ops);
+    do {
+        status = readb(platdata->port + NS16550_LINE_STATUS);
+    } while (!(status & SP_LSR_THOLD));
+    writeb(ch, platdata->port + NS16550_TRANSMIT_BUFFER);
+    ns16550_txintr_enable(platdata, ops);
 }
 
-static void serial_class_flowctrl_starttx(rtems_termios_device_context *base)
-{
-    struct serial_class *platdata = container_of(base, struct serial_class, base);
-    const struct dm_serial_ops *ops = serial_get_ops(platdata->dev);
+static void ns16550_flowctrl_starttx(rtems_termios_device_context *base) {
+    struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
+        struct ns16550_priv, base);
     rtems_interrupt_lock_context ctx;
-
     rtems_termios_device_lock_acquire(base, &ctx);
-    ops->set_mctrl(platdata->dev, TIOCM_RTS);
+    platdata->modem_control |= SP_MODEM_DTR;
+    writeb(platdata->modem_control, platdata->port + NS16550_MODEM_CONTROL);
     rtems_termios_device_lock_release(base, &ctx);
 }
 
-static void serial_class_flowctrl_stoptx(rtems_termios_device_context *base)
-{
-    struct serial_class *platdata = container_of(base, struct serial_class, base);
-    const struct dm_serial_ops *ops = serial_get_ops(platdata->dev);
+static void ns16550_flowctrl_stoptx(rtems_termios_device_context *base) {
+    struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
+        struct ns16550_priv, base);
     rtems_interrupt_lock_context ctx;
-
     rtems_termios_device_lock_acquire(base, &ctx);
-    ops->set_mctrl(platdata->dev, 0);
+    platdata->modem_control &= ~SP_MODEM_DTR;
+    writeb(platdata->modem_control, platdata->port + NS16550_MODEM_CONTROL);
     rtems_termios_device_lock_release(base, &ctx);
 }
 
-static bool serial_class_termios_set(rtems_termios_device_context *base,
-    const struct termios *t)
-{
-    struct serial_class *platdata = container_of(base, struct serial_class, base);
-    struct dm_serial_ops *ops = serial_get_ops(platdata->dev);
-    rtems_interrupt_lock_context ctx;
-    int ret;
+static bool ns16550_set_termios(rtems_termios_device_context *base, 
+    const struct termios *t) {
+    struct ns16550_platdata *platdata = RTEMS_CONTAINER_OF(base, 
+        struct ns16550_platdata, base);
+    uint32_t ulBaudDivisor;
+    uint8_t ucLineControl;
+    uint32_t baud_requested;
 
-    rtems_termios_device_lock_acquire(base, &ctx);
-    ret = ops->set_termios(platdata->dev, t);
-    rtems_termios_device_lock_release(base, &ctx);
-    return !ret;
+    /*
+    *  Calculate the baud rate divisor
+    *  Assert ensures there is no division by 0.
+    */
+    baud_requested = rtems_termios_baud_to_number(t->c_ospeed);
+    _Assert( baud_requested != 0 );
+    ulBaudDivisor = ns16550_baud_divisor_get(platdata, baud_requested);
+    ucLineControl = 0;
+
+    /* Parity */
+    if (t->c_cflag & PARENB) {
+        ucLineControl |= SP_LINE_PAR;
+        if (!(t->c_cflag & PARODD))
+            ucLineControl |= SP_LINE_ODD;
+    }
+    /*  Character Size */
+    if (t->c_cflag & CSIZE) {
+        switch (t->c_cflag & CSIZE) {
+        case CS5:
+            ucLineControl |= FIVE_BITS;
+            break;
+        case CS6:
+            ucLineControl |= SIX_BITS;
+            break;
+        case CS7:
+            ucLineControl |= SEVEN_BITS;
+            break;
+        case CS8:
+            ucLineControl |= EIGHT_BITS;
+            break;
+        }
+    } else {
+        ucLineControl |= EIGHT_BITS;
+    }
+
+    /* Stop Bits */
+    if (t->c_cflag & CSTOPB) 
+        ucLineControl |= SP_LINE_STOP; /* 2 stop bits */
+
+    /* Now actually set the chip */
+    if (ulBaudDivisor != platdata->baud_divisor || ucLineControl != platdata->line_control) {
+        platdata->baud_divisor = ulBaudDivisor;
+        platdata->line_control = ucLineControl;
+
+        /*
+        *  Set the baud rate
+        *
+        *  NOTE: When the Divisor Latch Access Bit (DLAB) is set to 1,
+        *        the transmit buffer and interrupt enable registers
+        *        turn into the LSB and MSB divisor latch registers.
+        */
+        rtems_interrupt_lock_context ctx;
+        rtems_termios_device_lock_acquire(base, &ctx);
+        writeb(SP_LINE_DLAB, platdata->port + NS16550_LINE_CONTROL);
+        writeb(ulBaudDivisor & 0xff, platdata->port + NS16550_DIVISOR_LATCH_L);
+        writeb((ulBaudDivisor >> 8) & 0xff, platdata->port + NS16550_DIVISOR_LATCH_M);
+
+        /* Now write the line control */
+        if (platdata->has_precision_clock_synthesizer) {
+            writeb((uint8_t)(ulBaudDivisor >> 24), platdata->port + NS16550_SCRATCH_PAD);
+            writeb(ucLineControl, platdata->port + NS16550_LINE_CONTROL);
+            writeb((uint8_t)(ulBaudDivisor >> 16), platdata->port + NS16550_SCRATCH_PAD);
+        } else {
+            writeb(ucLineControl, platdata->port + NS16550_LINE_CONTROL);
+        }
+        rtems_termios_device_lock_release(base, &ctx);
+    }
+    return true;
 }
 
-static void serial_class_xmit_start(rtems_termios_device_context *base,
-    const char *buf, size_t len)
-{
-    struct serial_class *platdata = container_of(base, struct serial_class, base);
-    const struct dm_serial_ops *ops = serial_get_ops(platdata->dev);
-
+static void ns16550_xmit_start(rtems_termios_device_context *base,
+    const char *buf, size_t len) {
+    struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
+        struct ns16550_priv, base);
     platdata->total = len;
     if (len > 0) {
         platdata->remaining = len;
         platdata->buf = buf;
-        platdata->current = ops->fill_fifo(platdata->dev, buf, len);
-        serial_class_txintr_enable(platdata, ops);
+        platdata->current = ns16550_fifo_write(platdata, buf, len);
+        ns16550_txintr_enable(platdata);
     } else {
-        serial_class_txintr_disable(platdata, ops);
+        ns16550_txintr_disable(platdata);
     }
 }
 
-static const rtems_termios_device_flow serial_flowctrl_ops = {
-    .stop_remote_tx  = serial_class_flowctrl_stoptx,
-    .start_remote_tx = serial_class_flowctrl_starttx
+static const rtems_termios_device_flow ns16550_flowctrl_ops = {
+    .stop_remote_tx  = ns16550_flowctrl_stoptx,
+    .start_remote_tx = ns16550_flowctrl_starttx
 };
 
-static const rtems_termios_device_handler serial_termios_ops = {
-    .first_open     = serial_class_open,
-    .last_close     = serial_class_close,
-    .write          = serial_class_xmit_start,
-    .set_attributes = serial_class_termios_set,
+static const rtems_termios_device_handler ns16550_ops = {
+    .first_open     = ns16550_open,
+    .last_close     = ns16550_close,
+    .write          = ns16550_xmit_start,
+    .set_attributes = ns16550_set_termios,
     .mode           = TERMIOS_IRQ_DRIVEN
 };
 
-static int ns16550_serial_probe(struct drvmgr_dev *dev) {
+static void ns16550_console_putc(char c) {
+    struct serial_class *platdata = 
+        dev_get_uclass_plat(serial_console);
+    ns16550_putc_poll(&platdata->base, c);
+}
+
+static int ns16550_serial_preprobe(struct drvmgr_dev *dev) {
     struct ns16550_priv *priv;
     struct dev_private *devp;
     rtems_status_code sc;
@@ -442,31 +426,112 @@ static int ns16550_serial_probe(struct drvmgr_dev *dev) {
         return -DRVMGR_NOMEM;
     devp = device_get_private(dev);
     priv->port = devp->base;
-    dev->priv = priv;
     rtems_termios_device_context_initialize(&platdata->base, "UART");
-    sc = rtems_termios_device_install(dev->name, &serial_termios_ops, 
-        fops, &priv->base);
+    sc = rtems_termios_device_install(dev->name, &ns16550_ops, 
+        NULL, &priv->base);
     if (sc != RTEMS_SUCCESSFUL) {
         printk("UART(%s) register failed: %s\n", name, 
             rtems_status_text(sc));
         ret = rtems_status_code_to_errno(sc);
-        goto _free;
+        free(priv);
+        return ret;
+    }
+    dev->priv = priv;
+    return 0;
+}
+
+static int ns16550_serial_probe(struct drvmgr_dev *dev) {
+    struct ns16550_priv *platdata = dev->priv;
+    uint8_t  ucDataByte;
+    uint32_t ulBaudDivisor;
+    int ret;
+    
+    platdata->modem_control = SP_MODEM_IRQ;
+
+    /* Clear the divisor latch, clear all interrupt enables,
+    * and reset and
+    * disable the FIFO's.
+    */
+    writeb(0, platdata->port + NS16550_LINE_CONTROL);
+    writeb(NS16550_DISABLE_ALL_INTR, platdata->port + NS16550_INTERRUPT_ENABLE);
+
+    /* Set the divisor latch and set the baud rate. */
+    ulBaudDivisor = ns16550_baud_divisor_get(platdata, NS16550_DEFAULT_BDR);
+    platdata->baud_divisor = ulBaudDivisor;
+    ucDataByte = SP_LINE_DLAB;
+    writeb(ucDataByte, platdata->port + NS16550_LINE_CONTROL);
+
+    /* XXX */
+    writeb((uint8_t)(ulBaudDivisor & 0xffU), platdata->port + NS16550_DIVISOR_LATCH_L);
+    writeb((uint8_t)( ulBaudDivisor >> 8 ) & 0xffU, platdata->port + NS16550_DIVISOR_LATCH_M);
+
+    /* Clear the divisor latch and set the character size to eight bits */
+    /* with one stop bit and no parity checking. */
+    ucDataByte = EIGHT_BITS;
+    platdata->line_control = ucDataByte;
+    if (platdata->has_precision_clock_synthesizer) {
+        uint8_t fcr;
+
+        /*
+        * Enable precision clock synthesizer.  This must be done with DLAB == 1 in
+        * the line control register.
+        */
+        fcr = readb(platdata->port + NS16550_FIFO_CONTROL);
+        fcr |= 0x10;
+        writeb(fcr, platdata->port + NS16550_FIFO_CONTROL);
+
+        writeb((uint8_t)(ulBaudDivisor >> 24), platdata->port + NS16550_SCRATCH_PAD);
+        writeb(ucDataByte, platdata->port + NS16550_LINE_CONTROL);
+        writeb((uint8_t)(ulBaudDivisor >> 16), platdata->port + NS16550_SCRATCH_PAD);
+    } else {
+        writeb(ucDataByte, platdata->port + NS16550_LINE_CONTROL);
     }
 
-    return 0;
+    /* Enable and reset transmit and receive FIFOs. TJA     */
+    ucDataByte = SP_FIFO_ENABLE;
+    writeb(ucDataByte, platdata->port + NS16550_FIFO_CONTROL);
 
+    ucDataByte = SP_FIFO_ENABLE | SP_FIFO_RXRST | SP_FIFO_TXRST;
+    writeb(ucDataByte, platdata->port + NS16550_FIFO_CONTROL);
+    writeb(NS16550_DISABLE_ALL_INTR, platdata->port + NS16550_INTERRUPT_ENABLE);
+    ret = drvmgr_interrupt_register(dev, 0, dev->name, ns16550_isr, platdata);
+    if (ret) {
+        printk("Register irq for %s failed\n", dev->name);
+        return ret;
+    }
+
+    /* Set data terminal ready. */
+    /* And open interrupt tristate line */
+    writeb(platdata->modem_control, platdata->port + NS16550_MODEM_CONTROL);
+    readb(platdata->port + NS16550_LINE_STATUS);
+    readb(platdata->port + NS16550_RECEIVE_BUFFER);
+    return 0;
+}
+
+static int ns16550_serial_post(struct drvmgr_dev *dev) {
+
+    BSP_output_char = ns16550_console_putc;
+    return 0;
+}
+
+static int ns16550_remove(struct drvmgr_dev *dev) {
+    struct ns16550_priv *platdata = dev->priv;
+    writeb(NS16550_DISABLE_ALL_INTR, platdata->port + NS16550_INTERRUPT_ENABLE);
+    return drvmgr_interrupt_unregister(dev, 0, ns16550_isr, platdata);
 }
 
 static const struct dev_id id_table[] = {
-    {.compatible = "", NULL},
+    {.compatible = "ti,am4372-uart", NULL},
+    {.compatible = "ti,omap2-uart", NULL},
     {NULL, NULL}
 }
 
 static struct drvmgr_drv_ops serial_driver_ops = {
 	.init = {
-		am43xx_serial_probe,
+		ns16550_serial_preprobe,
+        ns16550_serial_probe
 	},
-	.remove = NULL,
+	.remove = ns16550_remove,
 };
 		
 PLATFORM_DRIVER(serial) = {

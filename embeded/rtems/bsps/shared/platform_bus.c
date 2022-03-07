@@ -44,14 +44,20 @@ int platform_res_count_get(struct drvmgr_key *keys,
 	return count;
 }
 
+union drvmgr_key_value *v __platform_resource_get(
+	struct drvmgr_key *keys, enum drvmgr_kt key_type,
+	const char *nm, int index) {
+	char name[RES_NAME_SIZE];
+	struct drvmgr_key *key_match;
+	snprintf(name, RES_NAME_SIZE-1, "%s%d", nm, index);
+	return drvmgr_key_val_get(keys, name, key_type);
+}
+
 int __platform_reg_resource_get(struct drvmgr_key *keys, int index,
 	unsigned int *reg) {
 	union drvmgr_key_value *v;
-	char name[RES_NAME_SIZE];
-	
-	snprintf(name, RES_NAME_SIZE-1, "REG%d", index);
-	v = drvmgr_key_val_get(keys, name, DRVMGR_KT_INT);
-	if (v == NULL) {
+	v = __platform_resource_get(keys, DRVMGR_KT_INT, "REG", 0);
+	if (!v) {
 		if (index == 0) {
 			v = drvmgr_key_val_get(keys, "REG", DRVMGR_KT_INT);
 			if (v == NULL)
@@ -66,11 +72,8 @@ int __platform_reg_resource_get(struct drvmgr_key *keys, int index,
 int __platform_irq_resource_get(struct drvmgr_key *keys, int index,
 	unsigned int *oirq) {
 	union drvmgr_key_value *v;
-	char name[RES_NAME_SIZE];
-	
-	snprintf(name, RES_NAME_SIZE-1, "IRQ%d", index);
-	v = drvmgr_key_val_get(keys, name, DRVMGR_KT_INT);
-	if (v == NULL) {
+	v = __platform_resource_get(keys, DRVMGR_KT_INT, "IRQ", 0);
+	if (!v) {
 		if (index == 0) {
 			v = drvmgr_key_val_get(keys, "IRQ", DRVMGR_KT_INT);
 			if (v == NULL)
