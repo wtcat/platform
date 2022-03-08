@@ -131,6 +131,18 @@ struct ns16550_priv {
 static int _reg_shift;
 static struct drvmgr_dev *stdout_path;
 
+static const struct ns16550_info am4372_info = {
+    .clock = 48000000,
+    .fifo_size = 64,
+    .reg_shift = 2
+};
+
+static const struct dev_id id_table[] = {
+    {.compatible = "ti,am4372-uart", (void *)&am4372_info},
+    {.compatible = "ti,omap2-uart", NULL},
+    {NULL, NULL}
+};
+
 
 static inline int ns16550_tx_empty(struct ns16550_priv *platdata) {
     int status = readb(platdata->port + NS16550_LINE_STATUS);
@@ -404,14 +416,17 @@ static const rtems_termios_device_handler ns16550_ops = {
 };
 
 static int ns16550_serial_preprobe(struct drvmgr_dev *dev) {
+    const struct ns16550_info *info;
     struct ns16550_priv *platdata;
     struct dev_private *devp;
+    const struct dev_id *match_id;
     rtems_status_code sc;
 
     platdata = rtems_calloc(1, sizeof(struct ns16550_priv));
     if (platdata == NULL) 
         return -DRVMGR_NOMEM;
     devp = device_get_private(dev);
+    dev->priv = platdata;
     platdata->port = devp->base;
     rtems_termios_device_context_initialize(&platdata->base, "UART");
     sc = rtems_termios_device_install(dev->name, &ns16550_ops, 
@@ -422,9 +437,15 @@ static int ns16550_serial_preprobe(struct drvmgr_dev *dev) {
         free(platdata);
         return rtems_status_code_to_errno(sc);
     }
-    _reg_shift = 2;
-    platdata->clock = 48000000;
-    dev->priv = platdata;
+    match_id = device_match(dev, id_table);
+    if (match_id) {
+        info = (const struct ns16550_info *)match_id->data;
+        platdata->clock = info->clock;
+        _reg_shift = info->reg_shift;
+    } else {
+        _reg_shift = 2;
+        platdata->clock = 48000000;
+    }
     return 0;
 }
 
@@ -517,11 +538,6 @@ static int ns16550_remove(struct drvmgr_dev *dev) {
     return drvmgr_interrupt_unregister(dev, 0, ns16550_isr, platdata);
 }
 
-static const struct dev_id id_table[] = {
-    {.compatible = "ti,am4372-uart", NULL},
-    {.compatible = "ti,omap2-uart", NULL},
-    {NULL, NULL}
-};
 
 static struct drvmgr_drv_ops serial_driver_ops = {
 	.init = {

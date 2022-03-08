@@ -121,7 +121,8 @@ int platform_dev_populate_on_bus(struct drvmgr_bus *bus,
 int platform_bus_device_register(struct drvmgr_dev *dev,
 	struct drvmgr_bus_ops *bus_ops, int bustype);
 int platform_irq_map(struct drvmgr_dev *dev, int index);
-
+const struct dev_id *device_match(struct drvmgr_dev *dev, 
+	const struct dev_id id_table);
 
 static inline struct dev_private *device_get_private(struct drvmgr_dev *dev) {
 	return (struct dev_private *)(dev + 1);

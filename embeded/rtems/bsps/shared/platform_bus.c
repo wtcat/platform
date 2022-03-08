@@ -87,6 +87,17 @@ int platform_irq_resource_get(struct drvmgr_key *keys, int index,
 	return 0;
 }
 
+const struct dev_id *device_match(struct drvmgr_dev *dev, 
+	const struct dev_id id_table) {
+	struct dev_private *priv = (struct dev_private *)dev->businfo;
+	while (ddrv->ids) {
+		if (!strcmp(priv->res->compatible, id_table->compatible))
+			return id_table;
+		id_table++;
+	}
+	return NULL;
+}
+
 int platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev, 
 	int bustype) {
 	if (!drv || !dev || !dev->parent || !dev->businfo)

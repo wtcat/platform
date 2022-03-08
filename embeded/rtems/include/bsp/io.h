@@ -20,7 +20,14 @@
 #ifndef __ASM_ARM_IO_H
 #define __ASM_ARM_IO_H
 
+#include <stdint.h>
+
+#include "bsp/byteorder.h"
 #include "asm/barriers.h"
+
+#ifdef __cplusplus
+extern "C"{
+#endif
 
 /*
  * Generic virtual read/write.  Note that we don't support half-word
@@ -306,4 +313,7 @@ static inline void __raw_readsl(unsigned long addr, void *data, int longlen)
 #define writesb(a, d, s)	__raw_writesb((unsigned long)a, d, s)
 #define readsb(a, d, s)		__raw_readsb((unsigned long)a, d, s)
 
+#ifdef __cplusplus
+}
+#endif
 #endif	/* __ASM_ARM_IO_H */
