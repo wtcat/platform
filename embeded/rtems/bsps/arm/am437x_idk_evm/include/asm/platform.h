@@ -327,7 +327,7 @@
  * peripheral buses, a BSP-specific IDLE task may be capable of turning
  * components off to save power during extended periods of no task activity.
  */
-#define BSP_IDLE_TASK_BODY
+//#define BSP_IDLE_TASK_BODY
 
 /* Generated from spec:/acfg/if/bsp-idle-task-stack-size */
 
@@ -359,7 +359,7 @@
  *   <a href="https://en.cppreference.com/w/c/types/size_t">size_t</a>.
  * @endparblock
  */
-#define BSP_IDLE_TASK_STACK_SIZE 
+//#define BSP_IDLE_TASK_STACK_SIZE 
 
 /* Generated from spec:/acfg/if/bsp-initial-extension */
 
@@ -386,7 +386,7 @@
  * The value of this configuration option is placed after the entries of all
  * other initial user extensions.
  */
-#define BSP_INITIAL_EXTENSION
+//#define BSP_INITIAL_EXTENSION
 
 /* Generated from spec:/acfg/if/bsp-interrupt-stack-size */
 
@@ -420,7 +420,7 @@
  * * It shall be aligned according to #CPU_INTERRUPT_STACK_ALIGNMENT.
  * @endparblock
  */
-#define BSP_INTERRUPT_STACK_SIZE
+//#define BSP_INTERRUPT_STACK_SIZE
 
 /* Generated from spec:/acfg/if/bsp-prerequisite-drivers */
 
@@ -448,7 +448,7 @@
  * other initial user extensions (including
  * #CONFIGURE_APPLICATION_PREREQUISITE_DRIVERS).
  */
-#define CONFIGURE_BSP_PREREQUISITE_DRIVERS
+//#define CONFIGURE_BSP_PREREQUISITE_DRIVERS
 
 /* Generated from spec:/acfg/if/disable-bsp-settings */
 
@@ -474,7 +474,7 @@
  * If this configuration option is undefined, then the described feature is not
  * enabled.
  */
-#define CONFIGURE_DISABLE_BSP_SETTINGS
+//#define CONFIGURE_DISABLE_BSP_SETTINGS
 
 /* Generated from spec:/acfg/if/malloc-bsp-supports-sbrk */
 
@@ -500,7 +500,7 @@
  * This option should not be defined by the application. Only the BSP knows how
  * it allocates memory to the C Program Heap.
  */
-#define CONFIGURE_MALLOC_BSP_SUPPORTS_SBRK
+//#define CONFIGURE_MALLOC_BSP_SUPPORTS_SBRK
 
 /** @} */
 
@@ -551,7 +551,7 @@
  * href=https://docs.rtems.org/branches/master/c-user/config/intro.html#unlimited-objects>Unlimited
  * Objects</a>.
  */
-#define CONFIGURE_MAXIMUM_BARRIERS
+#define CONFIGURE_MAXIMUM_BARRIERS 0
 
 /* Generated from spec:/acfg/if/max-message-queues */
 
@@ -589,7 +589,7 @@
  * Objects</a>.  You have to account for the memory used to store the messages
  * of each message queue, see #CONFIGURE_MESSAGE_BUFFER_MEMORY.
  */
-#define CONFIGURE_MAXIMUM_MESSAGE_QUEUES
+#define CONFIGURE_MAXIMUM_MESSAGE_QUEUES 0
 
 /* Generated from spec:/acfg/if/max-partitions */
 
@@ -626,7 +626,7 @@
  * href=https://docs.rtems.org/branches/master/c-user/config/intro.html#unlimited-objects>Unlimited
  * Objects</a>.
  */
-#define CONFIGURE_MAXIMUM_PARTITIONS
+#define CONFIGURE_MAXIMUM_PARTITIONS 0
 
 /* Generated from spec:/acfg/if/max-periods */
 
@@ -663,7 +663,7 @@
  * href=https://docs.rtems.org/branches/master/c-user/config/intro.html#unlimited-objects>Unlimited
  * Objects</a>.
  */
-#define CONFIGURE_MAXIMUM_PERIODS
+#define CONFIGURE_MAXIMUM_PERIODS 100
 
 /* Generated from spec:/acfg/if/max-ports */
 
@@ -700,7 +700,7 @@
  * href=https://docs.rtems.org/branches/master/c-user/config/intro.html#unlimited-objects>Unlimited
  * Objects</a>.
  */
-#define CONFIGURE_MAXIMUM_PORTS
+#define CONFIGURE_MAXIMUM_PORTS 0
 
 /* Generated from spec:/acfg/if/max-regions */
 
@@ -737,7 +737,7 @@
  * href=https://docs.rtems.org/branches/master/c-user/config/intro.html#unlimited-objects>Unlimited
  * Objects</a>.
  */
-#define CONFIGURE_MAXIMUM_REGIONS
+#define CONFIGURE_MAXIMUM_REGIONS 2
 
 /* Generated from spec:/acfg/if/max-semaphores */
 
@@ -839,7 +839,7 @@
  * which enable floating point support.
  * @endparblock
  */
-#define CONFIGURE_MAXIMUM_TASKS 30
+#define CONFIGURE_MAXIMUM_TASKS 36
 
 /* Generated from spec:/acfg/if/max-thread-local-storage-size */
 
@@ -886,7 +886,7 @@
  * alignment of an application executable.
  * @endparblock
  */
-#define CONFIGURE_MAXIMUM_THREAD_LOCAL_STORAGE_SIZE
+//#define CONFIGURE_MAXIMUM_THREAD_LOCAL_STORAGE_SIZE
 
 /* Generated from spec:/acfg/if/max-timers */
 
@@ -983,7 +983,7 @@
  * required memory for the system-provided task storage areas since tasks
  * constructed by rtems_task_construct() use a user-provided task storage area.
  */
-#define CONFIGURE_MINIMUM_TASKS_WITH_USER_PROVIDED_STORAGE
+//#define CONFIGURE_MINIMUM_TASKS_WITH_USER_PROVIDED_STORAGE
 
 /** @} */
 
@@ -1016,7 +1016,7 @@
  * The value of this configuration option shall be convertible to an integer of
  * type ::rtems_task_argument.
  */
-#define CONFIGURE_INIT_TASK_ARGUMENTS
+//#define CONFIGURE_INIT_TASK_ARGUMENTS
 
 /* Generated from spec:/acfg/if/init-task-attributes */
 
@@ -1032,7 +1032,7 @@
  * @par Value Constraints
  * The value of this configuration option shall be a valid task attribute set.
  */
-#define CONFIGURE_INIT_TASK_ATTRIBUTES
+//#define CONFIGURE_INIT_TASK_ATTRIBUTES
 
 /* Generated from spec:/acfg/if/init-task-construct-storage-size */
 
@@ -1086,7 +1086,7 @@
  * configuration options are mutually exclusive.
  * @endparblock
  */
-#define CONFIGURE_INIT_TASK_CONSTRUCT_STORAGE_SIZE
+//define CONFIGURE_INIT_TASK_CONSTRUCT_STORAGE_SIZE
 
 /* Generated from spec:/acfg/if/init-task-entrypoint */
 
@@ -1198,7 +1198,7 @@
  * configuration options are mutually exclusive.
  * @endparblock
  */
-#define CONFIGURE_INIT_TASK_STACK_SIZE 4096
+#define CONFIGURE_INIT_TASK_STACK_SIZE 8192
 
 /* Generated from spec:/acfg/if/rtems-init-tasks-table */
 
@@ -1606,7 +1606,7 @@
  * otherwise a compile time error will occur.
  * @endparblock
  */
-#define CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
+//#define CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
 
 /* Generated from spec:/acfg/if/appl-needs-watchdog-driver */
 
@@ -1629,7 +1629,7 @@
  * user will get a link time error for an undefined symbol.
  * @endparblock
  */
-#define CONFIGURE_APPLICATION_NEEDS_WATCHDOG_DRIVER
+//#define CONFIGURE_APPLICATION_NEEDS_WATCHDOG_DRIVER
 
 /* Generated from spec:/acfg/if/appl-needs-zero-driver */
 
@@ -1673,7 +1673,7 @@
  * application device driver initializers.
  * @endparblock
  */
-#define CONFIGURE_APPLICATION_PREREQUISITE_DRIVERS
+//#define CONFIGURE_APPLICATION_PREREQUISITE_DRIVERS
 
 /* Generated from spec:/acfg/if/ata-driver-task-priority */
 
@@ -1694,7 +1694,7 @@
  * This configuration option is only evaluated if the configuration option
  * #CONFIGURE_APPLICATION_NEEDS_ATA_DRIVER is defined.
  */
-#define CONFIGURE_ATA_DRIVER_TASK_PRIORITY
+//#define CONFIGURE_ATA_DRIVER_TASK_PRIORITY
 
 /* Generated from spec:/acfg/if/exception-to-signal-mapping */
 
@@ -1788,7 +1788,7 @@
  * configuration option value shall be larger than the number of statically
  * configured device drivers.
  */
-#define CONFIGURE_MAXIMUM_DRIVERS
+//#define CONFIGURE_MAXIMUM_DRIVERS
 
 /** @} */
 
@@ -1826,7 +1826,7 @@
  * The record extensions capture thread create, start, restart, delete, switch,
  * begin, exitted and terminate events.
  */
-#define CONFIGURE_RECORD_EXTENSIONS_ENABLED
+//#define CONFIGURE_RECORD_EXTENSIONS_ENABLED
 
 /* Generated from spec:/acfg/if/record-fatal-dump-base64 */
 
@@ -1853,7 +1853,7 @@
  * @par Notes
  * This extension can be used to produce crash dumps.
  */
-#define CONFIGURE_RECORD_FATAL_DUMP_BASE64
+//#define CONFIGURE_RECORD_FATAL_DUMP_BASE64
 
 /* Generated from spec:/acfg/if/record-fatal-dump-base64-zlib */
 
@@ -1879,7 +1879,7 @@
  * The zlib compression needs about 512KiB of RAM.  This extension can be used
  * to produce crash dumps.
  */
-#define CONFIGURE_RECORD_FATAL_DUMP_BASE64_ZLIB
+//#define CONFIGURE_RECORD_FATAL_DUMP_BASE64_ZLIB
 
 /* Generated from spec:/acfg/if/record-per-processor-items */
 
@@ -1914,7 +1914,7 @@
  * processor (#CONFIGURE_MAXIMUM_PROCESSORS).  If the value of this
  * configuration option is zero, then nothing is allocated.
  */
-#define CONFIGURE_RECORD_PER_PROCESSOR_ITEMS
+//#define CONFIGURE_RECORD_PER_PROCESSOR_ITEMS
 
 /** @} */
 
@@ -1988,7 +1988,7 @@
  * drivers and basic input/output functions such as printf(). Filesystems can
  * be disabled to reduce the memory footprint of an application.
  */
-#define CONFIGURE_APPLICATION_DISABLE_FILESYSTEM
+//#define CONFIGURE_APPLICATION_DISABLE_FILESYSTEM
 
 /* Generated from spec:/acfg/if/filesystem-all */
 
@@ -2016,7 +2016,7 @@
  * If this configuration option is undefined, then the described feature is not
  * enabled.
  */
-#define CONFIGURE_FILESYSTEM_ALL
+//#define CONFIGURE_FILESYSTEM_ALL
 
 /* Generated from spec:/acfg/if/filesystem-dosfs */
 
@@ -2050,7 +2050,7 @@
  * If this configuration option is undefined, then the described feature is not
  * enabled.
  */
-#define CONFIGURE_FILESYSTEM_FTPFS
+//#define CONFIGURE_FILESYSTEM_FTPFS
 
 /* Generated from spec:/acfg/if/filesystem-imfs */
 
@@ -2086,7 +2086,7 @@
  * If this configuration option is undefined, then the described feature is not
  * enabled.
  */
-#define CONFIGURE_FILESYSTEM_JFFS2
+//#define CONFIGURE_FILESYSTEM_JFFS2
 
 /* Generated from spec:/acfg/if/filesystem-nfs */
 
@@ -2101,7 +2101,7 @@
  * If this configuration option is undefined, then the described feature is not
  * enabled.
  */
-#define CONFIGURE_FILESYSTEM_NFS
+//#define CONFIGURE_FILESYSTEM_NFS
 
 /* Generated from spec:/acfg/if/filesystem-rfs */
 
@@ -2120,7 +2120,7 @@
  * This filesystem requires a Block Device Cache configuration, see
  * #CONFIGURE_APPLICATION_NEEDS_LIBBLOCK.
  */
-#define CONFIGURE_FILESYSTEM_RFS
+//#define CONFIGURE_FILESYSTEM_RFS
 
 /* Generated from spec:/acfg/if/filesystem-tftpfs */
 
@@ -2135,7 +2135,7 @@
  * If this configuration option is undefined, then the described feature is not
  * enabled.
  */
-#define CONFIGURE_FILESYSTEM_TFTPFS
+//#define CONFIGURE_FILESYSTEM_TFTPFS
 
 /* Generated from spec:/acfg/if/imfs-disable-chmod */
 
@@ -2149,7 +2149,7 @@
  * If this configuration option is undefined, then the root IMFS supports
  * changing the mode of files.
  */
-#define CONFIGURE_IMFS_DISABLE_CHMOD
+//#define CONFIGURE_IMFS_DISABLE_CHMOD
 
 /* Generated from spec:/acfg/if/imfs-disable-chown */
 
@@ -2163,7 +2163,7 @@
  * If this configuration option is undefined, then the root IMFS supports
  * changing the ownership of files.
  */
-#define CONFIGURE_IMFS_DISABLE_CHOWN
+//#define CONFIGURE_IMFS_DISABLE_CHOWN
 
 /* Generated from spec:/acfg/if/imfs-disable-link */
 
@@ -2177,7 +2177,7 @@
  * If this configuration option is undefined, then the root IMFS supports hard
  * links.
  */
-#define CONFIGURE_IMFS_DISABLE_LINK
+//#define CONFIGURE_IMFS_DISABLE_LINK
 
 /* Generated from spec:/acfg/if/imfs-disable-mknod */
 
@@ -2191,7 +2191,7 @@
  * If this configuration option is undefined, then the root IMFS supports
  * making files.
  */
-#define CONFIGURE_IMFS_DISABLE_MKNOD
+//#define CONFIGURE_IMFS_DISABLE_MKNOD
 
 /* Generated from spec:/acfg/if/imfs-disable-mknod-device */
 
@@ -2205,7 +2205,7 @@
  * If this configuration option is undefined, then the root IMFS supports
  * making device files.
  */
-#define CONFIGURE_IMFS_DISABLE_MKNOD_DEVICE
+//#define CONFIGURE_IMFS_DISABLE_MKNOD_DEVICE
 
 /* Generated from spec:/acfg/if/imfs-disable-mknod-file */
 
@@ -2219,7 +2219,7 @@
  * If this configuration option is undefined, then the root IMFS supports
  * making regular files.
  */
-#define CONFIGURE_IMFS_DISABLE_MKNOD_FILE
+//#define CONFIGURE_IMFS_DISABLE_MKNOD_FILE
 
 /* Generated from spec:/acfg/if/imfs-disable-mount */
 
@@ -2233,7 +2233,7 @@
  * If this configuration option is undefined, then the root IMFS supports
  * mounting other filesystems.
  */
-#define CONFIGURE_IMFS_DISABLE_MOUNT
+//#define CONFIGURE_IMFS_DISABLE_MOUNT
 
 /* Generated from spec:/acfg/if/imfs-disable-readdir */
 
@@ -2248,7 +2248,7 @@
  * If this configuration option is undefined, then the root IMFS supports
  * reading directories.
  */
-#define CONFIGURE_IMFS_DISABLE_READDIR
+//#define CONFIGURE_IMFS_DISABLE_READDIR
 
 /* Generated from spec:/acfg/if/imfs-disable-readlink */
 
@@ -2262,7 +2262,7 @@
  * If this configuration option is undefined, then the root IMFS supports
  * reading symbolic links.
  */
-#define CONFIGURE_IMFS_DISABLE_READLINK
+//#define CONFIGURE_IMFS_DISABLE_READLINK
 
 /* Generated from spec:/acfg/if/imfs-disable-rename */
 
@@ -2276,7 +2276,7 @@
  * If this configuration option is undefined, then the root IMFS supports
  * renaming files.
  */
-#define CONFIGURE_IMFS_DISABLE_RENAME
+//#define CONFIGURE_IMFS_DISABLE_RENAME
 
 /* Generated from spec:/acfg/if/imfs-disable-rmnod */
 
@@ -2290,7 +2290,7 @@
  * If this configuration option is undefined, then the root IMFS supports
  * removing files.
  */
-#define CONFIGURE_IMFS_DISABLE_RMNOD
+//#define CONFIGURE_IMFS_DISABLE_RMNOD
 
 /* Generated from spec:/acfg/if/imfs-disable-symlink */
 
@@ -2304,7 +2304,7 @@
  * If this configuration option is undefined, then the root IMFS supports
  * creating symbolic links.
  */
-#define CONFIGURE_IMFS_DISABLE_SYMLINK
+//#define CONFIGURE_IMFS_DISABLE_SYMLINK
 
 /* Generated from spec:/acfg/if/imfs-disable-unmount */
 
@@ -2318,7 +2318,7 @@
  * If this configuration option is undefined, then the root IMFS supports
  * unmounting other filesystems.
  */
-#define CONFIGURE_IMFS_DISABLE_UNMOUNT
+//#define CONFIGURE_IMFS_DISABLE_UNMOUNT
 
 /* Generated from spec:/acfg/if/imfs-disable-utime */
 
@@ -2332,7 +2332,7 @@
  * If this configuration option is undefined, then the root IMFS supports
  * changing file times.
  */
-#define CONFIGURE_IMFS_DISABLE_UTIME
+//#define CONFIGURE_IMFS_DISABLE_UTIME
 
 /* Generated from spec:/acfg/if/imfs-enable-mkfifo */
 
@@ -2394,7 +2394,7 @@
  *   bytes.
  * @endparblock
  */
-#define CONFIGURE_IMFS_MEMFILE_BYTES_PER_BLOCK
+#define CONFIGURE_IMFS_MEMFILE_BYTES_PER_BLOCK 128
 
 /* Generated from spec:/acfg/if/use-devfs-as-base-filesystem */
 

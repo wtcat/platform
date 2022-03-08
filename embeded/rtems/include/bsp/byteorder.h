@@ -371,7 +371,7 @@ static inline void memcpy_swap(void *dst, const void *src, size_t length)
 	const uint8_t *psrc = (const uint8_t *)src;
 
 	_Assert(((psrc < pdst && (psrc + length) <= pdst) ||
-		  (psrc > pdst && (pdst + length) <= psrc)))
+		  (psrc > pdst && (pdst + length) <= psrc)));
 	psrc += length - 1;
 	for (; length > 0; length--) 
 		*pdst++ = *psrc--;
