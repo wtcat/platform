@@ -589,7 +589,7 @@
  * Objects</a>.  You have to account for the memory used to store the messages
  * of each message queue, see #CONFIGURE_MESSAGE_BUFFER_MEMORY.
  */
-#define CONFIGURE_MAXIMUM_MESSAGE_QUEUES 0
+#define CONFIGURE_MAXIMUM_MESSAGE_QUEUES 6
 
 /* Generated from spec:/acfg/if/max-partitions */
 
@@ -626,7 +626,7 @@
  * href=https://docs.rtems.org/branches/master/c-user/config/intro.html#unlimited-objects>Unlimited
  * Objects</a>.
  */
-#define CONFIGURE_MAXIMUM_PARTITIONS 0
+#define CONFIGURE_MAXIMUM_PARTITIONS 2
 
 /* Generated from spec:/acfg/if/max-periods */
 
@@ -886,7 +886,7 @@
  * alignment of an application executable.
  * @endparblock
  */
-//#define CONFIGURE_MAXIMUM_THREAD_LOCAL_STORAGE_SIZE
+#define CONFIGURE_MAXIMUM_THREAD_LOCAL_STORAGE_SIZE 0
 
 /* Generated from spec:/acfg/if/max-timers */
 
@@ -1198,7 +1198,11 @@
  * configuration options are mutually exclusive.
  * @endparblock
  */
-#define CONFIGURE_INIT_TASK_STACK_SIZE 8192
+#if defined(__rtems_libbsd__)
+#define CONFIGURE_INIT_TASK_STACK_SIZE (32 * 1024)
+#else
+#define CONFIGURE_INIT_TASK_STACK_SIZE 4096
+#endif
 
 /* Generated from spec:/acfg/if/rtems-init-tasks-table */
 
@@ -1449,7 +1453,7 @@
  * @par Notes
  * This device driver is supported by all BSPs.
  */
-//#define CONFIGURE_APPLICATION_NEEDS_NULL_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_NULL_DRIVER
 
 /* Generated from spec:/acfg/if/appl-needs-rtc-driver */
 
@@ -1717,7 +1721,7 @@
  * This is especially useful for applications written in Ada or C++.
  * @endparblock
  */
-#define CONFIGURE_EXCEPTION_TO_SIGNAL_MAPPING
+//#define CONFIGURE_EXCEPTION_TO_SIGNAL_MAPPING
 
 /* Generated from spec:/acfg/if/max-drivers */
 
@@ -2445,7 +2449,7 @@
  * before RTEMS release 4.5.0.
  * @endparblock
  */
-#define CONFIGURE_USE_DEVFS_AS_BASE_FILESYSTEM
+//#define CONFIGURE_USE_DEVFS_AS_BASE_FILESYSTEM
 
 /* Generated from spec:/acfg/if/use-miniimfs-as-base-filesystem */
 
@@ -2481,7 +2485,7 @@
  * * #CONFIGURE_IMFS_DISABLE_UNMOUNT.
  * @endparblock
  */
-#define CONFIGURE_USE_MINIIMFS_AS_BASE_FILESYSTEM
+//#define CONFIGURE_USE_MINIIMFS_AS_BASE_FILESYSTEM
 
 /** @} */
 
@@ -2522,7 +2526,7 @@
  * See also #CONFIGURE_MALLOC_DIRTY.
  * @endparblock
  */
-#define CONFIGURE_DIRTY_MEMORY
+//#define CONFIGURE_DIRTY_MEMORY
 
 /* Generated from spec:/acfg/if/disable-newlib-reentrancy */
 
@@ -2542,7 +2546,7 @@
  * behaviour.  For example, #errno is no longer a thread-local variable if this
  * option is enabled.
  */
-#define CONFIGURE_DISABLE_NEWLIB_REENTRANCY
+//#define CONFIGURE_DISABLE_NEWLIB_REENTRANCY
 
 /* Generated from spec:/acfg/if/executive-ram-size */
 
@@ -2576,7 +2580,7 @@
  * This is an advanced configuration option.  Use it only if you know exactly
  * what you are doing.
  */
-#define CONFIGURE_EXECUTIVE_RAM_SIZE
+#define CONFIGURE_EXECUTIVE_RAM_SIZE (512 * 1024)
 
 /* Generated from spec:/acfg/if/extra-task-stacks */
 
@@ -2607,7 +2611,7 @@
  * stacks larger then the minimum, then that memory is **not** accounted for by
  * ``<rtems/confdefs.h>``.
  */
-#define CONFIGURE_EXTRA_TASK_STACKS
+//#define CONFIGURE_EXTRA_TASK_STACKS
 
 /* Generated from spec:/acfg/if/initial-extensions */
 
@@ -2629,7 +2633,7 @@
  * #BSP_INITIAL_EXTENSION and after the entries of all other initial user
  * extensions.
  */
-#define CONFIGURE_INITIAL_EXTENSIONS
+//#define CONFIGURE_INITIAL_EXTENSIONS
 
 /* Generated from spec:/acfg/if/interrupt-stack-size */
 
@@ -2677,7 +2681,7 @@
  * #CONFIGURE_MINIMUM_TASK_STACK_SIZE instead of #CPU_STACK_MINIMUM_SIZE.
  * @endparblock
  */
-#define CONFIGURE_INTERRUPT_STACK_SIZE
+#define CONFIGURE_INTERRUPT_STACK_SIZE 4096
 
 /* Generated from spec:/acfg/if/malloc-dirty */
 
@@ -2698,7 +2702,7 @@
  * #CONFIGURE_DIRTY_MEMORY which dirties the memory only once during the system
  * initialization.
  */
-#define CONFIGURE_MALLOC_DIRTY
+//#define CONFIGURE_MALLOC_DIRTY
 
 /* Generated from spec:/acfg/if/max-file-descriptors */
 
@@ -2730,7 +2734,7 @@
  * The default value of three file descriptors allows RTEMS to support standard
  * input, output, and error I/O streams on ``/dev/console``.
  */
-#define CONFIGURE_MAXIMUM_FILE_DESCRIPTORS
+#define CONFIGURE_MAXIMUM_FILE_DESCRIPTORS 32
 
 /* Generated from spec:/acfg/if/max-processors */
 
@@ -2766,7 +2770,7 @@
  * all other configurations it has no effect.
  * @endparblock
  */
-#define CONFIGURE_MAXIMUM_PROCESSORS
+#define CONFIGURE_MAXIMUM_PROCESSORS 1
 
 /* Generated from spec:/acfg/if/max-thread-name-size */
 
@@ -2805,7 +2809,7 @@
  * This configuration option is available since RTEMS 5.1.
  * @endparblock
  */
-#define CONFIGURE_MAXIMUM_THREAD_NAME_SIZE
+#define CONFIGURE_MAXIMUM_THREAD_NAME_SIZE 16
 
 /* Generated from spec:/acfg/if/memory-overhead */
 
@@ -2919,7 +2923,7 @@
  * @endcode
  * @endparblock
  */
-#define CONFIGURE_MESSAGE_BUFFER_MEMORY
+//#define CONFIGURE_MESSAGE_BUFFER_MEMORY
 
 /* Generated from spec:/acfg/if/microseconds-per-tick */
 
@@ -2968,7 +2972,7 @@
  * of a clock tick quantum.
  * @endparblock
  */
-#define CONFIGURE_MICROSECONDS_PER_TICK
+#define CONFIGURE_MICROSECONDS_PER_TICK 1000
 
 /* Generated from spec:/acfg/if/min-task-stack-size */
 
@@ -3017,7 +3021,7 @@
  * used to define the default value of #CONFIGURE_INTERRUPT_STACK_SIZE.
  * @endparblock
  */
-#define CONFIGURE_MINIMUM_TASK_STACK_SIZE
+#define CONFIGURE_MINIMUM_TASK_STACK_SIZE 1024
 
 /* Generated from spec:/acfg/if/stack-checker-enabled */
 
@@ -3068,7 +3072,7 @@
  * This configuration option has no impact if the Clock Driver is not
  * configured, see #CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER.
  */
-#define CONFIGURE_TICKS_PER_TIMESLICE
+#define CONFIGURE_TICKS_PER_TIMESLICE 50
 
 /* Generated from spec:/acfg/if/unified-work-areas */
 
@@ -3095,7 +3099,7 @@
  * all available memory rather then just until you run out of RTEMS Workspace.
  * @endparblock
  */
-#define CONFIGURE_UNIFIED_WORK_AREAS
+//#define CONFIGURE_UNIFIED_WORK_AREAS
 
 /* Generated from spec:/acfg/if/unlimited-allocation-size */
 
@@ -3125,7 +3129,7 @@
  * the rtems_resource_unlimited() macro.
  * @endparblock
  */
-#define CONFIGURE_UNLIMITED_ALLOCATION_SIZE
+//#define CONFIGURE_UNLIMITED_ALLOCATION_SIZE
 
 /* Generated from spec:/acfg/if/unlimited-objects */
 
@@ -3151,7 +3155,7 @@
  * See also #CONFIGURE_UNLIMITED_ALLOCATION_SIZE.
  * @endparblock
  */
-#define CONFIGURE_UNLIMITED_OBJECTS
+//#define CONFIGURE_UNLIMITED_OBJECTS
 
 /* Generated from spec:/acfg/if/verbose-system-init */
 
@@ -3231,7 +3235,7 @@
  * option #CONFIGURE_IDLE_TASK_INITIALIZES_APPLICATION.
  * @endparblock
  */
-#define CONFIGURE_IDLE_TASK_BODY
+//#define CONFIGURE_IDLE_TASK_BODY
 
 /* Generated from spec:/acfg/if/idle-task-init-appl */
 
@@ -3272,7 +3276,7 @@
  * otherwise a compile time error in the configuration file will occur.
  * @endparblock
  */
-#define CONFIGURE_IDLE_TASK_INITIALIZES_APPLICATION
+//#define CONFIGURE_IDLE_TASK_INITIALIZES_APPLICATION
 
 /* Generated from spec:/acfg/if/idle-task-stack-size */
 
@@ -3302,7 +3306,7 @@
  * In SMP configurations, there is one IDLE task per configured processor, see
  * #CONFIGURE_MAXIMUM_PROCESSORS.
  */
-#define CONFIGURE_IDLE_TASK_STACK_SIZE
+#define CONFIGURE_IDLE_TASK_STACK_SIZE 1024
 
 /** @} */
 
@@ -3356,7 +3360,7 @@
  * This configuration option is only evaluated if #CONFIGURE_MP_APPLICATION is
  * defined.
  */
-#define CONFIGURE_EXTRA_MPCI_RECEIVE_SERVER_STACK
+//#define CONFIGURE_EXTRA_MPCI_RECEIVE_SERVER_STACK
 
 /* Generated from spec:/acfg/if/mp-appl */
 
@@ -3377,7 +3381,7 @@
  * ``--enable-multiprocessing`` build configuration option).  Otherwise a
  * compile time error in the configuration file will occur.
  */
-#define CONFIGURE_MP_APPLICATION
+//#define CONFIGURE_MP_APPLICATION
 
 /* Generated from spec:/acfg/if/mp-max-global-objects */
 
@@ -3410,7 +3414,7 @@
  * defined.
  * @endparblock
  */
-#define CONFIGURE_MP_MAXIMUM_GLOBAL_OBJECTS
+//#define CONFIGURE_MP_MAXIMUM_GLOBAL_OBJECTS
 
 /* Generated from spec:/acfg/if/mp-max-nodes */
 
@@ -3438,7 +3442,7 @@
  * This configuration option is only evaluated if #CONFIGURE_MP_APPLICATION is
  * defined.
  */
-#define CONFIGURE_MP_MAXIMUM_NODES
+//#define CONFIGURE_MP_MAXIMUM_NODES
 
 /* Generated from spec:/acfg/if/mp-max-proxies */
 
@@ -3474,7 +3478,7 @@
  * defined.
  * @endparblock
  */
-#define CONFIGURE_MP_MAXIMUM_PROXIES
+//#define CONFIGURE_MP_MAXIMUM_PROXIES
 
 /* Generated from spec:/acfg/if/mp-mpci-table-pointer */
 
@@ -3501,7 +3505,7 @@
  * defined.
  * @endparblock
  */
-#define CONFIGURE_MP_MPCI_TABLE_POINTER
+//#define CONFIGURE_MP_MPCI_TABLE_POINTER
 
 /* Generated from spec:/acfg/if/mp-node-number */
 
@@ -3536,7 +3540,7 @@
  * defined.
  * @endparblock
  */
-#define CONFIGURE_MP_NODE_NUMBER
+//#define CONFIGURE_MP_NODE_NUMBER
 
 /** @} */
 
@@ -3590,7 +3594,7 @@
  * href=https://docs.rtems.org/branches/master/c-user/config/intro.html#unlimited-objects>Unlimited
  * Objects</a>.
  */
-#define CONFIGURE_MAXIMUM_POSIX_KEYS
+#define CONFIGURE_MAXIMUM_POSIX_KEYS 3
 
 /* Generated from spec:/acfg/if/max-posix-key-value-pairs */
 
@@ -3634,7 +3638,7 @@
  * deleted.
  * @endparblock
  */
-#define CONFIGURE_MAXIMUM_POSIX_KEY_VALUE_PAIRS
+#define CONFIGURE_MAXIMUM_POSIX_KEY_VALUE_PAIRS CONFIGURE_MAXIMUM_POSIX_KEYS
 
 /* Generated from spec:/acfg/if/max-posix-message-queues */
 
@@ -3676,7 +3680,7 @@
  * Objects</a>.  You have to account for the memory used to store the messages
  * of each message queue, see #CONFIGURE_MESSAGE_BUFFER_MEMORY.
  */
-#define CONFIGURE_MAXIMUM_POSIX_MESSAGE_QUEUES
+//#define CONFIGURE_MAXIMUM_POSIX_MESSAGE_QUEUES 0
 
 /* Generated from spec:/acfg/if/max-posix-queued-signals */
 
@@ -3717,7 +3721,7 @@
  * ``--enable-posix`` build configuration option.
  * @endparblock
  */
-#define CONFIGURE_MAXIMUM_POSIX_QUEUED_SIGNALS
+//#define CONFIGURE_MAXIMUM_POSIX_QUEUED_SIGNALS 0
 
 /* Generated from spec:/acfg/if/max-posix-semaphores */
 
@@ -3764,7 +3768,7 @@
  * space for these semaphores is user-provided.
  * @endparblock
  */
-#define CONFIGURE_MAXIMUM_POSIX_SEMAPHORES
+//#define CONFIGURE_MAXIMUM_POSIX_SEMAPHORES
 
 /* Generated from spec:/acfg/if/max-posix-shms */
 
@@ -3805,7 +3809,7 @@
  * href=https://docs.rtems.org/branches/master/c-user/config/intro.html#unlimited-objects>Unlimited
  * Objects</a>.
  */
-#define CONFIGURE_MAXIMUM_POSIX_SHMS
+//#define CONFIGURE_MAXIMUM_POSIX_SHMS
 
 /* Generated from spec:/acfg/if/max-posix-threads */
 
@@ -3854,7 +3858,7 @@
  * All POSIX threads have floating point enabled.
  * @endparblock
  */
-#define CONFIGURE_MAXIMUM_POSIX_THREADS
+//#define CONFIGURE_MAXIMUM_POSIX_THREADS
 
 /* Generated from spec:/acfg/if/max-posix-timers */
 
@@ -3900,7 +3904,7 @@
  * build configuration option.
  * @endparblock
  */
-#define CONFIGURE_MAXIMUM_POSIX_TIMERS
+//#define CONFIGURE_MAXIMUM_POSIX_TIMERS
 
 /* Generated from spec:/acfg/if/min-posix-thread-stack-size */
 
@@ -3927,7 +3931,7 @@
  *   application-specific minimum value.
  * @endparblock
  */
-#define CONFIGURE_MINIMUM_POSIX_THREAD_STACK_SIZE
+//#define CONFIGURE_MINIMUM_POSIX_THREAD_STACK_SIZE 
 
 /** @} */
 
@@ -3964,7 +3968,7 @@
  * The application shall provide the function referenced by this configuration
  * option.
  */
-#define CONFIGURE_POSIX_INIT_THREAD_ENTRY_POINT
+//#define CONFIGURE_POSIX_INIT_THREAD_ENTRY_POINT
 
 /* Generated from spec:/acfg/if/posix-init-thread-stack-size */
 
@@ -3989,7 +3993,7 @@
  *   href="https://en.cppreference.com/w/c/types/integer">uintptr_t</a>.
  * @endparblock
  */
-#define CONFIGURE_POSIX_INIT_THREAD_STACK_SIZE
+//#define CONFIGURE_POSIX_INIT_THREAD_STACK_SIZE
 
 /* Generated from spec:/acfg/if/posix-init-thread-table */
 
@@ -4017,7 +4021,7 @@
  * otherwise a compile time error in the configuration file will occur.
  * @endparblock
  */
-#define CONFIGURE_POSIX_INIT_THREAD_TABLE
+//#define CONFIGURE_POSIX_INIT_THREAD_TABLE
 
 /** @} */
 
@@ -4087,7 +4091,7 @@
  * This configuration option is only evaluated if the configuration option
  * #CONFIGURE_SCHEDULER_CBS is defined.
  */
-#define CONFIGURE_CBS_MAXIMUM_SERVERS
+//#define CONFIGURE_CBS_MAXIMUM_SERVERS
 
 /* Generated from spec:/acfg/if/max-priority */
 
@@ -4145,7 +4149,7 @@
  * be compliant with various standards.  These priorities range from 0 to 255.
  * @endparblock
  */
-#define CONFIGURE_MAXIMUM_PRIORITY
+#define CONFIGURE_MAXIMUM_PRIORITY 127
 
 /* Generated from spec:/acfg/if/scheduler-assignments */
 
@@ -4195,7 +4199,7 @@
  * Scheduler Configuration</a>.
  * @endparblock
  */
-#define CONFIGURE_SCHEDULER_ASSIGNMENTS
+//#define CONFIGURE_SCHEDULER_ASSIGNMENTS
 
 /* Generated from spec:/acfg/if/scheduler-cbs */
 
@@ -4222,7 +4226,7 @@
  * exactly one processor.
  * @endparblock
  */
-#define CONFIGURE_SCHEDULER_CBS
+//#define CONFIGURE_SCHEDULER_CBS
 
 /* Generated from spec:/acfg/if/scheduler-edf */
 
@@ -4248,7 +4252,7 @@
  * exactly one processor.
  * @endparblock
  */
-#define CONFIGURE_SCHEDULER_EDF
+//#define CONFIGURE_SCHEDULER_EDF
 
 /* Generated from spec:/acfg/if/scheduler-edf-smp */
 
@@ -4281,7 +4285,7 @@
  * #CONFIGURE_MAXIMUM_PROCESSORS is greater than one.
  * @endparblock
  */
-#define CONFIGURE_SCHEDULER_EDF_SMP
+//#define CONFIGURE_SCHEDULER_EDF_SMP
 
 /* Generated from spec:/acfg/if/scheduler-name */
 
@@ -4342,7 +4346,7 @@
  * Use rtems_build_name() to define the scheduler name.
  * @endparblock
  */
-#define CONFIGURE_SCHEDULER_NAME
+//#define CONFIGURE_SCHEDULER_NAME
 
 /* Generated from spec:/acfg/if/scheduler-priority */
 
@@ -4407,7 +4411,7 @@
  * #CONFIGURE_MAXIMUM_PRIORITY configuration option.
  * @endparblock
  */
-#define CONFIGURE_SCHEDULER_PRIORITY_AFFINITY_SMP
+//#define CONFIGURE_SCHEDULER_PRIORITY_AFFINITY_SMP
 
 /* Generated from spec:/acfg/if/scheduler-priority-smp */
 
@@ -4439,7 +4443,7 @@
  * #CONFIGURE_MAXIMUM_PRIORITY configuration option.
  * @endparblock
  */
-#define CONFIGURE_SCHEDULER_PRIORITY_SMP
+//#define CONFIGURE_SCHEDULER_PRIORITY_SMP
 
 /* Generated from spec:/acfg/if/scheduler-simple */
 
@@ -4465,7 +4469,7 @@
  * exactly one processor.
  * @endparblock
  */
-#define CONFIGURE_SCHEDULER_SIMPLE
+//#define CONFIGURE_SCHEDULER_SIMPLE
 
 /* Generated from spec:/acfg/if/scheduler-simple-smp */
 
@@ -4494,7 +4498,7 @@
  * up to 32 processors.
  * @endparblock
  */
-#define CONFIGURE_SCHEDULER_SIMPLE_SMP
+//#define CONFIGURE_SCHEDULER_SIMPLE_SMP
 
 /* Generated from spec:/acfg/if/scheduler-strong-apa */
 
@@ -4519,7 +4523,7 @@
  * This scheduler algorithm is not correctly implemented.  Do not use it.
  * @endparblock
  */
-#define CONFIGURE_SCHEDULER_STRONG_APA
+//#define CONFIGURE_SCHEDULER_STRONG_APA
 
 /* Generated from spec:/acfg/if/scheduler-table-entries */
 
@@ -4582,7 +4586,7 @@
  * Scheduler Configuration</a>.
  * @endparblock
  */
-#define CONFIGURE_SCHEDULER_TABLE_ENTRIES
+//#define CONFIGURE_SCHEDULER_TABLE_ENTRIES
 
 /* Generated from spec:/acfg/if/scheduler-user */
 
@@ -4624,7 +4628,7 @@
  * how these are defined for the Deterministic Priority Scheduler.
  * @endparblock
  */
-#define CONFIGURE_SCHEDULER_USER
+//#define CONFIGURE_SCHEDULER_USER
 
 /** @} */
 
@@ -4673,7 +4677,7 @@
  * * #CONFIGURE_TASK_STACK_DEALLOCATOR
  * @endparblock
  */
-#define CONFIGURE_TASK_STACK_ALLOCATOR
+//#define CONFIGURE_TASK_STACK_ALLOCATOR
 
 /* Generated from spec:/acfg/if/task-stack-no-workspace */
 
@@ -4691,7 +4695,7 @@
  * This configuration option may be used if a custom task stack allocator is
  * configured, see #CONFIGURE_TASK_STACK_ALLOCATOR.
  */
-#define CONFIGURE_TASK_STACK_ALLOCATOR_AVOIDS_WORK_SPACE
+//#define CONFIGURE_TASK_STACK_ALLOCATOR_AVOIDS_WORK_SPACE
 
 /* Generated from spec:/acfg/if/task-stack-allocator-for-idle */
 
@@ -4717,7 +4721,7 @@
  * stack of an IDLE task will not be from the RTEMS Workspace or the memory
  * statically allocated by default.
  */
-#define CONFIGURE_TASK_STACK_ALLOCATOR_FOR_IDLE
+//#define CONFIGURE_TASK_STACK_ALLOCATOR_FOR_IDLE
 
 /* Generated from spec:/acfg/if/task-stack-allocator-init */
 
@@ -4748,7 +4752,7 @@
  * * #CONFIGURE_TASK_STACK_DEALLOCATOR
  * @endparblock
  */
-#define CONFIGURE_TASK_STACK_ALLOCATOR_INIT
+//#define CONFIGURE_TASK_STACK_ALLOCATOR_INIT
 
 /* Generated from spec:/acfg/if/task-stack-deallocator */
 
@@ -4778,7 +4782,7 @@
  * * ``CONFIGURE_TASK_STACK_DEALLOCATOR``
  * @endparblock
  */
-#define CONFIGURE_TASK_STACK_DEALLOCATOR
+//#define CONFIGURE_TASK_STACK_DEALLOCATOR
 
 /* Generated from spec:/acfg/if/task-stack-from-alloc */
 
@@ -4802,8 +4806,13 @@
  * This configuration option may be used if a custom task stack allocator is
  * configured, see #CONFIGURE_TASK_STACK_ALLOCATOR.
  */
-#define CONFIGURE_TASK_STACK_FROM_ALLOCATOR
+//#define CONFIGURE_TASK_STACK_FROM_ALLOCATOR
 
-/** @} */
+
+/*
+ * Shell configurations
+ */
+#define CONFIGURE_SHELL_COMMANDS_INIT
+#define CONFIGURE_SHELL_COMMANDS_ALL
 
 #endif /* BSP_ASM_PLATFORM_H_ */
