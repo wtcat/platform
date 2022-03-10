@@ -20,6 +20,14 @@ declare_args() {
   use_rtl = false
 }
 
+# BSD-Net
+if (use_libbsd) {
+  declare_args() {
+    use_bsdnet_ftpd = false
+    use_bsdnet_telnet = false;
+  }
+}
+
 declare_args() {
   target_board = ""
   target_version = 5

@@ -1,3 +1,6 @@
+/*
+ * CopyRight 2022 wtcat
+ */
 #include <stdio.h>
 #include <errno.h>
 #include <sys/stat.h>
@@ -9,19 +12,9 @@
 #include <rtems/rtl/rap-shell.h>
 
 #include <bsp/irq-info.h>
-#include "bsp/asm/platform.h"
 
-#ifndef CONFIG_DYNMAIC_LIB_CONTENT
-#define CONFIG_DYNMAIC_LIB_CONTENT \
-    "/etc/libdl*.a\n"
-#endif
-#ifndef CONFIG_JOEL_SCRIPT_CONTENT
-#define CONFIG_JOEL_SCRIPT_CONTENT \
-    "#! joel -t JOEL -p 10 -s 8192\n" \
-    "sleep 2\n" \
-    "mkdir /home\n" \
-    "mount -t dosfs /dev/fdisk /home\n"
-#endif
+#include "bsp/sysconf.h"
+
 
 #ifndef CONFIG_SHELL_STACKSZ
 #ifdef __rtems_libbsd__
@@ -156,19 +149,7 @@ static void shell_commands_register(void) {
 #endif /* __rtems_libbsd__ */
 }
 
-static void shell_etc_init(void) {
-    int ret = IMFS_make_linearfile("/etc/libdl.conf", 0666, 
-        CONFIG_DYNMAIC_LIB_CONTENT, 
-        sizeof(CONFIG_DYNMAIC_LIB_CONTENT));
-    if (!ret) {
-        IMFS_make_linearfile("/etc/start.joel", 0777, 
-            CONFIG_JOEL_SCRIPT_CONTENT, 
-            sizeof(CONFIG_JOEL_SCRIPT_CONTENT));
-    }
-    return ret;
-}
-
-static int shell_init(rtems_shell_login_check_t login_check) {
+int shell_init(rtems_shell_login_check_t login_check) {
 #if defined(CONFIGURE_SHELL_COMMANDS_INIT)
     rtems_status_code sc;
     shell_commands_register();
@@ -178,8 +159,6 @@ static int shell_init(rtems_shell_login_check_t login_check) {
         printf("Shell initialize failed(%s)\n", rtems_status_text(sc));
         return rtems_status_code_to_errno(sc);
     }
-    if (!shell_etc_init())
-        rtems_shell_script_file(0, "/etc/start.joel");
 #else
     (void) login_check;
 #endif //CONFIGURE_SHELL_COMMANDS_INIT

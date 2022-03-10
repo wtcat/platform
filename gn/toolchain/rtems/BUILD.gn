@@ -43,6 +43,9 @@ gcc_toolchain("rtems") {
 
 config("rtems_config") {
     include_dirs = ["//embeded/rtems/include"]
+    if (use_libbsd) {
+      defines = ["__rtems_libbsd__"]
+    }
     cflags = CC_FLAGS
     ldflags = CC_FLAGS
     asmflags = CC_FLAGS

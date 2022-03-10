@@ -3306,7 +3306,7 @@
  * In SMP configurations, there is one IDLE task per configured processor, see
  * #CONFIGURE_MAXIMUM_PROCESSORS.
  */
-#define CONFIGURE_IDLE_TASK_STACK_SIZE 1024
+#define CONFIGURE_IDLE_TASK_STACK_SIZE CONFIGURE_MINIMUM_TASK_STACK_SIZE
 
 /** @} */
 
@@ -3594,7 +3594,7 @@
  * href=https://docs.rtems.org/branches/master/c-user/config/intro.html#unlimited-objects>Unlimited
  * Objects</a>.
  */
-#define CONFIGURE_MAXIMUM_POSIX_KEYS 3
+#define CONFIGURE_MAXIMUM_POSIX_KEYS 12
 
 /* Generated from spec:/acfg/if/max-posix-key-value-pairs */
 
@@ -4807,12 +4807,5 @@
  * configured, see #CONFIGURE_TASK_STACK_ALLOCATOR.
  */
 //#define CONFIGURE_TASK_STACK_FROM_ALLOCATOR
-
-
-/*
- * Shell configurations
- */
-#define CONFIGURE_SHELL_COMMANDS_INIT
-#define CONFIGURE_SHELL_COMMANDS_ALL
 
 #endif /* BSP_ASM_PLATFORM_H_ */

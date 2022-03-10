@@ -18,8 +18,8 @@ extern "C"{
 
 /* Internal helpers only used by the * APIs further below */
 #define __bswap_16(x) __builtin_bswap16((uint16_t)(x))
-#define __bswap_32(x) __builtin_bswap16((uint32_t)(x))
-#define __bswap_64(x) __builtin_bswap16((uint64_t)(x))
+#define __bswap_32(x) __builtin_bswap32((uint32_t)(x))
+#define __bswap_64(x) __builtin_bswap64((uint64_t)(x))
 
 #if (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
 #define le16_to_cpu(val) (val)

@@ -19,13 +19,29 @@ group("all") {
 # Generate executable target
 executable("rtems") {
   sources = [
-    "main.c"
+    "main.c",
+    "shell.c"
   ]
   deps = [
     ":preprocess",
     "bsps/shared",
     "bsps/${target_cpu}/${target_board}:board"
   ]
+
+  if (use_libbsd) {
+    defines += [
+      "RTEMS_BSD_CONFIG_INIT",
+      "RTEMS_BSD_CONFIG_BSP_CONFIG"
+    ]
+    libs += ["bsd"]
+    if (use_bsdnet_ftpd) {
+      defines += ["RTEMS_BSD_CONFIG_SERVICE_FTPD"]
+      libs += ["ftpd"]
+    }
+    if (use_bsdnet_telnet) {
+      defines += ["RTEMS_BSD_CONFIG_SERVICE_TELNETD"]
+      libs += ["telnetd"]
+    }
 }
 
 # Binary and uboot image generate
