@@ -18,6 +18,7 @@ group("all") {
 
 # Generate executable target
 executable("rtems") {
+  libs = []
   sources = [
     "main.c",
     "shell.c"
@@ -42,6 +43,7 @@ executable("rtems") {
       defines += ["RTEMS_BSD_CONFIG_SERVICE_TELNETD"]
       libs += ["telnetd"]
     }
+  }
 }
 
 # Binary and uboot image generate

@@ -1,8 +1,15 @@
+/*
+ * CopyRight(c) 2022 wtcat
+ */
+#include <string.h>
 #include <unistd.h>
 
 #include <rtems.h>
+#include <rtems/imfs.h>
 #include <rtems/shell.h>
 #include <rtems/bspIo.h>
+
+#include <bsp/stackalloc.h>
 #include "bsp/sysconf.h"
 
 #if defined (__rtems_libbsd__)
@@ -24,8 +31,10 @@ static int sysfile_add(const char *pathname, int mode,
 static void etc_init(void) {
 #ifdef CONFIG_JOEL_SCRIPT_CONTENT
     if (!sysfile_add("/etc/start.joel", 0777, 
-      CONFIG_JOEL_SCRIPT_CONTENT))
-      rtems_shell_script_file(0, "/etc/start.joel");
+      CONFIG_JOEL_SCRIPT_CONTENT)) {
+        char *script[] = {"/etc/start.joel"};
+      rtems_shell_script_file(0, script);
+    }
 #endif
 #ifdef CONFIGURE_ETC_RC_CONF_CONTENT
     sysfile_add("/etc/rc.conf", 0666, 
@@ -37,18 +46,22 @@ static void etc_init(void) {
 #endif
 }
 
-static rtems_task Init(rtems_task_argument ignored) {
-  printk( "Hello World\n" );
-  shell_init(NULL);
-  etc_init();
+static void libbsd_init(void) {
 #if defined(__rtems_libbsd__)
   if (rtems_bsd_initialize())
     rtems_panic("LIBBSD initialize failed\n");
-  /* Execute /etc/rc.conf script */
   rtems_bsd_run_etc_rc_conf(RTEMS_MILLISECONDS_TO_TICKS(10000), true);
-#else /* !__rtems_libbsd__ */
+#endif/* __rtems_libbsd__ */
+}
 
-#endif /* __rtems_libbsd__ */
+static rtems_task Init(rtems_task_argument arg) {
+  printk( "Hello World\n" );
+  shell_init(NULL);
+  etc_init();
+  libbsd_init();
+  for ( ; ; ) {
+    rtems_task_wake_after(RTEMS_MILLISECONDS_TO_TICKS(1000));
+  }
 }
 
 #if defined (__rtems_libbsd__) && \
