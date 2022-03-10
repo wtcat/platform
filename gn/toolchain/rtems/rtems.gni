@@ -23,8 +23,8 @@ declare_args() {
 # BSD-Net
 if (use_libbsd) {
   declare_args() {
-    use_bsdnet_ftpd = false
-    use_bsdnet_telnet = false;
+    use_bsdnet_ftpd = true
+    use_bsdnet_telnet = true
   }
 }
 
