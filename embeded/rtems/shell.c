@@ -13,6 +13,7 @@
 
 #include <bsp/irq-info.h>
 
+#include "shell/shell_vt100.h"
 #include "bsp/sysconf.h"
 
 
@@ -32,9 +33,36 @@
 #define SHELL_PRIO CONFIG_SHELL_TASKPRIO
 #endif
 
+/* Macro to send VT100 commands. */
+#define SHELL_VT100_CMD(_cmd_) \
+    do {				   \
+        static const char cmd[] = _cmd_; \
+        fprintf(stdout, "%s", cmd);	\
+    } while (0)
+
 #define BSD_SHELL_COMMAND(key) \
     extern rtems_shell_cmd_t rtems_shell_##key##_Command; \
     rtems_shell_add_cmd_struct(&rtems_shell_##key##_Command)
+
+
+#if defined(CONFIGURE_SHELL_COMMAND_CLEAR)
+static int shell_main_clear_terminal(int argc, char *argv[]) {
+    if (argc > 1)
+        return -EINVAL;
+    SHELL_VT100_CMD(SHELL_VT100_CURSORHOME);
+    SHELL_VT100_CMD(SHELL_VT100_CLEARSCREEN);
+    return 0;
+}
+
+static rtems_shell_cmd_t shell_clear_command = {
+    "clear",                         /* name */
+    "clear     # Clear screen",      /* usage */
+    "rtems",                         /* topic */
+    shell_main_clear,                /* command */
+    NULL,                            /* aliass */
+    NULL                             /* next */
+};
+#endif /* CONFIGURE_SHELL_COMMAND_CLEAR */
 
 #if defined(CONFIGURE_SHELL_COMMAND_RAP)
 static struct rtems_shell_cmd_tt rtems_rap_command = {
@@ -78,6 +106,9 @@ static rtems_shell_cmd_t shell_reboot_command = {
 #endif /* CONFIG_SHELL_REBOOT */
 
 static void shell_commands_register(void) {
+#if defined(CONFIGURE_SHELL_COMMAND_CLEAR)
+    rtems_shell_add_cmd_struct(&shell_clear_command);
+#endif
 #if defined(CONFIGURE_SHELL_COMMAND_IRQ)
     rtems_shell_add_cmd_struct(&bsp_interrupt_shell_command);        
 #endif 
