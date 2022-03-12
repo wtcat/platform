@@ -14,6 +14,9 @@
 
 #include <sys/param.h>
 
+#define __need_getopt_newlib
+#include <getopt.h>
+
 #define SOH  0x01
 #define STX  0x02
 #define EOT  0x04
@@ -199,11 +202,9 @@ static int xm_receive(struct param_struct *param) {
     xm_input_flush(fd);
 
     for ( ; ; ) {
-
         while (retry > 0) {
             if (trychar)
                 xm_putc(fd, trychar);
-
             c = xm_getc(fd);
             if (c >= 0) {
                 switch (c) {
@@ -242,15 +243,12 @@ static int xm_receive(struct param_struct *param) {
                     break;
                 }
             }
-
             retry--;
         }
-
         if (trychar == 'C') { 
             trychar = NAK; 
             continue; 
         }
-
         xm_input_flush(fd);
         xm_putc(fd, CAN);
         xm_putc(fd, CAN);
@@ -267,16 +265,13 @@ static int xm_receive(struct param_struct *param) {
         xbuff[0] = c;
         if (xm_read(fd, xbuff+1, packet_size, &t_new) != packet_size)
             goto reject;
-  
         if (xbuff[1] == (uint8_t)(~xbuff[2]) && 
            (xbuff[1] == packetno || xbuff[1] == (uint8_t)packetno-1) &&
             xm_check(&xbuff[3], bufsz, crc)) {
-
             if (xbuff[1] == packetno) {
                 int count = XMODEM_FILE_SIZE - len;
                 if (count > bufsz) 
                     count = bufsz;
-                
                 if (count > 0) {
                     memcpy(fcache+fp, &xbuff[3], count);
                     fp += count;
@@ -299,7 +294,6 @@ static int xm_receive(struct param_struct *param) {
                 ++packetno;
                 retrans = MAXRETRANS + 1;
             }
-
             if (--retrans <= 0) {
                 xm_input_flush(fd);
                 xm_putc(fd, CAN);
@@ -311,7 +305,6 @@ static int xm_receive(struct param_struct *param) {
             xm_putc(fd, ACK);
             continue;
         }
-
     reject:
         xm_input_flush(fd);
         xm_putc(fd, NAK);
@@ -359,7 +352,6 @@ static int xm_send(struct param_struct *param) {
     t_new.c_cc[VTIME] = XMODE_TIMEOUT;
     tcsetattr(fd, TCSANOW, &t_new);
     xm_input_flush(fd);
-
     for ( ; ; ) {
         while (retry) {
             c = xm_getc(fd);
@@ -402,7 +394,6 @@ start_trans:
 			xbuff[1] = packetno;
 			xbuff[2] = ~packetno;
 			c = param->size - len;
-
             if (c >= 1024) {
                 bufsz = 1024;
                 xbuff[0] = STX; 
@@ -490,6 +481,7 @@ _close:
 }
 
 static int shell_main_xm(int argc, char *argv[]) {
+    int (*fn_exec)(struct param_struct *param);
     struct param_struct param;
     rtems_event_set event;
     rtems_status_code sc;
@@ -499,14 +491,14 @@ static int shell_main_xm(int argc, char *argv[]) {
 
     if (!strcmp(argv[0], "xm.rx")) {
         if (argc == 2 || argc == 3) {
-            param.parent = rtems_task_self();
+            param.thread = rtems_task_self();
             ret = open(argv[1], O_RDWR);
             if (ret < 0) {
                 if (!strncmp("/dev", argv[1], 4)) {
                     printf("\"%s\" is not exist.\n", argv[1]);
                     goto out;
                 }
-                ret = open(argv[1], O_CREAT|O_RDWR, S_IRWXU|S_IRWXG|S_IRWXO);
+                ret = open(argv[1], O_CREAT|O_RDWR, S_IRWXG|S_IRWXO);
                 if (ret < 0) { 
                     printf("%s open %s failed\n", __func__, argv[1]);
                     goto out;
@@ -558,8 +550,67 @@ out:
     return ret;
 }
 
-static void shell_xmodem_init(void)
-{
+static int xm_console_
+static int shell_main_xm(int argc, char *argv[]) {
+    int (*fn_exec)(struct param_struct *param) = xm_receive;
+    struct param_struct param;
+    struct getopt_data getopt_reent;
+    const char *fname = NULL;
+    off_t offset = 0;
+    int speed = 0, ch;
+    bool f_recv = true;
+    bool f_fexist = false; 
+    int permission;
+    int ret;
+
+    if (argc < 3)
+        return -EINVAL;
+    memset(&getopt_reent, 0, sizeof(getopt_data));
+    memset(&param, 0, sizeof(param));
+    while ((ch = getopt_r(argc, argv, "f::o:s:t", &getopt_reent)) != -1) {
+        switch(ch) {
+        case 'f':
+            fname = getopt_reent.optarg;
+            break;
+        case 'o':
+            param.offset = (size_t)strtoul(getopt_reent.optarg, NULL, 0);
+            break;
+        case 's':
+            speed = (int)strtoul(getopt_reent.optarg, NULL, 0);
+            break;
+        case 't':
+            fn_exec = xm_send;
+            break;
+        default:
+            break;
+        }
+    }
+    if (!fname)
+        return -EINVAL;
+    if (!access(fname, F_OK)) {
+        permission = O_RDWR;
+    } else {
+        if (fn_exec == xm_send)
+            return -EINVAL;
+        permission = O_CREAT|O_RDWR;
+    }
+    if (fn_exec == xm_send) {
+        struct stat statbuf;
+        if (stat(fname, &statbuf) < 0)
+            return -EIO;
+        param.size = statbuf.st_size;
+    }
+    param.file = open(fname, permission);
+    if (param.file < 0)
+        return -EIO;
+
+    ret = fn_exec(&param);
+_close_f:
+    close(param.file);
+    return  ret;
+}
+
+static void xm_shell_init(void) {
     static rtems_shell_cmd_t shell_rx_command = {
         "xm.rx",                                       /* name */
         "rx [filepath] [offset], XModem-115200N8",  /* usage */
@@ -568,7 +619,6 @@ static void shell_xmodem_init(void)
         NULL,                                       /* alias */
         NULL                                        /* next */
     };
-
     static rtems_shell_cmd_t shell_sx_command = {
         "xm.tx",                                       /* name */
         "xm.tx [filepath], XModem-115200N8",           /* usage */
@@ -577,7 +627,6 @@ static void shell_xmodem_init(void)
         NULL,                                       /* alias */
         NULL                                        /* next */
     };
-
     rtems_shell_add_cmd_struct(&shell_rx_command);
     rtems_shell_add_cmd_struct(&shell_sx_command);
 }
@@ -585,4 +634,3 @@ static void shell_xmodem_init(void)
 RTEMS_SYSINIT_ITEM(shell_xmodem_init,
     RTEMS_SYSINIT_LAST,
     RTEMS_SYSINIT_ORDER_MIDDLE);
-
