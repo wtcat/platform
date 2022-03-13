@@ -7,7 +7,7 @@ import("//gn/toolchain/rtems/rtems.gni")
 #   '--cflags',
 #   '--libs-only-other',
 # ]
-pkgargs = ["--path", "${rtems_package_path}"]
+pkgargs = ["--path", rebase_path(rtems_package_path, root_build_dir)]
 pkgresult = exec_script("//gn/toolchain/rtems/configure.py", pkgargs, "value")
 CC_FLAGS  = pkgresult[0]
 LD_FLAGS  = pkgresult[1]
