@@ -44,6 +44,10 @@
     extern rtems_shell_cmd_t rtems_shell_##key##_Command; \
     rtems_shell_add_cmd_struct(&rtems_shell_##key##_Command)
 
+#define SHELL_COMMAND_ADD(key) \
+    extern rtems_shell_cmd_t shell_##key##_command; \
+    rtems_shell_add_cmd_struct(&shell_##key##_command)
+
 
 #if defined(CONFIGURE_SHELL_COMMAND_CLEAR)
 static int shell_main_clear_terminal(int argc, char *argv[]) {
@@ -106,6 +110,9 @@ static rtems_shell_cmd_t shell_reboot_command = {
 #endif /* CONFIG_SHELL_REBOOT */
 
 static void shell_commands_register(void) {
+#ifdef CONFIGURE_SHELL_COMMAND_XMODEM
+    SHELL_COMMAND_ADD(xmodem);
+#endif
 #if defined(CONFIGURE_SHELL_COMMAND_CLEAR)
     rtems_shell_add_cmd_struct(&shell_clear_command);
 #endif

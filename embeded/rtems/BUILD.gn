@@ -26,7 +26,8 @@ executable("rtems") {
   deps = [
     ":preprocess",
     "bsps/shared",
-    "bsps/${target_cpu}/${target_board}:board"
+    "bsps/${target_cpu}/${target_board}:board",
+    "component"
   ]
 
   if (use_libbsd) {

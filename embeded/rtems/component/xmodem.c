@@ -1,3 +1,5 @@
+#include "bsp/sysconf.h"
+#ifdef CONFIGURE_SHELL_COMMAND_XMODEM
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
@@ -8,6 +10,7 @@
 #include <assert.h>
 
 #include <rtems.h>
+#include <rtems/malloc.h>
 #include <rtems/sysinit.h>
 #include <rtems/termiostypes.h>
 #include <rtems/shell.h>
@@ -26,19 +29,20 @@
 #define CTRLZ 0x1A
 
 #define MAXRETRANS 25
-#define XMODE_THREAD_STACK_SIZE (8 * 1024)
 #define XMODEM_FILE_SIZE (10 * 1024 * 1024)
 #define XMODEM_EXIT_EVENT RTEMS_EVENT_0
 #define XMODE_FCACHE_SIZE 4096
 #define XMODE_TIMEOUT 15 /* 1.5s */
 
 struct param_struct {
-    rtems_id thread;
+    struct termios t;
+    struct termios t_new;
     union {
         off_t offset;
         size_t size;
     };
     int file;
+    int fdev;
 };
 
 static const char *err_code_text[] = {
@@ -165,7 +169,7 @@ static ssize_t xm_write(int fd, const void *buffer, size_t size,
 
 static int xm_receive(struct param_struct *param) {
     uint8_t xbuff[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */
-    uint8_t fcache[XMODE_FCACHE_SIZE];
+    char *fcache;
     int bufsz, crc = 0;
     uint8_t trychar = 'C';
     uint8_t packetno = 1;
@@ -174,33 +178,17 @@ static int xm_receive(struct param_struct *param) {
     int retrans = MAXRETRANS;
     struct termios t_old, t_new;
     size_t packet_size;
-    int fd = -1;
+    int fd;
     int ret = 0;
     int fp = 0;
     int file;
 
-    fd = open("/dev/console", O_RDWR);
-    if (fd < 0) {
-        printf("%s open console failed\n", __func__);
-        goto _close;
-    }
+    fcache = rtems_malloc(XMODE_FCACHE_SIZE);
+    if (fcache == NULL)
+        return -ENOMEM;
+    fd = param->fdev;
     file = param->file;
-    lseek(file, SEEK_SET, param->offset);
-    tcgetattr(fd, &t_old);
-    t_new = t_old;
-
-    /* 115200N8, Timeout: 15 * 0.1s*/
-    t_new.c_iflag = BRKINT;
-    t_new.c_oflag = 0;
-    t_new.c_cflag = CS8 | CREAD | CLOCAL;
-    t_new.c_lflag = 0;
-    t_new.c_ispeed = B115200;
-    t_new.c_ospeed = B115200;
-    t_new.c_cc[VMIN] = 0;
-    t_new.c_cc[VTIME] = XMODE_TIMEOUT;
-    tcsetattr(fd, TCSANOW, &t_new);
     xm_input_flush(fd);
-
     for ( ; ; ) {
         while (retry > 0) {
             if (trychar)
@@ -263,7 +251,7 @@ static int xm_receive(struct param_struct *param) {
         trychar = 0;
         packet_size = bufsz + (crc? 1: 0) + 3;
         xbuff[0] = c;
-        if (xm_read(fd, xbuff+1, packet_size, &t_new) != packet_size)
+        if (xm_read(fd, xbuff+1, packet_size, &param->t_new) != packet_size)
             goto reject;
         if (xbuff[1] == (uint8_t)(~xbuff[2]) && 
            (xbuff[1] == packetno || xbuff[1] == (uint8_t)packetno-1) &&
@@ -310,16 +298,14 @@ static int xm_receive(struct param_struct *param) {
         xm_putc(fd, NAK);
     }    
 _exit:
-    tcsetattr(fd, TCSADRAIN, &t_old);
+    free(fcache);
     xm_input_flush(fd);
-    close(fd);
 _close:
     printf("\n%s\n", err_code_text[ret]);
-    rtems_event_send(param->parent, XMODEM_EXIT_EVENT);
+    return ret;
 }
 
 static int xm_send(struct param_struct *param) {
-    struct termios t_old, t_new;
     uint8_t xbuff[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */
 	uint8_t packetno = 1;
     int bufsz, crc = -1;
@@ -328,29 +314,12 @@ static int xm_send(struct param_struct *param) {
     size_t packet_size;
     uint16_t ccrc;
     uint8_t ccks;
-    int fd = -1;
+    int fd;
     int ret = 0;
     int file;
 
-    fd = open("/dev/console", O_RDWR);
-    if (fd < 0) {
-        printf("%s open console failed\n", __func__);
-        goto _close;
-    }
+    fd = param->fdev;
     file = param->file;
-    tcgetattr(fd, &t_old);
-    t_new = t_old;
-
-    /* 115200N8, Timeout: 15 * 0.1s*/
-    t_new.c_iflag = BRKINT;
-    t_new.c_oflag = 0;
-    t_new.c_cflag = CS8 | CREAD | CLOCAL;
-    t_new.c_lflag = 0;
-    t_new.c_ispeed = B115200;
-    t_new.c_ospeed = B115200;
-    t_new.c_cc[VMIN] = 0;
-    t_new.c_cc[VTIME] = XMODE_TIMEOUT;
-    tcsetattr(fd, TCSANOW, &t_new);
     xm_input_flush(fd);
     for ( ; ; ) {
         while (retry) {
@@ -424,7 +393,7 @@ start_trans:
 
                 packet_size = bufsz + 4 + (crc? 1: 0);
 				for (retry = 0; retry < MAXRETRANS; retry++) {
-                    if (xm_write(fd, xbuff, packet_size, &t_new) 
+                    if (xm_write(fd, xbuff, packet_size, &param->t_new) 
                         != packet_size) {
                         continue;
                     }
@@ -472,85 +441,54 @@ start_trans:
 		}
 	} 
 _exit:
-    tcsetattr(fd, TCSADRAIN, &t_old);
     xm_input_flush(fd);
-    close(fd);
 _close:
     printf("%s\n", err_code_text[ret]);
-    rtems_event_send(param->parent, XMODEM_EXIT_EVENT);
-}
-
-static int shell_main_xm(int argc, char *argv[]) {
-    int (*fn_exec)(struct param_struct *param);
-    struct param_struct param;
-    rtems_event_set event;
-    rtems_status_code sc;
-    rtems_name name;
-    rtems_id id;
-    int ret = -1;
-
-    if (!strcmp(argv[0], "xm.rx")) {
-        if (argc == 2 || argc == 3) {
-            param.thread = rtems_task_self();
-            ret = open(argv[1], O_RDWR);
-            if (ret < 0) {
-                if (!strncmp("/dev", argv[1], 4)) {
-                    printf("\"%s\" is not exist.\n", argv[1]);
-                    goto out;
-                }
-                ret = open(argv[1], O_CREAT|O_RDWR, S_IRWXG|S_IRWXO);
-                if (ret < 0) { 
-                    printf("%s open %s failed\n", __func__, argv[1]);
-                    goto out;
-                }
-            }
-            param.file = ret;
-            if (argc == 2)
-                param.offset = 0;
-            else
-                param.offset = strtoul(argv[2], NULL, 0);
-        } else {
-            printf("Invalid command format. rx [filepath] [offset]\n");
-            ret = -EINVAL;
-            goto out;
-        }
-    } else if (!strcmp(argv[0], "xm.tx")) {
-        if (argc == 2) {
-            struct stat statbuf;
-            if (!strncmp("/dev", argv[1], 4)) {
-                printf("Can't send device file: \"%s\"\n", argv[1]);
-                goto out;
-            }
-            param.parent = rtems_task_self();
-            ret = open(argv[1], O_RDONLY);
-            if (ret < 0) {
-                printf("%s open %s failed\n", __func__, argv[1]);
-                goto out; 
-            }
-            param.file = ret;
-            ret = stat(argv[1], &statbuf);
-            if (ret < 0) {
-                printf("%s get file(%s) size failed\n", __func__, argv[1]);
-                goto out;
-            }
-            param.size = statbuf.st_size;
-        } else {
-            printf("Invalid command format. rx [filepath] [offset]\n");
-            ret = -EINVAL;
-            goto out; 
-        }
-    }
-    sc = rtems_event_receive(XMODEM_EXIT_EVENT,
-        RTEMS_EVENT_ALL | RTEMS_WAIT, RTEMS_NO_TIMEOUT, &event);
-    if (sc != RTEMS_SUCCESSFUL) 
-        ret = rtems_status_code_to_errno(sc);
-free:
-    close(param.file);
-out:
     return ret;
 }
 
-static int xm_console_
+static int xm_open_console(struct param_struct *param, uint32_t bdr) {
+    uint32_t speed;
+    int fd = open("/dev/console", O_RDWR);
+    if (fd < 0) {
+        printf("%s open console failed\n", __func__);
+        return -1;
+    }
+    switch (bdr) {
+    case 115200:  speed = B115200; break;
+    case 230400:  speed = B230400; break;
+    case 460800:  speed = B460800; break;
+    case 921600:  speed = B921600; break;
+    default: speed = B115200; break;
+    }
+
+    tcgetattr(fd, &param->t_new);
+    param->t = param->t_new;
+    param->fdev = fd;
+    param->t_new.c_iflag = BRKINT;
+    param->t_new.c_oflag = 0;
+    param->t_new.c_cflag = CS8 | CREAD | CLOCAL;
+    param->t_new.c_lflag = 0;
+    param->t_new.c_ispeed = speed;
+    param->t_new.c_ospeed = speed;
+    param->t_new.c_cc[VMIN] = 0;
+    param->t_new.c_cc[VTIME] = XMODE_TIMEOUT;
+    tcsetattr(fd, TCSANOW, &param->t_new);
+    return 0;
+}
+
+static void xm_close_console(struct param_struct *param) {
+    tcsetattr(param->fdev, TCSADRAIN, &param->t);
+    close(param->fdev);
+}
+
+static const char help_usage[] = {
+    "Usage:\n"
+    "xm -f file_name [-t] [-o offset] [-s baudrate]\n"
+    "   -s Baudrate(115200, 230400, 460800, 921600)\n"
+    "   -t send file"
+};
+
 static int shell_main_xm(int argc, char *argv[]) {
     int (*fn_exec)(struct param_struct *param) = xm_receive;
     struct param_struct param;
@@ -558,16 +496,16 @@ static int shell_main_xm(int argc, char *argv[]) {
     const char *fname = NULL;
     off_t offset = 0;
     int speed = 0, ch;
-    bool f_recv = true;
-    bool f_fexist = false; 
     int permission;
     int ret;
 
-    if (argc < 3)
-        return -EINVAL;
+    if (argc < 2) {
+        printf(help_usage);
+        return 0;
+    }
     memset(&getopt_reent, 0, sizeof(getopt_data));
     memset(&param, 0, sizeof(param));
-    while ((ch = getopt_r(argc, argv, "f::o:s:t", &getopt_reent)) != -1) {
+    while ((ch = getopt_r(argc, argv, "f::o:s:ht", &getopt_reent)) != -1) {
         switch(ch) {
         case 'f':
             fname = getopt_reent.optarg;
@@ -581,6 +519,9 @@ static int shell_main_xm(int argc, char *argv[]) {
         case 't':
             fn_exec = xm_send;
             break;
+        case 'h':
+            printf(help_usage);
+            return 0;
         default:
             break;
         }
@@ -590,8 +531,10 @@ static int shell_main_xm(int argc, char *argv[]) {
     if (!access(fname, F_OK)) {
         permission = O_RDWR;
     } else {
-        if (fn_exec == xm_send)
+        if (fn_exec == xm_send) {
+            printf("Not found file(%s)\n", fname);
             return -EINVAL;
+        }
         permission = O_CREAT|O_RDWR;
     }
     if (fn_exec == xm_send) {
@@ -603,34 +546,29 @@ static int shell_main_xm(int argc, char *argv[]) {
     param.file = open(fname, permission);
     if (param.file < 0)
         return -EIO;
-
-    ret = fn_exec(&param);
+    if (!xm_open_console(&param, speed)) {
+        ret = fn_exec(&param);
+        xm_close_console(&param);
+    }
 _close_f:
     close(param.file);
-    return  ret;
+    return ret;
 }
 
-static void xm_shell_init(void) {
-    static rtems_shell_cmd_t shell_rx_command = {
-        "xm.rx",                                       /* name */
-        "rx [filepath] [offset], XModem-115200N8",  /* usage */
-        "rtems",                                    /* topic */
-        shell_main_xmodem,                          /* command */
-        NULL,                                       /* alias */
-        NULL                                        /* next */
-    };
-    static rtems_shell_cmd_t shell_sx_command = {
-        "xm.tx",                                       /* name */
-        "xm.tx [filepath], XModem-115200N8",           /* usage */
-        "rtems",                                    /* topic */
-        shell_main_xmodem,                          /* command */
-        NULL,                                       /* alias */
-        NULL                                        /* next */
-    };
-    rtems_shell_add_cmd_struct(&shell_rx_command);
-    rtems_shell_add_cmd_struct(&shell_sx_command);
+rtems_shell_cmd_t shell_xmodem_command = {
+    "xm",                                       /* name */
+    help_usage,  /* usage */
+    "rtems",                                    /* topic */
+    shell_main_xm,                          /* command */
+    NULL,                                       /* alias */
+    NULL                                        /* next */
+};
+
+static void termios_resize(void) {
+    rtems_termios_bufsize(2048, 2048, 2048);
 }
 
-RTEMS_SYSINIT_ITEM(shell_xmodem_init,
-    RTEMS_SYSINIT_LAST,
+RTEMS_SYSINIT_ITEM(termios_resize,
+    RTEMS_SYSINIT_BSP_START, 
     RTEMS_SYSINIT_ORDER_MIDDLE);
+#endif /* CONFIGURE_SHELL_COMMAND_XMODEM */
