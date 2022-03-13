@@ -145,7 +145,7 @@ static const struct dev_id id_table[] = {
 
 
 static inline int ns16550_tx_empty(struct ns16550_priv *platdata) {
-    int status = readb(platdata->port + NS16550_LINE_STATUS);
+    int status = readb_relaxed(platdata->port + NS16550_LINE_STATUS);
     return status & SP_LSR_THOLD;
 }
 
@@ -153,7 +153,7 @@ static inline ssize_t ns16550_fifo_write(struct ns16550_priv *platdata,
     const char *buf, size_t size) {
     size_t out = size > SP_FIFO_SIZE? SP_FIFO_SIZE: size;
     for (size_t i = 0; i < out; ++i)
-        writeb(buf[i], platdata->port + NS16550_TRANSMIT_BUFFER);
+        writeb_relaxed(buf[i], platdata->port + NS16550_TRANSMIT_BUFFER);
     return out;
 }
 
@@ -216,8 +216,8 @@ static void ns16550_isr(void *arg) {
 
     do {
         for (i = 0; i < SP_FIFO_SIZE; ++i) {
-            if (readb(platdata->port + NS16550_LINE_STATUS) & SP_LSR_RDY)
-                buf[i] = readb(platdata->port + NS16550_RECEIVE_BUFFER);
+            if (readb_relaxed(platdata->port + NS16550_LINE_STATUS) & SP_LSR_RDY)
+                buf[i] = readb_relaxed(platdata->port + NS16550_RECEIVE_BUFFER);
             else
                 break;
         }
@@ -234,13 +234,13 @@ static void ns16550_isr(void *arg) {
                 platdata->total = 0;
             }
         }
-    } while (!(readb(platdata->port + NS16550_INTERRUPT_ID) & SP_IID_0));
+    } while (!(readb_relaxed(platdata->port + NS16550_INTERRUPT_ID) & SP_IID_0));
 }
 
 static void ns16550_txintr_enable(struct ns16550_priv *platdata) {
     rtems_interrupt_lock_context ctx;
     rtems_termios_device_lock_acquire(&platdata->base, &ctx);
-    writeb(SP_INT_TX_ENABLE, platdata->port + NS16550_INTERRUPT_ENABLE);
+    writeb_relaxed(SP_INT_TX_ENABLE, platdata->port + NS16550_INTERRUPT_ENABLE);
     platdata->txintr = true;
     rtems_termios_device_lock_release(&platdata->base, &ctx);
 }
@@ -248,7 +248,7 @@ static void ns16550_txintr_enable(struct ns16550_priv *platdata) {
 static void ns16550_txintr_disable(struct ns16550_priv *platdata) {
     rtems_interrupt_lock_context ctx;
     rtems_termios_device_lock_acquire(&platdata->base, &ctx);
-    writeb(NS16550_ENABLE_ALL_INTR_EXCEPT_TX, 
+    writeb_relaxed(NS16550_ENABLE_ALL_INTR_EXCEPT_TX, 
         platdata->port + NS16550_INTERRUPT_ENABLE);
     platdata->txintr = false;
     rtems_termios_device_lock_release(&platdata->base, &ctx);
@@ -283,9 +283,9 @@ static void ns16550_putc_poll(rtems_termios_device_context *base,
     uint32_t status;
     ns16550_txintr_disable(platdata);
     do {
-        status = readb(platdata->port + NS16550_LINE_STATUS);
+        status = readb_relaxed(platdata->port + NS16550_LINE_STATUS);
     } while (!(status & SP_LSR_THOLD));
-    writeb(ch, platdata->port + NS16550_TRANSMIT_BUFFER);
+    writeb_relaxed(ch, platdata->port + NS16550_TRANSMIT_BUFFER);
     ns16550_txintr_enable(platdata);
 }
 
