@@ -258,6 +258,7 @@ static bool ns16550_open(struct rtems_termios_tty *tty,
     rtems_termios_device_context *base,
     struct termios *term,
     rtems_libio_open_close_args_t *args) {
+    printk("*********@@@\n");
     struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
         struct ns16550_priv, base);
     platdata->tty = tty;
@@ -391,6 +392,7 @@ static void ns16550_xmit_start(rtems_termios_device_context *base,
     const char *buf, size_t len) {
     struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
         struct ns16550_priv, base);
+    printk("*****");
     platdata->total = len;
     if (len > 0) {
         platdata->remaining = len;
@@ -553,7 +555,7 @@ PLATFORM_DRIVER(serial) = {
         .obj_type = DRVMGR_OBJ_DRV,
         .drv_id   = DRIVER_PLATFORM_ID,
         .name     = "serial",
-        .bus_type = DRVMGR_BUS_TYPE_ROOT,
+        .bus_type = DRVMGR_BUS_TYPE_PLATFORM,
         .ops      = &serial_driver_ops
     },
     .ids = id_table

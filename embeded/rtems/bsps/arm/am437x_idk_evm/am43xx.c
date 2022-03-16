@@ -55,7 +55,7 @@ BSP_START_TEXT_SECTION void bsp_start_hook_1(void)
     arm_a9mpcore_start_hook_1();
     bsp_start_copy_sections();
     setup_mmu_and_cache();
-    rtems_cache_enable_data();
+    //rtems_cache_enable_data();
     bsp_start_clear_bss();
 }
 
@@ -74,7 +74,8 @@ uint32_t bsp_fdt_map_intr(const uint32_t *intr,
 
 void bsp_reset(void)
 {
-    
+    printk("BSP reset...\n");
+    for (;;);
 }
 
 /* LIBBSD PHY DRIVER */

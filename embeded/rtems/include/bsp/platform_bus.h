@@ -58,7 +58,7 @@ extern "C"{
 #define TEMPLATE_RESOURCES_REGISTER(_name, ...) \
 	static void platform_resource_##_name##_register(void) { \
 		static const struct bus_resource *const _name[] = {__VA_ARGS__}; \
-		platform_res_register((const struct bus_resource *)_name); \
+		platform_res_register((const struct bus_resource *const*)_name); \
 	}	\
 	RTEMS_SYSINIT_ITEM(platform_resource_##_name##_register, \
 		RTEMS_SYSINIT_BSP_START,  \
@@ -102,7 +102,7 @@ struct dev_private {
 	unsigned short irqs[];
 };
 
-const struct bus_resource *platform_res_get(void);
+const struct bus_resource *const * platform_res_get(void);
 int platform_res_count_get(struct drvmgr_key *keys, 
 	const char *name, size_t len);
 void *platform_resource_get(struct drvmgr_key *keys, enum drvmgr_kt key_type, 
@@ -111,13 +111,13 @@ int platform_reg_resource_get(struct drvmgr_key *keys, int index,
 	unsigned int *reg);
 int platform_irq_resource_get(struct drvmgr_key *keys, int index,
 	unsigned int *oirq);
-int platform_res_register(const struct bus_resource *r);
+int platform_res_register(const struct bus_resource *const *r);
 int platform_dev_register(struct drvmgr_bus *parent,
 	const struct bus_resource *r);
 int platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev, 
 	int bustype);
 int platform_dev_populate_on_bus(struct drvmgr_bus *bus,
-	const struct bus_resource *r);
+	const struct bus_resource *const *r);
 int platform_bus_device_register(struct drvmgr_dev *dev,
 	struct drvmgr_bus_ops *bus_ops, int bustype);
 int platform_irq_map(struct drvmgr_dev *dev, int index);
@@ -187,7 +187,7 @@ static inline bool devcie_has_property(struct drvmgr_dev *dev, const char *prop)
 
 #define PLATFORM_DRIVER(name) \
 	static struct dev_driver __drv_##name; \
-	platform_devres_init(__drv_##name); \
+	platform_driver_init(__drv_##name); \
 	static struct dev_driver __drv_##name
 
 #ifdef __cplusplus

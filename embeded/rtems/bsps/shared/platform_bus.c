@@ -17,13 +17,13 @@
 
 #define RES_NAME_SIZE 32
 
-static const struct bus_resource *platform_resources;
+static const struct bus_resource *const *platform_resources;
 
-const struct bus_resource *platform_res_get(void) {
+const struct bus_resource *const *platform_res_get(void) {
 	return platform_resources;
 }
 
-int platform_res_register(const struct bus_resource *r) {
+int platform_res_register(const struct bus_resource *const *r) {
 	if (platform_resources == NULL) {
 		platform_resources = r;
 		return 0;
@@ -105,8 +105,7 @@ int platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev,
 	if (drv->bus_type != bustype ||
 		dev->parent->bus_type != bustype)
 		return 0;
-	
-	struct dev_driver *ddrv = RTEMS_CONTAINER_OF(drv, struct dev_driver, ids);
+	struct dev_driver *ddrv = RTEMS_CONTAINER_OF(drv, struct dev_driver, drv);
 	struct dev_private *priv = (struct dev_private *)dev->businfo;
 	while (ddrv->ids) {
 		if (!strcmp(priv->res->compatible, ddrv->ids->compatible))
@@ -190,7 +189,7 @@ static int platform_bus_get_freq(struct drvmgr_dev *dev, int no,
 
 int platform_dev_register(struct drvmgr_bus *parent,
 	const struct bus_resource *r) {
-	struct drvmgr_dev *dev;
+	struct drvmgr_dev *dev;	
 	int nr = platform_irq_count_get((struct drvmgr_key *)r->keys);
 	drvmgr_alloc_dev(&dev, sizeof(struct dev_private) + nr * sizeof(short));
 	struct dev_private *priv = device_get_private(dev);
@@ -227,14 +226,16 @@ int platform_dev_register(struct drvmgr_bus *parent,
 }
 
 int platform_dev_populate_on_bus(struct drvmgr_bus *bus,
-	const struct bus_resource *r) {
+	const struct bus_resource *const *r) {
 	int ret;
 	if (r == NULL)
 		return DRVMGR_FAIL;
-	while (r->compatible || r->name) {
-		if (r->parent_bus != bus->bus_type)
+	while (*r) {
+		if (!(*r)->compatible)
 			continue;
-		ret = platform_dev_register(bus, r);
+		if ((*r)->parent_bus != bus->bus_type)
+			continue;
+		ret = platform_dev_register(bus, *r);
 		if (ret)
 			return ret;
 		r++;
