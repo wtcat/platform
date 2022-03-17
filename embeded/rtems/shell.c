@@ -50,7 +50,7 @@
 
 
 #if defined(CONFIGURE_SHELL_COMMAND_CLEAR)
-static int shell_main_clear_terminal(int argc, char *argv[]) {
+static int shell_main_clear(int argc, char *argv[]) {
     if (argc > 1)
         return -EINVAL;
     SHELL_VT100_CMD(SHELL_VT100_CURSORHOME);

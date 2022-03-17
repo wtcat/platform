@@ -50,7 +50,7 @@ extern "C"{
 		RESOURCE_BASE_DECLARE } \
 		_name = { \
 			.compatible = _compatible, \
-			.name = _devname, \
+			.name = "/dev/"_devname, \
 			.parent_bus = _parent, \
 			.keys = { __VA_ARGS__, DRVMGR_KEY_EMPTY } \
 		}

@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 
 #include <rtems/console.h>
 #include <rtems/termiostypes.h>
@@ -213,7 +214,6 @@ static void ns16550_isr(void *arg) {
     struct ns16550_priv *platdata = arg;
     char buf [SP_FIFO_SIZE];
     int i;
-
     do {
         for (i = 0; i < SP_FIFO_SIZE; ++i) {
             if (readb_relaxed(platdata->port + NS16550_LINE_STATUS) & SP_LSR_RDY)
@@ -221,7 +221,8 @@ static void ns16550_isr(void *arg) {
             else
                 break;
         }
-        rtems_termios_enqueue_raw_characters(platdata->tty, buf, i);
+        if (i > 0) 
+            rtems_termios_enqueue_raw_characters(platdata->tty, buf, i);
         if (platdata->total && ns16550_tx_empty(platdata)) {
             size_t current = platdata->current;
             platdata->buf += current;
@@ -245,27 +246,30 @@ static void ns16550_txintr_enable(struct ns16550_priv *platdata) {
     rtems_termios_device_lock_release(&platdata->base, &ctx);
 }
 
-static void ns16550_txintr_disable(struct ns16550_priv *platdata) {
+static bool ns16550_txintr_disable(struct ns16550_priv *platdata) {
     rtems_interrupt_lock_context ctx;
     rtems_termios_device_lock_acquire(&platdata->base, &ctx);
     writeb_relaxed(NS16550_ENABLE_ALL_INTR_EXCEPT_TX, 
         platdata->port + NS16550_INTERRUPT_ENABLE);
+    bool old = platdata->txintr;
     platdata->txintr = false;
     rtems_termios_device_lock_release(&platdata->base, &ctx);
+    return old;
 }
 
+static void ns16550_xmit_start(rtems_termios_device_context *base,
+    const char *buf, size_t len);
 static bool ns16550_open(struct rtems_termios_tty *tty,
     rtems_termios_device_context *base,
     struct termios *term,
     rtems_libio_open_close_args_t *args) {
-    printk("*********@@@\n");
     struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
         struct ns16550_priv, base);
     platdata->tty = tty;
     rtems_termios_set_initial_baud(tty, NS16550_DEFAULT_BDR); // class default baudrate
     writeb(NS16550_ENABLE_ALL_INTR_EXCEPT_TX, 
-    platdata->port + NS16550_INTERRUPT_ENABLE);
-    return 0;
+        platdata->port + NS16550_INTERRUPT_ENABLE);
+    return true;
 }
 
 static void ns16550_close(struct rtems_termios_tty *tty,
@@ -282,12 +286,13 @@ static void ns16550_putc_poll(rtems_termios_device_context *base,
     struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
         struct ns16550_priv, base);
     uint32_t status;
-    ns16550_txintr_disable(platdata);
+    bool tx_ena = ns16550_txintr_disable(platdata);
     do {
         status = readb_relaxed(platdata->port + NS16550_LINE_STATUS);
     } while (!(status & SP_LSR_THOLD));
     writeb_relaxed(ch, platdata->port + NS16550_TRANSMIT_BUFFER);
-    ns16550_txintr_enable(platdata);
+    if (tx_ena)
+        ns16550_txintr_enable(platdata);
 }
 
 static void ns16550_flowctrl_starttx(rtems_termios_device_context *base) {
@@ -392,7 +397,6 @@ static void ns16550_xmit_start(rtems_termios_device_context *base,
     const char *buf, size_t len) {
     struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
         struct ns16550_priv, base);
-    printk("*****");
     platdata->total = len;
     if (len > 0) {
         platdata->remaining = len;
@@ -528,6 +532,7 @@ static void ns16550_console_putc(char c) {
 
 static int ns16550_serial_post(struct drvmgr_dev *dev) {
     if (devcie_has_property(dev, "stdout")) {
+        link(dev->name, CONSOLE_DEVICE_NAME);
         stdout_path = dev;
         BSP_output_char = ns16550_console_putc;
     }
@@ -539,7 +544,6 @@ static int ns16550_remove(struct drvmgr_dev *dev) {
     writeb(NS16550_DISABLE_ALL_INTR, platdata->port + NS16550_INTERRUPT_ENABLE);
     return drvmgr_interrupt_unregister(dev, 0, ns16550_isr, platdata);
 }
-
 
 static struct drvmgr_drv_ops serial_driver_ops = {
 	.init = {

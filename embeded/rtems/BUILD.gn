@@ -80,3 +80,13 @@ group("preprocess") {
   ]
   exec_script("//gn/utils/shell.py", inputargs)
 }
+
+action("postprocess") {
+  basepath = rebase_path("${root_out_dir}")
+  script = "//gn/utils/shell.py"
+  outputs = ["${root_out_dir}/rtems.list"]
+  args = [
+    "${toolchain_prefix}objdump -d ${basepath}/rtems.elf > ${basepath}/rtems.list"
+  ]
+  deps = [":rtems"]
+}

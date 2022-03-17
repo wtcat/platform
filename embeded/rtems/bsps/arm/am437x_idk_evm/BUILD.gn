@@ -14,9 +14,9 @@ component("board") {
   defines = [
     "CONFIG_AM43XX"
   ]
-  deps = [
-    "//embeded/rtems/bsps/arm/shared/lib:libc"
-  ]
+  # deps = [
+  #   "//embeded/rtems/bsps/arm/shared/lib:libc"
+  # ]
   if (use_libbsd) {
     deps += [
       "bsd:drivers"

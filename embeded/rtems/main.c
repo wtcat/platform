@@ -55,7 +55,6 @@ static void libbsd_init(void) {
 }
 
 static rtems_task Init(rtems_task_argument arg) {
-  printf( "Hello World\n" );
   shell_init(NULL);
   etc_init();
   libbsd_init();
