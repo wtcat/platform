@@ -16,11 +16,11 @@ install:
   - bsps/arm/am43xx/include/bsp/irq.h
 links: []
 source:
-- bsps/arm/shared/cache/cache-l2c-310.c
 - bsps/arm/shared/clock/clock-a9mpcore.c
 - bsps/arm/shared/cp15/arm-cp15-set-exception-handler.c
 - bsps/arm/shared/cp15/arm-cp15-set-ttb-entries.c
 - bsps/arm/shared/start/bsp-start-memcpy.S
+- bsps/arm/am43xx/start/cache-l2c-310.c
 - bsps/arm/am43xx/start/bspreset.c
 - bsps/arm/am43xx/start/bspstart.c
 - bsps/arm/am43xx/start/bspstarthooks.c
