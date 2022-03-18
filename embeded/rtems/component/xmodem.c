@@ -182,7 +182,7 @@ static int xm_receive(struct param_struct *param) {
     int ret = 0;
     int fp = 0;
     int file;
-
+    
     fcache = rtems_malloc(XMODE_FCACHE_SIZE);
     if (fcache == NULL)
         return -ENOMEM;
@@ -493,7 +493,7 @@ static int shell_main_xm(int argc, char *argv[]) {
     }
     memset(&getopt_reent, 0, sizeof(getopt_data));
     memset(&param, 0, sizeof(param));
-    while ((ch = getopt_r(argc, argv, "f::o:s:ht", &getopt_reent)) != -1) {
+    while ((ch = getopt_r(argc, argv, "f:o:s:ht", &getopt_reent)) != -1) {
         switch(ch) {
         case 'f':
             fname = getopt_reent.optarg;
@@ -511,6 +511,7 @@ static int shell_main_xm(int argc, char *argv[]) {
             break;
         }
     }
+
     if (!fname)
         return -EINVAL;
     if (!access(fname, F_OK)) {
@@ -528,10 +529,13 @@ static int shell_main_xm(int argc, char *argv[]) {
             return -EIO;
         param.size = statbuf.st_size;
     }
+    printf("xmodem 33333...\n");
     param.file = open(fname, permission);
     if (param.file < 0)
         return -EIO;
+     printf("xmodem 4444...\n");
     if (!xm_open_console(&param)) {
+         printf("xmodem 5555...\n");
         ret = fn_exec(&param);
         xm_close_console(&param);
     }

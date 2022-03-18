@@ -7,12 +7,11 @@
     "/etc/libdl*.a\n"
     
 #define CONFIG_JOEL_SCRIPT_CONTENT \
-    "#! joel -t JOEL -p 10 -s 8192\n" \
+    "#! joel -v -t JOEL -p 10 -s 8192\n" \
     "sleep 2\n" \
     "mkdir /home\n" \
     "mkdir /temp\n" \
     "mount -t dosfs /dev/ram0 /temp\n"
-
 
 #define CONFIGURE_SHELL_COMMAND_XMODEM
 #define CONFIGURE_SHELL_COMMAND_IRQ
