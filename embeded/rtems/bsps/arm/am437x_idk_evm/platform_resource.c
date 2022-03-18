@@ -8,7 +8,7 @@
 TEMPLATE_RESOURCE(uart0, "ti,am4372-uart", "ttyS0", DRVMGR_BUS_TYPE_PLATFORM,
   	TRN("REG0", DRVMGR_KT_INT, 0x44e09000),
   	TRN("IRQ0", DRVMGR_KT_INT, nIRQ(72)),
-    TRN("stdout", DRVMGR_KT_ANY, 0) /* Console */
+    TRN("stdout", DRVMGR_KT_INT, 921600) /* Console : baudrate*/
 );
 TEMPLATE_RESOURCE(uart1, "ti,am4372-uart", "ttyS1", DRVMGR_BUS_TYPE_PLATFORM,
   	TRN("REG0", DRVMGR_KT_INT, 0x48022000),

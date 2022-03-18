@@ -21,7 +21,8 @@ executable("rtems") {
   libs = []
   sources = [
     "main.c",
-    "shell.c"
+    "shell.c",
+    "ram0.c"
   ]
   deps = [
     ":preprocess",

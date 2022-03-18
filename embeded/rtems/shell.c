@@ -197,7 +197,7 @@ int shell_init(rtems_shell_login_check_t login_check) {
     rtems_status_code sc;
     shell_commands_register();
     sc = rtems_shell_init("SHLL", SHELL_STACKSZ, SHELL_PRIO,
-        "/dev/console", false, false, login_check);
+        CONSOLE_DEVICE_NAME, false, false, login_check);
     if (sc != RTEMS_SUCCESSFUL) {
         printf("Shell initialize failed(%s)\n", rtems_status_text(sc));
         return rtems_status_code_to_errno(sc);

@@ -11,13 +11,12 @@
 
 #include <bsp/stackalloc.h>
 #include "bsp/sysconf.h"
+#include "bsp/init.h"
 
 #if defined (__rtems_libbsd__)
 #include <rtems/bsd/bsd.h>
 #include <machine/rtems-bsd-config.h>
 #endif
-
-extern int shell_init(rtems_shell_login_check_t login_check);
 
 static int sysfile_add(const char *pathname, int mode,
     const char *content) {
@@ -50,11 +49,12 @@ static void libbsd_init(void) {
 #if defined(__rtems_libbsd__)
   if (rtems_bsd_initialize())
     rtems_panic("LIBBSD initialize failed\n");
-  rtems_bsd_run_etc_rc_conf(RTEMS_MILLISECONDS_TO_TICKS(10000), true);
+  rtems_bsd_run_etc_rc_conf(RTEMS_MILLISECONDS_TO_TICKS(5000), true);
 #endif/* __rtems_libbsd__ */
 }
 
 static rtems_task Init(rtems_task_argument arg) {
+  ramblk_init();
   shell_init(NULL);
   etc_init();
   libbsd_init();

@@ -447,21 +447,12 @@ _close:
     return ret;
 }
 
-static int xm_open_console(struct param_struct *param, uint32_t bdr) {
-    uint32_t speed;
+static int xm_open_console(struct param_struct *param) {
     int fd = open("/dev/console", O_RDWR);
     if (fd < 0) {
         printf("%s open console failed\n", __func__);
         return -1;
     }
-    switch (bdr) {
-    case 115200:  speed = B115200; break;
-    case 230400:  speed = B230400; break;
-    case 460800:  speed = B460800; break;
-    case 921600:  speed = B921600; break;
-    default: speed = B115200; break;
-    }
-
     tcgetattr(fd, &param->t_new);
     param->t = param->t_new;
     param->fdev = fd;
@@ -469,8 +460,6 @@ static int xm_open_console(struct param_struct *param, uint32_t bdr) {
     param->t_new.c_oflag = 0;
     param->t_new.c_cflag = CS8 | CREAD | CLOCAL;
     param->t_new.c_lflag = 0;
-    param->t_new.c_ispeed = speed;
-    param->t_new.c_ospeed = speed;
     param->t_new.c_cc[VMIN] = 0;
     param->t_new.c_cc[VTIME] = XMODE_TIMEOUT;
     tcsetattr(fd, TCSANOW, &param->t_new);
@@ -484,8 +473,7 @@ static void xm_close_console(struct param_struct *param) {
 
 static const char help_usage[] = {
     "Usage:\n"
-    "xm -f file_name [-t] [-o offset] [-s baudrate]\n"
-    "   -s Baudrate(115200, 230400, 460800, 921600)\n"
+    "xm -f file_name [-t] [-o offset]\n"
     "   -t send file"
 };
 
@@ -495,7 +483,7 @@ static int shell_main_xm(int argc, char *argv[]) {
     struct getopt_data getopt_reent;
     const char *fname = NULL;
     off_t offset = 0;
-    int speed = 0, ch;
+    int ch;
     int permission;
     int ret;
 
@@ -512,9 +500,6 @@ static int shell_main_xm(int argc, char *argv[]) {
             break;
         case 'o':
             param.offset = (size_t)strtoul(getopt_reent.optarg, NULL, 0);
-            break;
-        case 's':
-            speed = (int)strtoul(getopt_reent.optarg, NULL, 0);
             break;
         case 't':
             fn_exec = xm_send;
@@ -546,7 +531,7 @@ static int shell_main_xm(int argc, char *argv[]) {
     param.file = open(fname, permission);
     if (param.file < 0)
         return -EIO;
-    if (!xm_open_console(&param, speed)) {
+    if (!xm_open_console(&param)) {
         ret = fn_exec(&param);
         xm_close_console(&param);
     }
