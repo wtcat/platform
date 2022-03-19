@@ -257,8 +257,6 @@ static bool ns16550_txintr_disable(struct ns16550_priv *platdata) {
     return old;
 }
 
-static void ns16550_xmit_start(rtems_termios_device_context *base,
-    const char *buf, size_t len);
 static bool ns16550_open(struct rtems_termios_tty *tty,
     rtems_termios_device_context *base,
     struct termios *term,
@@ -331,7 +329,7 @@ static bool ns16550_set_termios(rtems_termios_device_context *base,
     _Assert( baud_requested != 0 );
     ulBaudDivisor = ns16550_baud_divisor_get(platdata, baud_requested);
     ucLineControl = 0;
-
+    
     /* Parity */
     if (t->c_cflag & PARENB) {
         ucLineControl |= SP_LINE_PAR;
@@ -363,7 +361,8 @@ static bool ns16550_set_termios(rtems_termios_device_context *base,
         ucLineControl |= SP_LINE_STOP; /* 2 stop bits */
 
     /* Now actually set the chip */
-    if (ulBaudDivisor != platdata->baud_divisor || ucLineControl != platdata->line_control) {
+    if (ulBaudDivisor != platdata->baud_divisor || 
+        ucLineControl != platdata->line_control) {
         platdata->baud_divisor = ulBaudDivisor;
         platdata->line_control = ucLineControl;
 

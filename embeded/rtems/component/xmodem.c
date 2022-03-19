@@ -20,6 +20,8 @@
 #define __need_getopt_newlib
 #include <getopt.h>
 
+#define XM_DEBUG
+
 #define SOH  0x01
 #define STX  0x02
 #define EOT  0x04
@@ -44,6 +46,28 @@ struct param_struct {
     int file;
     int fdev;
 };
+
+#ifdef XM_DEBUG
+static FILE *f_logfp;
+#define XLOG_END() \
+    do { \
+        if (f_logfp) {  \
+            fclose(f_logfp); \
+            f_logfp = NULL;  \
+        }  \
+    } while (0)
+#define XLOG(fmt, ...) \
+    do { \
+        if (!f_logfp) \
+            f_logfp = fopen("/var/log/xmodem.txt", "w+");  \
+        fprintf(f_logfp, fmt, ##__VA_ARGS__); \
+    } while (0)
+#else /* !XM_DEBUG */
+
+#define XLOG_END()
+#define XLOG(fmt, ...)
+#endif /* XM_DEBUG */
+
 
 static const char *err_code_text[] = {
     [0] = "Completed!",
@@ -90,7 +114,8 @@ static const unsigned short crc16tab[256]= {
 	0xef1f,0xff3e,0xcf5d,0xdf7c,0xaf9b,0xbfba,0x8fd9,0x9ff8,
 	0x6e17,0x7e36,0x4e55,0x5e74,0x2e93,0x3eb2,0x0ed1,0x1ef0
 };
-  
+
+
 static uint16_t crc16_ccitt(const void *buf, int len) {
 	uint16_t crc = 0;
 	for(int counter = 0; counter < len; counter++)
@@ -194,6 +219,7 @@ static int xm_receive(struct param_struct *param) {
             if (trychar)
                 xm_putc(fd, trychar);
             c = xm_getc(fd);
+            XLOG("RX CHAR: %d\n", (int)c);
             if (c >= 0) {
                 switch (c) {
                 case SOH:
@@ -247,7 +273,6 @@ static int xm_receive(struct param_struct *param) {
     start_recv:
         if (trychar == 'C') 
             crc = 1;
-
         trychar = 0;
         packet_size = bufsz + (crc? 1: 0) + 3;
         xbuff[0] = c;
@@ -300,8 +325,7 @@ static int xm_receive(struct param_struct *param) {
 _exit:
     free(fcache);
     xm_input_flush(fd);
-_close:
-    printf("\n%s\n", err_code_text[ret]);
+    XLOG("***Receive Error: %s\n", err_code_text[ret]);
     return ret;
 }
 
@@ -443,7 +467,7 @@ start_trans:
 _exit:
     xm_input_flush(fd);
 _close:
-    printf("%s\n", err_code_text[ret]);
+    XLOG("%s\n", err_code_text[ret]);
     return ret;
 }
 
@@ -460,6 +484,8 @@ static int xm_open_console(struct param_struct *param) {
     param->t_new.c_oflag = 0;
     param->t_new.c_cflag = CS8 | CREAD | CLOCAL;
     param->t_new.c_lflag = 0;
+    param->t_new.c_ispeed = B115200;
+    param->t_new.c_ospeed = B115200;
     param->t_new.c_cc[VMIN] = 0;
     param->t_new.c_cc[VTIME] = XMODE_TIMEOUT;
     tcsetattr(fd, TCSANOW, &param->t_new);
@@ -484,7 +510,7 @@ static int shell_main_xm(int argc, char *argv[]) {
     const char *fname = NULL;
     off_t offset = 0;
     int ch;
-    int permission;
+    int oflag;
     int ret;
 
     if (argc < 2) {
@@ -515,13 +541,13 @@ static int shell_main_xm(int argc, char *argv[]) {
     if (!fname)
         return -EINVAL;
     if (!access(fname, F_OK)) {
-        permission = O_RDWR;
+        oflag = O_RDWR;
     } else {
         if (fn_exec == xm_send) {
             printf("Not found file(%s)\n", fname);
             return -EINVAL;
         }
-        permission = O_CREAT|O_RDWR;
+        oflag = O_CREAT|O_RDWR;
     }
     if (fn_exec == xm_send) {
         struct stat statbuf;
@@ -529,17 +555,19 @@ static int shell_main_xm(int argc, char *argv[]) {
             return -EIO;
         param.size = statbuf.st_size;
     }
-    printf("xmodem 33333...\n");
-    param.file = open(fname, permission);
+    if (oflag & O_CREAT)
+        param.file = open(fname, oflag, 0666);
+    else
+        param.file = open(fname, oflag);
     if (param.file < 0)
         return -EIO;
-     printf("xmodem 4444...\n");
     if (!xm_open_console(&param)) {
-         printf("xmodem 5555...\n");
+        lseek(param.file, SEEK_SET, param.offset);
         ret = fn_exec(&param);
         xm_close_console(&param);
     }
 _close_f:
+    XLOG_END();
     close(param.file);
     return ret;
 }
