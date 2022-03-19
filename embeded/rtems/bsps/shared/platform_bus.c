@@ -107,7 +107,7 @@ int platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev,
 		return 0;
 	struct dev_driver *ddrv = RTEMS_CONTAINER_OF(drv, struct dev_driver, drv);
 	struct dev_private *priv = (struct dev_private *)dev->businfo;
-	while (ddrv->ids) {
+	while (ddrv->ids->compatible) {
 		if (!strcmp(priv->res->compatible, ddrv->ids->compatible))
 			return 1;
 		ddrv->ids++;
@@ -233,7 +233,8 @@ int platform_dev_populate_on_bus(struct drvmgr_bus *bus,
 	while (*r) {
 		if (!(*r)->compatible)
 			continue;
-		if ((*r)->parent_bus != bus->bus_type)
+		if ((*r)->parent_bus != bus->bus_type ||
+			(*r)->parent_busid != bus->dev->minor_bus)
 			continue;
 		ret = platform_dev_register(bus, *r);
 		if (ret)

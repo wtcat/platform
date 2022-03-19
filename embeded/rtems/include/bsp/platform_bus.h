@@ -40,18 +40,20 @@ extern "C"{
 	const char *compatible; \
 	const char *name; \
 	int parent_bus; \
+	int parent_busid; \
 	const struct drvmgr_key keys[];
 
 
 #define RN(node) (const struct bus_resource *)(&node)
 #define TRN(rname, type, value) {rname, type, {value}}
-#define TEMPLATE_RESOURCE(_name, _compatible, _devname, _parent, ...) \
+#define TEMPLATE_RESOURCE(_name, _compatible, _parent, _parent_busid, ...) \
 	static const struct resoruce_##_name {\
 		RESOURCE_BASE_DECLARE } \
 		_name = { \
 			.compatible = _compatible, \
-			.name = "/dev/"_devname, \
+			.name = "/dev/"#_name, \
 			.parent_bus = _parent, \
+			.parent_busid = _parent_busid, \
 			.keys = { __VA_ARGS__, DRVMGR_KEY_EMPTY } \
 		}
 
