@@ -29,6 +29,10 @@
 extern "C"{
 #endif
 
+#ifndef __force
+#define __force
+#endif
+
 /*
  * Generic virtual read/write.  Note that we don't support half-word
  * read/writes.  We define __arch_*[bl] here, and leave __arch_*w
@@ -135,11 +139,11 @@ static inline void __raw_readsl(unsigned long addr, void *data, int longlen)
  * accesses.
  */
 #define readb_relaxed(c)	({ uint8_t  __r = __raw_readb(c); __r; })
-#define readw_relaxed(c)	({ uint16_t __r = le16_to_cpu((__force __le16) \
+#define readw_relaxed(c)	({ uint16_t __r = le16_to_cpu((__force uint16_t) \
 						__raw_readw(c)); __r; })
-#define readl_relaxed(c)	({ uint32_t __r = le32_to_cpu((__force __le32) \
+#define readl_relaxed(c)	({ uint32_t __r = le32_to_cpu((__force uint32_t) \
 						__raw_readl(c)); __r; })
-#define readq_relaxed(c)	({ uint64_t __r = le64_to_cpu((__force __le64) \
+#define readq_relaxed(c)	({ uint64_t __r = le64_to_cpu((__force uint64_t) \
 						__raw_readq(c)); __r; })
 
 #define writeb_relaxed(v, c)	((void)__raw_writeb((v), (c)))

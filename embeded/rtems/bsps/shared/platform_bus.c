@@ -100,17 +100,18 @@ const struct dev_id *device_match(struct drvmgr_dev *dev,
 
 int platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev, 
 	int bustype) {
+	struct dev_private *priv;
+	struct dev_driver *ddrv;
 	if (!drv || !dev || !dev->parent || !dev->businfo)
 		return 0;
 	if (drv->bus_type != bustype ||
 		dev->parent->bus_type != bustype)
 		return 0;
-	struct dev_driver *ddrv = RTEMS_CONTAINER_OF(drv, struct dev_driver, drv);
-	struct dev_private *priv = (struct dev_private *)dev->businfo;
-	while (ddrv->ids->compatible) {
-		if (!strcmp(priv->res->compatible, ddrv->ids->compatible))
+	ddrv = RTEMS_CONTAINER_OF(drv, struct dev_driver, drv);
+	priv = (struct dev_private *)dev->businfo;
+	for (int index = 0; ddrv->ids[index].compatible; index++) {
+		if (!strcmp(priv->res->compatible, ddrv->ids[index].compatible))
 			return 1;
-		ddrv->ids++;
 	}
 	return 0;
 }
@@ -230,7 +231,7 @@ int platform_dev_populate_on_bus(struct drvmgr_bus *bus,
 	int ret;
 	if (r == NULL)
 		return DRVMGR_FAIL;
-	while (*r) {
+	for ( ; *r; r++) {
 		if (!(*r)->compatible)
 			continue;
 		if ((*r)->parent_bus != bus->bus_type ||
@@ -239,7 +240,6 @@ int platform_dev_populate_on_bus(struct drvmgr_bus *bus,
 		ret = platform_dev_register(bus, *r);
 		if (ret)
 			return ret;
-		r++;
 	}
 	return DRVMGR_OK;
 }
@@ -259,7 +259,6 @@ int platform_bus_device_register(struct drvmgr_dev *dev,
 	dev->bus->reslist = NULL;
 	dev->bus->maps_up = NULL;
 	dev->bus->maps_down = NULL;
-	dev->name = dev->name;
 	dev->priv = NULL;
 	return drvmgr_bus_register(dev->bus);
 }

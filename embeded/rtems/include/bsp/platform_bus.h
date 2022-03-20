@@ -90,7 +90,7 @@ struct dev_id {
 
 struct dev_driver {
 	struct drvmgr_drv drv;
-	const struct dev_id *ids;
+	const struct dev_id *const ids;
 };
 
 struct bus_resource {
@@ -156,10 +156,11 @@ static inline int platform_irq_get(struct drvmgr_dev *dev,
 		index, oirq);
 }
 
-static inline bool devcie_has_property(struct drvmgr_dev *dev, const char *prop) {
+static inline union drvmgr_key_value *
+devcie_get_property(struct drvmgr_dev *dev, const char *prop) {
 	struct dev_private *priv = device_get_private(dev);
 	return drvmgr_key_val_get((struct drvmgr_key *)priv->res->keys, 
-		(char *)prop, DRVMGR_KT_ANY) != NULL;
+		(char *)prop, DRVMGR_KT_ANY);
 }
 
 #define platform_driver_init(drv) \

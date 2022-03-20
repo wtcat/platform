@@ -36,8 +36,9 @@ struct ns16550_priv {
     const struct ns16550_info *info;
 };
 
-#define NS16550_DEFAULT_BDR 115200
+#define NS16550_DEFAULT_BDR console_default_baudrate
 #define SP_FIFO_SIZE 16
+
 
 /*
  * Register list
@@ -130,6 +131,7 @@ struct ns16550_priv {
 #define SP_LSR_EFIFO  0x80
 
 static int _reg_shift;
+static unsigned int console_default_baudrate = 115200;
 static struct drvmgr_dev *stdout_path;
 
 static const struct ns16550_info am4372_info = {
@@ -144,6 +146,8 @@ static const struct dev_id id_table[] = {
     {NULL, NULL}
 };
 
+static bool ns16550_set_termios(rtems_termios_device_context *base, 
+    const struct termios *t);
 
 static inline int ns16550_tx_empty(struct ns16550_priv *platdata) {
     int status = readb_relaxed(platdata->port + NS16550_LINE_STATUS);
@@ -267,7 +271,7 @@ static bool ns16550_open(struct rtems_termios_tty *tty,
     rtems_termios_set_initial_baud(tty, NS16550_DEFAULT_BDR); // class default baudrate
     writeb(NS16550_ENABLE_ALL_INTR_EXCEPT_TX, 
         platdata->port + NS16550_INTERRUPT_ENABLE);
-    return true;
+    return ns16550_set_termios(base, &tty->termios);
 }
 
 static void ns16550_close(struct rtems_termios_tty *tty,
@@ -530,7 +534,9 @@ static void ns16550_console_putc(char c) {
 }
 
 static int ns16550_serial_post(struct drvmgr_dev *dev) {
-    if (devcie_has_property(dev, "stdout")) {
+    union drvmgr_key_value *prop = devcie_get_property(dev, "stdout");
+    if (prop) {
+        //console_default_baudrate = prop->i;
         link(dev->name, CONSOLE_DEVICE_NAME);
         stdout_path = dev;
         BSP_output_char = ns16550_console_putc;
@@ -555,7 +561,6 @@ static struct drvmgr_drv_ops serial_driver_ops = {
 		
 PLATFORM_DRIVER(serial) = {
     .drv = {
-        .obj_type = DRVMGR_OBJ_DRV,
         .drv_id   = DRIVER_PLATFORM_ID,
         .name     = "serial",
         .bus_type = DRVMGR_BUS_TYPE_PLATFORM,

@@ -7,6 +7,7 @@ component("board") {
   sources = [
     "am43xx.c",
     "console.c",
+    "gpio.c",
     "platform_resource.c"
     # "clock.c",
     # "clock_am43xx.c"
