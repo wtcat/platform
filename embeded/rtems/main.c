@@ -53,14 +53,17 @@ static void libbsd_init(void) {
 #endif/* __rtems_libbsd__ */
 }
 
+int RTEMS_WEAK main(void) {
+  return 0;
+}
+
 static rtems_task Init(rtems_task_argument arg) {
   ramblk_init();
   shell_init(NULL);
   etc_init();
   libbsd_init();
-  for ( ; ; ) {
-    rtems_task_wake_after(RTEMS_MILLISECONDS_TO_TICKS(1000));
-  }
+  main();
+  rtems_task_exit();
 }
 
 #if defined (__rtems_libbsd__) && \

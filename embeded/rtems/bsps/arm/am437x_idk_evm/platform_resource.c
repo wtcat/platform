@@ -55,8 +55,16 @@ TEMPLATE_RESOURCE(gpio5, "ti,am4372-gpio", DRVMGR_BUS_TYPE_PLATFORM, 0,
   	TRN("IRQ0", DRVMGR_KT_INT, nIRQ(148))
 );
 
+/*
+ * User button
+ */
+TEMPLATE_RESOURCE(gpio_keys, "gpio-keys", DRVMGR_BUS_TYPE_GPIO, 4,
+  	TRN("REG0", DRVMGR_KT_INT, 2)
+);
+
 TEMPLATE_RESOURCES_REGISTER(platform_resources,
     RN(ttyS0), RN(ttyS1), RN(ttyS2), RN(ttyS3), RN(ttyS4), 
 	RN(gpio0), RN(gpio1), RN(gpio2), RN(gpio3), RN(gpio4), RN(gpio5),
+	RN(gpio_keys),
 	NULL
 );

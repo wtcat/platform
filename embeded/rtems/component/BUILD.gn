@@ -1,6 +1,8 @@
 
 component("component") {
     sources = [
-        "xmodem.c"
+        "xmodem.c",
+        "timer_ii.c",
+        "workq.c"
     ]
 }
