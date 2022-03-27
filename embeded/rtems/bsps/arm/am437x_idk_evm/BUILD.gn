@@ -8,6 +8,7 @@ component("board") {
     "am43xx.c",
     "console.c",
     "gpio.c",
+    "gpio_keys.c",
     "platform_resource.c"
     # "clock.c",
     # "clock_am43xx.c"
