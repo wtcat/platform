@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include <rtems.h>
+#include <rtems/chain.h>
 #include <rtems/malloc.h>
 #include <rtems/sysinit.h>
 
@@ -27,12 +28,16 @@ int work_init(struct work_struct *work,
 }
 
 int work_submit_to_queue(struct workqueue *wq, struct work_struct *work) {
+	if (!rtems_chain_is_node_off_chain(&work->req.entry.node))
+		return -EBUSY;
 	work->req.entry.server = &wq->queue;
 	rtems_interrupt_server_request_submit(&work->req);
 	return 0;
 }
 
 int work_cancel(struct work_struct *work) {
+	if (rtems_chain_is_node_off_chain(&work->req.entry.node))
+		return -EINVAL;
 	rtems_interrupt_server_entry_destroy(&work->req.entry);
 	return 0;
 }
@@ -62,7 +67,7 @@ int work_delayed_sumbit_to_queue(struct workqueue *wq,
 
 int work_delayed_cancel(struct work_delayed_struct *work) {
 	if (!timer_ii_remove(&work->timer))
-		work_cancel(&work->work);
+		return work_cancel(&work->work);
 	return 0;
 }
 
