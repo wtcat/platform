@@ -231,6 +231,7 @@ static void gpio_entry_init(struct gpio_entry *e) {
 static void gpio_bus_isr(void *arg) {
 	struct gpio_priv *platdata = arg;
 	uint32_t status;
+	printk("GPIO Controller ISR\n");
     status = readl_relaxed(platdata->base + OMAP_GPIO_IRQSTATUS1);
     writel_relaxed(status, platdata->base + OMAP_GPIO_IRQSTATUS1);
     while (status) {

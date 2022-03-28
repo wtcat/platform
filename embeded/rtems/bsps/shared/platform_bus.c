@@ -259,7 +259,6 @@ int platform_bus_device_register(struct drvmgr_dev *dev,
 	dev->bus->reslist = NULL;
 	dev->bus->maps_up = NULL;
 	dev->bus->maps_down = NULL;
-	dev->priv = NULL;
 	return drvmgr_bus_register(dev->bus);
 }
 

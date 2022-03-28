@@ -20,7 +20,7 @@ struct gpio_keys_priv {
 };
 
 static void report_key(struct gpio_keys_priv *priv, bool pressed) {
-
+    printk("GPIO-KEYS(%d): %s\n", (int)priv->code, pressed? "PRESSED": "RELEASE");
 }
 
 static void gpio_keys_work(struct work_struct *work) {
@@ -42,30 +42,39 @@ static int gpio_keys_init(struct drvmgr_dev *dev) {
     struct dev_private *devp;
 	int ret;
     priv = rtems_calloc(1, sizeof(struct gpio_keys_priv));
-    if (priv == NULL) 
+    if (priv == NULL) {
+        printk("Error***(%s): no more memory\n", __func__);
         return -DRVMGR_NOMEM;
+    }
     devp = device_get_private(dev);
     prop = devcie_get_property(dev, "POLARITY");
     if (!prop) {
-        priv->polarity = (uint8_t)prop->i;
+        printk("Error***(%s): Not found POLARITY property\n", __func__);
         goto _free;
     }
+    priv->polarity = (uint8_t)prop->i;
     prop = devcie_get_property(dev, "CODE");
     if (!prop) {
-        priv->code = (uint16_t)prop->i;
+        printk("Error***(%s): Not found CODE property\n", __func__);
         goto _free;
     }
+    priv->code = (uint16_t)prop->i;
     priv->pin = (uint16_t)devp->base;
     priv->dev = dev;
 	dev->priv = priv;
     work_delayed_init(&priv->work, gpio_keys_work);
     ret = drvmgr_interrupt_register(dev, priv->pin, dev->name, 
         gpio_keys_isr, priv);
-    if (ret)
+    if (ret) {
+        printk("Error***(%s): install pin(%d) isr failed: %d\n", __func__, ret);
         goto _free;
-    ret = gpiod_configure(dev, priv->pin, GPIO_INTR(GPIO_EDGE_BOTH));
-    if (ret) 
+    }
+    ret = gpiod_configure(dev->parent->dev, priv->pin, GPIO_INTR(GPIO_EDGE_BOTH));
+    if (ret) {
+        printk("Error***(%s): configure pin(%d) failed: %d\n", __func__, ret);
         goto _unregister;
+    }
+    printk("gpio pin-number: %d\n", (int)priv->pin);
 	return 0;
 _unregister:
     drvmgr_interrupt_unregister(dev, priv->pin, gpio_keys_isr, priv);
@@ -75,7 +84,7 @@ _free:
 }
 
 static const struct dev_id id_table[] = {
-    {.compatible = "gpio_keys", NULL},
+    {.compatible = "gpio-keys", NULL},
     {NULL, NULL}
 };
 
