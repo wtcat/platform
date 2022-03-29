@@ -19,15 +19,16 @@ extern "C"{
 #define GPIO_INTR(type)  (GPIO_INPUT | (type))
 
 #define GPIO_MASK(n)  ((n) & 0x0F00)
-#define GPIO_INPUT    (0ul << 8)
-#define GPIO_OUTPUT   (1ul << 8)
-#define GPIO_PULLUP   (2ul << 8)
+#define GPIO_INPUT    (1ul << 8)
+#define GPIO_OUTPUT   (2ul << 8)
+#define GPIO_PULLUP   (3ul << 8)
 #define GPIO_PULLDOWN (4ul << 8)
 
 struct gpio_operations {
 	int (*configure)(struct drvmgr_dev *dev, int pin, unsigned int mode);
 	int (*set_pin)(struct drvmgr_dev *dev, int pin, int val);
 	int (*get_pin)(struct drvmgr_dev *dev, int pin, int *val);
+    void (*dump)(struct drvmgr_dev *dev);
 };
 
 static inline int gpiod_configure(struct drvmgr_dev *dev, int pin, 
@@ -52,6 +53,14 @@ static inline int gpiod_getpin(struct drvmgr_dev *dev, int pin,
     _Assert(dev->priv != NULL);
     const struct gpio_operations *ops = *(void **)dev->priv;
     return ops->get_pin(dev, pin, inval);
+}
+
+static inline void gpiod_dump(struct drvmgr_dev *dev) {
+    _Assert(dev != NULL);
+    _Assert(dev->priv != NULL);
+    const struct gpio_operations *ops = *(void **)dev->priv;
+    if (ops->dump)
+        ops->dump(dev);
 }
 
 #ifdef __cplusplus

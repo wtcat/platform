@@ -52,6 +52,34 @@ struct gpio_priv {
 #define OMAP_GPIO_IRQSTATUS_CLR_0  0x003c
 #define OMAP_GPIO_IRQSTATUS_CLR_1  0x0040
 
+static void gpio_bus_dump(struct drvmgr_dev *dev) {
+	struct gpio_priv *platdata = dev->priv;
+	printk("GPIO DUMP(0x%x):\n", platdata->base);
+	printk("	OMAP_GPIO_SYSCONFIG = 0x%x\n", 
+		readl_relaxed(platdata->base + OMAP_GPIO_SYSCONFIG));
+	printk("	OMAP_GPIO_SYSSTATUS = 0x%x\n", 
+		readl_relaxed(platdata->base + OMAP_GPIO_SYSSTATUS));
+	printk("	OMAP_GPIO_CTRL = 0x%x\n", 
+		readl_relaxed(platdata->base + OMAP_GPIO_CTRL));
+	printk("	OMAP_GPIO_OE = 0x%x\n", 
+		readl_relaxed(platdata->base + OMAP_GPIO_OE));
+	printk("	OMAP_GPIO_DATAIN = 0x%x\n", 
+		readl_relaxed(platdata->base + OMAP_GPIO_DATAIN));
+	printk("	OMAP_GPIO_DATAOUT = 0x%x\n", 
+		readl_relaxed(platdata->base + OMAP_GPIO_DATAOUT));
+	printk("	OMAP_GPIO_LEVELDETECT0 = 0x%x\n", 
+		readl_relaxed(platdata->base + OMAP_GPIO_LEVELDETECT0));
+	printk("	OMAP_GPIO_LEVELDETECT1 = 0x%x\n", 
+		readl_relaxed(platdata->base + OMAP_GPIO_LEVELDETECT1));
+	printk("	OMAP_GPIO_RISINGDETECT = 0x%x\n", 
+		readl_relaxed(platdata->base + OMAP_GPIO_RISINGDETECT));
+	printk("	OMAP_GPIO_FALLINGDETECT = 0x%x\n", 
+		readl_relaxed(platdata->base + OMAP_GPIO_FALLINGDETECT));
+	printk("	OMAP_GPIO_IRQSTATUS_SET_0 = 0x%x\n", 
+		readl_relaxed(platdata->base + OMAP_GPIO_IRQSTATUS_SET_0));
+	printk("	OMAP_GPIO_IRQSTATUS_SET_1 = 0x%x\n", 
+		readl_relaxed(platdata->base + OMAP_GPIO_IRQSTATUS_SET_1));
+}
 
 static void gpio_bus_set_dir(struct drvmgr_dev *dev, int pin, 
 	int input) {
@@ -168,24 +196,26 @@ static int gpio_bus_unite(struct drvmgr_drv *drv, struct drvmgr_dev *dev) {
 
 static int gpio_bus_intr_register(struct drvmgr_dev *dev, int index, 
 	const char *info, drvmgr_isr isr, void *arg) {
-	struct gpio_priv *platdata = dev->priv;
+	struct gpio_priv *platdata = dev->parent->dev->priv;
 	if (index >= GPIO_PAD_PINS)
 		return -DRVMGR_EINVAL;
 	rtems_interrupt_lock_context lock_context;
 	rtems_interrupt_lock_acquire(&platdata->lock, &lock_context);
 	platdata->enties[index].arg = arg;	
 	platdata->enties[index].handler = isr;
+	writel_relaxed(BIT(index), platdata->base + OMAP_GPIO_IRQSTATUS_SET_0);
 	rtems_interrupt_lock_release(&platdata->lock, &lock_context);
 	return DRVMGR_OK;
 }
 
 static int gpio_bus_intr_unregister(struct drvmgr_dev *dev, int index, 
 	drvmgr_isr isr, void *arg) {
-	struct gpio_priv *platdata = dev->priv;
+	struct gpio_priv *platdata = dev->parent->dev->priv;
 	if (index >= GPIO_PAD_PINS)
 		return -DRVMGR_EINVAL;
 	rtems_interrupt_lock_context lock_context;
 	rtems_interrupt_lock_acquire(&platdata->lock, &lock_context);
+	writel_relaxed(BIT(index), platdata->base + OMAP_GPIO_IRQSTATUS_CLR_0);
 	platdata->enties[index].handler = gpio_bus_default_isr;
 	platdata->enties[index].arg = NULL;
 	rtems_interrupt_lock_release(&platdata->lock, &lock_context);
@@ -193,13 +223,13 @@ static int gpio_bus_intr_unregister(struct drvmgr_dev *dev, int index,
 }
 	
 static int gpio_bus_intr_clear(struct drvmgr_dev *dev, int index) {
-	struct gpio_priv *platdata = dev->priv;
+	struct gpio_priv *platdata = dev->parent->dev->priv;;
 	writel_relaxed(BIT(index), platdata->base + OMAP_GPIO_IRQSTATUS1);
 	return DRVMGR_OK;
 }
 
 static int gpio_bus_intr_mask(struct drvmgr_dev *dev, int index) {
-	struct gpio_priv *platdata = dev->priv;
+	struct gpio_priv *platdata = dev->parent->dev->priv;
 	writel_relaxed(BIT(index), platdata->base + OMAP_GPIO_IRQSTATUS_CLR_0);
 	return DRVMGR_OK;
 }
@@ -231,7 +261,6 @@ static void gpio_entry_init(struct gpio_entry *e) {
 static void gpio_bus_isr(void *arg) {
 	struct gpio_priv *platdata = arg;
 	uint32_t status;
-	printk("GPIO Controller ISR\n");
     status = readl_relaxed(platdata->base + OMAP_GPIO_IRQSTATUS1);
     writel_relaxed(status, platdata->base + OMAP_GPIO_IRQSTATUS1);
     while (status) {
@@ -244,7 +273,8 @@ static void gpio_bus_isr(void *arg) {
 static const struct gpio_operations gpio_ops = {
 	.configure = gpio_bus_configure,
 	.get_pin = gpio_bus_getpin,
-	.set_pin = gpio_bus_setpin
+	.set_pin = gpio_bus_setpin,
+	.dump = gpio_bus_dump
 };
 
 static struct drvmgr_bus_ops gpio_bus_ops = {
