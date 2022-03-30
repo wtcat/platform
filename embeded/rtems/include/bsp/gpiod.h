@@ -27,7 +27,7 @@ extern "C"{
 struct gpio_operations {
 	int (*configure)(struct drvmgr_dev *dev, int pin, unsigned int mode);
 	int (*set_pin)(struct drvmgr_dev *dev, int pin, int val);
-	int (*get_pin)(struct drvmgr_dev *dev, int pin, int *val);
+	int (*get_pin)(struct drvmgr_dev *dev, int pin);
     void (*dump)(struct drvmgr_dev *dev);
 };
 
@@ -47,12 +47,11 @@ static inline int gpiod_setpin(struct drvmgr_dev *dev, int pin,
     return ops->set_pin(dev, pin, val);
 }
 
-static inline int gpiod_getpin(struct drvmgr_dev *dev, int pin, 
-	int *inval) {
+static inline int gpiod_getpin(struct drvmgr_dev *dev, int pin) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
     const struct gpio_operations *ops = *(void **)dev->priv;
-    return ops->get_pin(dev, pin, inval);
+    return ops->get_pin(dev, pin);
 }
 
 static inline void gpiod_dump(struct drvmgr_dev *dev) {

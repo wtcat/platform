@@ -173,15 +173,11 @@ static int gpio_bus_setpin(struct drvmgr_dev *dev, int pin,
 	return 0;
 }
 
-static int gpio_bus_getpin(struct drvmgr_dev *dev, int pin, 
-	int *inval) {
+static int gpio_bus_getpin(struct drvmgr_dev *dev, int pin) {
 	struct gpio_priv *platdata = dev->priv;
 	rtems_interrupt_lock_context lock_context;
-	uint32_t v, ofs;
 	rtems_interrupt_lock_acquire(&platdata->lock, &lock_context);
-	v = readl_relaxed(platdata->base + OMAP_GPIO_OE);
-	ofs = OMAP_GPIO_DATAIN + (((v >> pin) & 1) << 2);
-	v = readl_relaxed(platdata->base + ofs);
+	uint32_t v = readl_relaxed(platdata->base + OMAP_GPIO_DATAIN);
 	rtems_interrupt_lock_release(&platdata->lock, &lock_context);
 	return !!(v & BIT(pin));
 }

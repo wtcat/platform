@@ -13,22 +13,22 @@
 
 struct gpio_keys_priv {
     struct work_delayed_struct work;
-    struct drvmgr_dev *dev;
+    struct drvmgr_dev *parent;
     uint16_t code;
     uint8_t pin;
     uint8_t polarity;
 };
 
 static void report_key(struct gpio_keys_priv *priv, bool pressed) {
-    printk("GPIO-KEYS(%d): %s\n", (int)priv->code, pressed? "PRESSED": "RELEASE");
+    printk("GPIO-KEYS(%d): %s\n", (int)priv->code, 
+        pressed? "PRESSED": "RELEASE");
 }
 
 static void gpio_keys_work(struct work_struct *work) {
     struct gpio_keys_priv *priv = RTEMS_CONTAINER_OF(work, 
         struct gpio_keys_priv, work.work);
-    int status;
-    if (!gpiod_getpin(priv->dev, priv->pin, &status))
-        report_key(priv, status == (int)priv->polarity);
+    int status = gpiod_getpin(priv->parent, priv->pin);
+    report_key(priv, status == (int)priv->polarity);
 }
 
 static void gpio_keys_isr(void *arg) {
@@ -60,7 +60,7 @@ static int gpio_keys_init(struct drvmgr_dev *dev) {
     }
     priv->code = (uint16_t)prop->i;
     priv->pin = (uint16_t)devp->base;
-    priv->dev = dev;
+    priv->parent = dev->parent->dev;
 	dev->priv = priv;
     work_delayed_init(&priv->work, gpio_keys_work);
     ret = drvmgr_interrupt_register(dev, priv->pin, dev->name, 

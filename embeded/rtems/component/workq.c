@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include <rtems.h>
+#include <rtems/bspIo.h>
 #include <rtems/chain.h>
 #include <rtems/malloc.h>
 #include <rtems/sysinit.h>
@@ -31,6 +32,7 @@ int work_submit_to_queue(struct workqueue *wq, struct work_struct *work) {
 	if (!rtems_chain_is_node_off_chain(&work->req.entry.node))
 		return -EBUSY;
 	work->req.entry.server = &wq->queue;
+	RTEMS_COMPILER_MEMORY_BARRIER();
 	rtems_interrupt_server_request_submit(&work->req);
 	return 0;
 }
@@ -44,7 +46,7 @@ int work_cancel(struct work_struct *work) {
 
 static void work_delayed_timer(struct timer_ii *timer) {
 	struct work_delayed_struct *work = RTEMS_CONTAINER_OF(timer, 
-		struct work_delayed_struct, work);
+		struct work_delayed_struct, timer);
 	work_submit_to_queue(work->wq, &work->work);
 }
 
@@ -58,10 +60,13 @@ int work_delayed_init(struct work_delayed_struct *work,
 int work_delayed_sumbit_to_queue(struct workqueue *wq, 
 	struct work_delayed_struct *work, uint32_t delay_ms) {
 	uint32_t ticks = RTEMS_MILLISECONDS_TO_TICKS(delay_ms);
-	if (RTEMS_PREDICT_TRUE(ticks > 0))
+	if (RTEMS_PREDICT_TRUE(ticks > 0)) {
+		work->wq = wq;
+		RTEMS_COMPILER_MEMORY_BARRIER();
 		timer_ii_mod(&work->timer, ticks);
-	else
+	} else {
 		work_submit_to_queue(wq, &work->work);
+	}
 	return 0;
 }
 
