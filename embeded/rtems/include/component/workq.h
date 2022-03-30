@@ -9,7 +9,9 @@
 extern "C"{
 #endif
 
-struct workqueue;
+struct workqueue {
+	rtems_interrupt_server_control queue;
+};
 
 struct work_struct {
 	rtems_interrupt_server_request req;
@@ -26,7 +28,6 @@ extern struct workqueue *_system_workqueue;
 int work_init(struct work_struct *work, void (*worker)(struct work_struct *));
 int work_submit_to_queue(struct workqueue *wq, struct work_struct *work);
 int work_cancel(struct work_struct *work);
-
 int work_delayed_init(struct work_delayed_struct *work,
 	void (*worker)(struct work_struct *));
 int work_delayed_sumbit_to_queue(struct workqueue *wq, 

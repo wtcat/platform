@@ -14,10 +14,6 @@
 #define SYSWQ_PRIO  10
 #define SYSWQ_STKSZ 4096
 
-struct workqueue {
-	rtems_interrupt_server_control queue;
-};
-
 struct workqueue *_system_workqueue;
 
 int work_init(struct work_struct *work, 
