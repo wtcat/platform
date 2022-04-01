@@ -9,32 +9,32 @@
 #include <rtems/sysinit.h>
 
 #include "component/workq.h"
+#include "bsp/sysconf.h"
 
 
 #define SYSWQ_PRIO  10
 #define SYSWQ_STKSZ 4096
 
-struct workqueue *_system_workqueue;
+struct workqueue _system_workqueue[CONFIGURE_MAXIMUM_PROCESSORS];
 
 int work_init(struct work_struct *work, 
 	void (*worker)(struct work_struct *)) {
 	rtems_status_code sc;
-	sc = rtems_interrupt_server_request_initialize(_system_workqueue->queue.index, 
+	sc = rtems_interrupt_server_request_initialize(_system_workqueue[0].queue.index, 
 		&work->req, (rtems_interrupt_handler)worker, work);
 	return rtems_status_code_to_errno(sc);
 }
 
 int work_submit_to_queue(struct workqueue *wq, struct work_struct *work) {
-	if (!rtems_chain_is_node_off_chain(&work->req.entry.node))
-		return -EBUSY;
+	if (RTEMS_PREDICT_FALSE(wq == NULL || work == NULL))
+		return -EINVAL; 
 	work->req.entry.server = &wq->queue;
-	RTEMS_COMPILER_MEMORY_BARRIER();
 	rtems_interrupt_server_request_submit(&work->req);
 	return 0;
 }
 
 int work_cancel(struct work_struct *work) {
-	if (rtems_chain_is_node_off_chain(&work->req.entry.node))
+	if (RTEMS_PREDICT_FALSE(work == NULL))
 		return -EINVAL;
 	rtems_interrupt_server_entry_destroy(&work->req.entry);
 	return 0;
@@ -56,9 +56,10 @@ int work_delayed_init(struct work_delayed_struct *work,
 int work_delayed_sumbit_to_queue(struct workqueue *wq, 
 	struct work_delayed_struct *work, uint32_t delay_ms) {
 	uint32_t ticks = RTEMS_MILLISECONDS_TO_TICKS(delay_ms);
+	if (RTEMS_PREDICT_FALSE(wq == NULL || work == NULL))
+		return -EINVAL; 
 	if (RTEMS_PREDICT_TRUE(ticks > 0)) {
 		work->wq = wq;
-		RTEMS_COMPILER_MEMORY_BARRIER();
 		timer_ii_mod(&work->timer, ticks);
 	} else {
 		work_submit_to_queue(wq, &work->work);
@@ -72,36 +73,60 @@ int work_delayed_cancel(struct work_delayed_struct *work) {
 	return 0;
 }
 
-int workqueue_create(struct workqueue **q, size_t stksz, int prio) {
+int workqueue_create(struct workqueue *wq, size_t stksz, int prio) {
 	rtems_interrupt_server_config cfg;
-	struct workqueue *wq;
 	rtems_status_code sc;
 	uint32_t index;
-
-	wq = rtems_calloc(1, sizeof(struct workqueue));
 	if (wq == NULL)
-		return -ENOMEM;
+		return -EINVAL;
 	memset(&cfg, 0, sizeof(cfg));
 	cfg.storage_size = stksz;
 	cfg.priority = (rtems_task_priority)prio;
-	cfg.name = rtems_build_name('w', 'k', 'q', '@');
+	cfg.name = rtems_build_name('W', 'Q', '@', '0');
 	cfg.modes = RTEMS_PREEMPT | RTEMS_NO_ASR | RTEMS_NO_TIMESLICE;
 	cfg.attributes = RTEMS_LOCAL;
 	sc = rtems_interrupt_server_create(&wq->queue, &cfg, &index);
-	if (sc != RTEMS_SUCCESSFUL) {
-		free(wq);
+	if (sc != RTEMS_SUCCESSFUL) 
 		return rtems_status_code_to_errno(sc);
-	}
 	(void)index;
-	*q = wq;
 	return 0;
 }
 
+int workqueue_destory(struct workqueue *wq) {
+	if (wq != NULL) {
+		uint32_t server = wq->queue.index;
+		rtems_status_code sc;
+		sc = rtems_interrupt_server_delete(server);
+		return rtems_status_code_to_errno(sc);
+	}
+	return -EINVAL;
+}
+
 static void workq_init(void) {
+	int cpu_max = rtems_configuration_get_maximum_processors();
+	rtems_status_code sc;
 	int ret;
-	ret = workqueue_create(&_system_workqueue, SYSWQ_STKSZ, SYSWQ_PRIO);
-	if (ret)
-		rtems_panic("Create system workqueue failed!\n");
+	for (int cpu_index = 0; cpu_index < cpu_max; cpu_index++) {
+		cpu_set_t cpu;
+		ret = workqueue_create(&_system_workqueue[cpu_index], SYSWQ_STKSZ, SYSWQ_PRIO);
+		if (!ret) {
+		#if defined(RTEMS_SMP)
+			rtems_id task = _system_workqueue[cpu_index].queue.server;
+			rtems_id scheduler;
+			sc = rtems_scheduler_ident_by_processor(cpu_index, &scheduler);
+			if (sc != RTEMS_SUCCESSFUL)
+				rtems_panic("Get scheduler failed: %s!\n", rtems_status_text(sc));
+			sc = rtems_task_set_scheduler(task, scheduler, SYSWQ_PRIO);
+			_Assert(sc == RTEMS_SUCCESSFUL);
+			CPU_ZERO(&cpu);
+			CPU_SET(cpu_index, &cpu);
+			rtems_task_set_affinity(task, sizeof(cpu), &cpu);
+			(void) sc;
+		#endif
+		} else {
+			rtems_panic("Create system workqueue failed!\n");
+		}
+	}
 }
 
 RTEMS_SYSINIT_ITEM(workq_init, 
