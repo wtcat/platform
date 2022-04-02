@@ -7,12 +7,12 @@
 #include <bsp.h>
 #include "bsp/gpiod.h"
 #include "bsp/platform_bus.h"
-#include "component/workq.h"
+#include "component/workqueue.h"
 
-#define GPIO_DEBOUNCE_TIME 10
+#define GPIO_DEBOUNCE_TIME WQ_MSEC(10)
 
 struct gpio_keys_priv {
-    struct work_delayed_struct work;
+    struct delayed_work_struct work;
     struct drvmgr_dev *parent;
     uint16_t code;
     uint8_t pin;
@@ -33,7 +33,7 @@ static void gpio_keys_work(struct work_struct *work) {
 
 static void gpio_keys_isr(void *arg) {
     struct gpio_keys_priv *priv = arg;
-    work_delayed_submit(&priv->work, GPIO_DEBOUNCE_TIME);
+    schedule_delayed_work(&priv->work, GPIO_DEBOUNCE_TIME);
 }
 
 static int gpio_keys_init(struct drvmgr_dev *dev) {
@@ -62,7 +62,7 @@ static int gpio_keys_init(struct drvmgr_dev *dev) {
     priv->pin = (uint16_t)devp->base;
     priv->parent = dev->parent->dev;
 	dev->priv = priv;
-    work_delayed_init(&priv->work, gpio_keys_work);
+    delayed_work_init(&priv->work, gpio_keys_work);
     ret = drvmgr_interrupt_register(dev, priv->pin, dev->name, 
         gpio_keys_isr, priv);
     if (ret) {

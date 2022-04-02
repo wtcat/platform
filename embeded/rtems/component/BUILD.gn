@@ -3,6 +3,6 @@ component("component") {
     sources = [
         "xmodem.c",
         "timer_ii.c",
-        "workq.c"
+        "workqueue.c"
     ]
 }

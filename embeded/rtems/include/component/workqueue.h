@@ -1,5 +1,8 @@
-#ifndef COMPONENT_WORKQ_H_
-#define COMPONENT_WORKQ_H_
+/*
+ * CopyRight 2022 wtcat
+ */
+#ifndef COMPONENT_WORKQUEUE_H_
+#define COMPONENT_WORKQUEUE_H_
 
 #include <rtems.h>
 #include <rtems/scheduler.h>
@@ -16,6 +19,7 @@ extern "C"{
 #define SMP_ALIGNMENT
 #endif
 
+#define WQ_MSEC(n) RTEMS_MILLISECONDS_TO_TICKS(n)
 
 struct workqueue {
 #if defined(RTEMS_SMP)
@@ -53,7 +57,7 @@ int cancel_queue_work(struct workqueue *wq, struct work_struct *work,
 int schedule_delayed_work_to_queue(struct workqueue *wq, 
     struct delayed_work_struct *work, uint32_t ticks);
 int cancel_queue_delayed_work(struct workqueue *wq, 
-    struct work_struct *work, bool wait);
+    struct delayed_work_struct *work, bool wait);
 int workqueue_create(struct workqueue *wq, int cpu_index, uint32_t prio, 
     size_t stksize, uint32_t modes, uint32_t attributes);
 int workqueue_destory(struct workqueue *wq);
@@ -65,7 +69,8 @@ static inline int schedule_work(struct work_struct *work) {
     return schedule_work_to_queue(_SYSTEM_WQ, work);
 }
 
-static inline int schedule_delayed_work(struct work_struct *work, uint32_t ticks) {
+static inline int schedule_delayed_work(struct delayed_work_struct *work, 
+    uint32_t ticks) {
     return schedule_delayed_work_to_queue(_SYSTEM_WQ, work, ticks);
 }
 
@@ -77,16 +82,16 @@ static inline int cancel_work_async(struct work_struct *work) {
     return cancel_queue_work(_SYSTEM_WQ, work, false);
 }
 
-static inline int cancel_delayed_work_sync(struct work_struct *work) {
+static inline int cancel_delayed_work_sync(struct delayed_work_struct *work) {
     return cancel_queue_delayed_work(_SYSTEM_WQ, work, true);
 }
 
-static inline int cancel_delayed_work_async(struct work_struct *work) {
+static inline int cancel_delayed_work_async(struct delayed_work_struct *work) {
     return cancel_queue_delayed_work(_SYSTEM_WQ, work, false);
 }
 
 #ifdef __cplusplus
 }
 #endif
-#endif /* COMPONENT_WORKQ_H_ */
+#endif /* COMPONENT_WORKQUEUE_H_ */
 
