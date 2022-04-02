@@ -85,6 +85,7 @@ static void schedule_worker(rtems_task_argument arg) {
             rtems_chain_set_off_chain(&work->node);
             handler = work->handler;
             rtems_interrupt_lock_release(&wq->lock, &lock_context);
+            _Assert(handler != NULL);
             /* Execute user work */
             handler(work);
         } while (true);

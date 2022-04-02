@@ -1,0 +1,5 @@
+component("testsuite") {
+    sources = [
+        "workqueue_unittest.c"
+    ]
+}

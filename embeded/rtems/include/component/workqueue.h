@@ -44,7 +44,7 @@ extern struct workqueue _system_workqueue[];
 
 #define _SYSTEM_WQ  (&_system_workqueue[rtems_scheduler_get_processor()])
 #define WORK_INITIALIZER(_handler) \
-    {{NULL, NULL}, _handler, 0}
+    {{NULL, NULL}, _handler}
 
 void work_init(struct work_struct *work, 
     void (*handler)(struct work_struct *));

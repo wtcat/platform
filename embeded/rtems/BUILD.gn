@@ -28,7 +28,8 @@ executable("rtems") {
     ":preprocess",
     "bsps/shared",
     "bsps/${target_cpu}/${target_board}:board",
-    "component"
+    "component",
+    "testsuite"
   ]
 
   if (use_libbsd) {
