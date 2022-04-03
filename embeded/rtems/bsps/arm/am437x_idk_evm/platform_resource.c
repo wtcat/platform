@@ -1,5 +1,16 @@
 #include "bsp/platform_bus.h"
 
+
+/* PRCM Base Address */
+#define PRCM_BASE			0x44DF0000
+#define	CM_WKUP				0x44DF2800
+#define	CM_PER				0x44DF8800
+#define CM_DPLL				0x44DF4200
+#define CM_RTC				0x44DF8500
+#define PRM_RSTCTRL			(PRCM_BASE + 0x4000)
+#define PRM_RSTST			(PRM_RSTCTRL + 4)
+
+#define PER_REG(ofs) (CM_PER + (ofs)) 
 #define nIRQ(n) ((n) + 32)
 
 /*
@@ -64,9 +75,30 @@ TEMPLATE_RESOURCE(gpio_keys, "gpio-keys", DRVMGR_BUS_TYPE_GPIO, 4,
 	TRN("CODE", DRVMGR_KT_INT, 0x10)
 );
 
+/*
+ * DMTimer
+ */
+TEMPLATE_RESOURCE(timer2, "ti,am4372-timer", DRVMGR_BUS_TYPE_PLATFORM, 0,
+  	TRN("REG0", DRVMGR_KT_INT, 0x48040000),
+	TRN("IRQ0", DRVMGR_KT_INT, nIRQ(68)),
+	TRN("fck", DRVMGR_KT_INT, PER_REG(0x530))
+);
+TEMPLATE_RESOURCE(timer3, "ti,am4372-timer", DRVMGR_BUS_TYPE_PLATFORM, 0,
+  	TRN("REG0", DRVMGR_KT_INT, 0x48042000),
+	TRN("IRQ0", DRVMGR_KT_INT, nIRQ(69)),
+	TRN("fck", DRVMGR_KT_INT, PER_REG(0x538))
+);
+TEMPLATE_RESOURCE(timer4, "ti,am4372-timer", DRVMGR_BUS_TYPE_PLATFORM, 0,
+  	TRN("REG0", DRVMGR_KT_INT, 0x48044000),
+	TRN("IRQ0", DRVMGR_KT_INT, nIRQ(92)),
+	TRN("fck", DRVMGR_KT_INT, PER_REG(0x540))
+);
+
+
 TEMPLATE_RESOURCES_REGISTER(platform_resources,
     RN(ttyS0), RN(ttyS1), RN(ttyS2), RN(ttyS3), RN(ttyS4), 
 	RN(gpio0), RN(gpio1), RN(gpio2), RN(gpio3), RN(gpio4), RN(gpio5),
 	RN(gpio_keys),
+	RN(timer2), RN(timer3), RN(timer4),
 	NULL
 );
