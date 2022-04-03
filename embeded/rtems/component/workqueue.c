@@ -44,7 +44,7 @@ static void destory_helper_work(struct work_struct *work) {
     rtems_task_exit();
 }
 
-static int wait_event_helper(struct workqueue *wq, uint32_t events, 
+static int request_event_helper(struct workqueue *wq, uint32_t events, 
     uint32_t timeout, void (*helper)(struct work_struct *), bool prepend) {
     struct helper_work_struct helper_work;
     rtems_interrupt_lock_context lock_context;
@@ -128,7 +128,7 @@ int cancel_queue_work(struct workqueue *wq, struct work_struct *work,
     rtems_chain_set_off_chain(&work->node);
     rtems_interrupt_lock_release(&wq->lock, &lock_context);
     if (wait) {
-        return wait_event_helper(wq, RTEMS_EVENT_WORK_CANCEL, 
+        return request_event_helper(wq, RTEMS_EVENT_WORK_CANCEL, 
             RTEMS_NO_TIMEOUT, cancel_helper_work, true);
     }
     return 0;
@@ -214,7 +214,7 @@ int workqueue_create(struct workqueue *wq, int cpu_index, uint32_t prio,
 }
 
 int workqueue_destory(struct workqueue *wq) {
-    return wait_event_helper(wq, RTEMS_EVENT_WORKQUEUE_TERMINAL, 
+    return request_event_helper(wq, RTEMS_EVENT_WORKQUEUE_TERMINAL, 
         RTEMS_NO_TIMEOUT, destory_helper_work, false);
 }
 
