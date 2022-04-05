@@ -1,5 +1,12 @@
 component("testsuite") {
-    sources = [
-        "workqueue_unittest.c"
+    include_dirs = [
+        "googletest/include",
+        "googletest"
     ]
+    sources = [
+        "googletest/src/gtest-all.cc",
+        "test_main.cc"
+        #"workqueue_unittest.c"
+    ]
+
 }

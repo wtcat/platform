@@ -75,7 +75,7 @@ static int gpio_keys_init(struct drvmgr_dev *dev) {
         goto _unregister;
     }
     printk("gpio pin-number: %d\n", (int)priv->pin);
-    gpiod_dump(dev->parent->dev);
+    //gpiod_dump(dev->parent->dev);
 	return 0;
 _unregister:
     drvmgr_interrupt_unregister(dev, priv->pin, gpio_keys_isr, priv);

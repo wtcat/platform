@@ -8,6 +8,7 @@ target_version = 6
 target_board = "am437x_idk_evm"
 
 rtems_package_path = "//rtems/build/arm/am437x_idk_evm"
+compiler_cflags = "-O2"
 
 use_bin = true
 use_uboot = true
