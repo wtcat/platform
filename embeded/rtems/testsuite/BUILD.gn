@@ -1,10 +1,10 @@
 component("testsuite") {
     include_dirs = [
-        "googletest/include",
-        "googletest"
+        "//embeded/googletest/include",
+        "//embeded/googletest"
     ]
     sources = [
-        "googletest/src/gtest-all.cc",
+        "//embeded/googletest/src/gtest-all.cc",
         "test_main.cc",
         "workqueue_unit_test.cc",
         "timlib_unit_test.cc"
