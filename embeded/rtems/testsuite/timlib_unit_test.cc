@@ -54,7 +54,7 @@ TEST_F(cc_timlib_test, open_close) {
 }
 
 TEST_F(cc_timlib_test, start) {
-    uint32_t cnt1, cnt2;
+    uint32_t cnt1, cnt2, cnt3;
     uint32_t basefreq;
     int ret = timlib_get_freq(dev_, &basefreq, NULL);
     ASSERT_TRUE(ret == 0);
@@ -66,6 +66,9 @@ TEST_F(cc_timlib_test, start) {
     cnt2 = timlib_get_counter(dev_);
     ASSERT_TRUE(cnt2 < cnt1);
     std::cout << "cnt1 = " << cnt1 << " cnt2 = " << cnt2 << "\n";
+    timlib_restart(dev_);
+    cnt3 = timlib_get_counter(dev_);
+    ASSERT_TRUE(cnt3 > cnt2);
 
     timlib_stop(dev_);
     cnt1 = timlib_get_counter(dev_);

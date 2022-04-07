@@ -27,10 +27,12 @@ executable("rtems") {
   deps = [
     ":preprocess",
     "bsps/shared",
-    "bsps/${target_cpu}/${target_board}:board",
     "component",
-    "testsuite"
+    "bsps/${target_cpu}/${target_board}:board"
   ]
+  if (use_testsuite) {
+    deps += ["testsuite"]
+  }
 
   if (use_libbsd) {
     defines += [
