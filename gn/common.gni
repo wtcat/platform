@@ -6,6 +6,9 @@ declare_args() {
   
   #Generate uboot image
   use_uboot = false
+
+  #Enable unit testcase
+  use_testsuite = false
 }
 
 declare_args () {

@@ -12,5 +12,6 @@ compiler_cflags = "-O2"
 
 use_bin = true
 use_uboot = true
+use_testsuite = true
 uboot_ldaddr = 2148548608
 
