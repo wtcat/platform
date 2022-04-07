@@ -13,6 +13,7 @@
     "mkdir /var/log\n" \
     "mkdir /home\n" \
     "mkdir /temp\n" \
+    "mkdos /dev/ram0\n" \
     "mount -t dosfs /dev/ram0 /temp\n"
 
 #define CONFIGURE_SHELL_COMMAND_XMODEM
