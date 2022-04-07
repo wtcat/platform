@@ -839,7 +839,7 @@
  * which enable floating point support.
  * @endparblock
  */
-#define CONFIGURE_MAXIMUM_TASKS 36
+#define CONFIGURE_MAXIMUM_TASKS 64
 
 /* Generated from spec:/acfg/if/max-thread-local-storage-size */
 
@@ -2580,7 +2580,7 @@
  * This is an advanced configuration option.  Use it only if you know exactly
  * what you are doing.
  */
-#define CONFIGURE_EXECUTIVE_RAM_SIZE (512 * 1024)
+#define CONFIGURE_EXECUTIVE_RAM_SIZE (2048 * 1024)
 
 /* Generated from spec:/acfg/if/extra-task-stacks */
 

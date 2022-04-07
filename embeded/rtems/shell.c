@@ -17,15 +17,16 @@
 #include "bsp/sysconf.h"
 
 
-#ifndef CONFIG_SHELL_STACKSZ
-#ifdef __rtems_libbsd__
+#if defined(__rtems_libbsd__)
 #define SHELL_STACKSZ  (32 * 1024)
-#else
+#else // !__rtems_libbsd__
+
+#ifndef CONFIG_SHELL_STACKSZ
 #define SHELL_STACKSZ  (4 * 1024)
-#endif
-#else //!CONFIG_SHELL_STACKSZ
+#else 
 #define SHELL_STACKSZ  CONFIG_SHELL_STACKSZ
-#endif //CONFIG_SHELL_STACKSZ
+#endif 
+#endif //__rtems_libbsd__
 
 #ifndef CONFIG_SHELL_TASKPRIO
 #define SHELL_PRIO  (CONFIGURE_MAXIMUM_PRIORITY - 3)
