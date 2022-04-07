@@ -1,6 +1,7 @@
 import("//gn/toolchain/rtems/rtems.gni")
 
 component("board") {
+  deps = []
   include_dirs = [
     "include"
   ]
@@ -14,17 +15,9 @@ component("board") {
     # "clock.c",
     # "clock_am43xx.c"
   ]
-  defines = [
-    "CONFIG_AM43XX"
-  ]
-  # deps = [
-  #   "//embeded/rtems/bsps/arm/shared/lib:libc"
-  # ]
+  defines = ["CONFIG_AM43XX"]
   if (use_libbsd) {
-    deps += [
-      "bsd:drivers"
-    ]
-    defines += ["__rtems_libbsd__"]
+    deps += ["bsd:bsd_drivers"]
   }
 }
 

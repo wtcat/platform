@@ -19,6 +19,7 @@ group("all") {
 # Generate executable target
 executable("rtems") {
   libs = []
+  defines = []
   sources = [
     "main.c",
     "shell.c",

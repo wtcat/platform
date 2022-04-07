@@ -1,11 +1,7 @@
-import("//gn/toolchain/rtems/rtems.gni")
-import("//lib/featrues.gni")
-import("//arch/common.gni")
-
 #=========================
 # BSD Drivers
 #=========================
-component("drivers") {
+component("bsd_drivers") {
   sources = [
     "ti_sdhci.c",
     "ti_scm.c",
