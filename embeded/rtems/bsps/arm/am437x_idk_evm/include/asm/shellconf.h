@@ -7,11 +7,8 @@
     "/etc/libdl*.a\n"
     
 #define CONFIG_JOEL_SCRIPT_CONTENT \
-    "#! joel -v -t JOEL -p 10 -s 8192\n" \
-    "sleep 2\n" \
-    "mkdir /var\n" \
-    "mkdir /var/log\n" \
-    "mkdir /home\n" \
+    "#! joel -v -t JOEL -p 110 -s 8192\n" \
+    "sleep 3\n" \
     "mkdir /temp\n" \
     "mkdos /dev/ram0\n" \
     "mount -t dosfs /dev/ram0 /temp\n"

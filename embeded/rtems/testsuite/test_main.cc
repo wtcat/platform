@@ -39,7 +39,7 @@ static uint32_t change_prio(uint32_t pri) {
     return prio;
 }
 
-int main(void) {
+int app_main(void) {
     int argc = 1;
     char *argv[] = {(char *)" "};
 

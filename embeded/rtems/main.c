@@ -43,17 +43,22 @@ static void etc_init(void) {
     sysfile_add("/etc/libdl.conf", 0666, 
       CONFIG_DYNMAIC_LIB_CONTENT);
 #endif
+    sync();
 }
 
 static void libbsd_init(void) {
 #if defined(__rtems_libbsd__)
+  rtems_task_priority prio;
+  rtems_task_set_priority(RTEMS_SELF, 110, &prio);
+  (void) prio;
   if (rtems_bsd_initialize())
     rtems_panic("LIBBSD initialize failed\n");
+  rtems_task_wake_after(RTEMS_MILLISECONDS_TO_TICKS(1000));
   rtems_bsd_run_etc_rc_conf(RTEMS_MILLISECONDS_TO_TICKS(5000), true);
 #endif/* __rtems_libbsd__ */
 }
 
-int RTEMS_WEAK main(void) {
+int RTEMS_WEAK app_main(void) {
   return 0;
 }
 
@@ -62,7 +67,7 @@ static rtems_task Init(rtems_task_argument arg) {
   shell_init(NULL);
   etc_init();
   libbsd_init();
-  main();
+  app_main();
   rtems_task_exit();
 }
 
