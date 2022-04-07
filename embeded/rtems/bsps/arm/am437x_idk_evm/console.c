@@ -287,12 +287,19 @@ static void ns16550_putc_poll(rtems_termios_device_context *base,
     char ch) {
     struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
         struct ns16550_priv, base);
+    rtems_interrupt_lock_context ctx;
     uint32_t status;
     bool tx_ena = ns16550_txintr_disable(platdata);
     do {
-        status = readb_relaxed(platdata->port + NS16550_LINE_STATUS);
-    } while (!(status & SP_LSR_THOLD));
-    writeb_relaxed(ch, platdata->port + NS16550_TRANSMIT_BUFFER);
+        rtems_termios_device_lock_acquire(base, &ctx);
+        uint32_t status = readb_relaxed(platdata->port + NS16550_LINE_STATUS);
+        if (status & SP_LSR_THOLD) {
+            writeb_relaxed(ch, platdata->port + NS16550_TRANSMIT_BUFFER);
+            rtems_termios_device_lock_release(base, &ctx);
+            break;
+        }
+        rtems_termios_device_lock_release(base, &ctx);
+    } while (true);
     if (tx_ena)
         ns16550_txintr_enable(platdata);
 }
@@ -411,6 +418,25 @@ static void ns16550_xmit_start(rtems_termios_device_context *base,
     }
 }
 
+static void ns16550_polled_xmit_start(rtems_termios_device_context *base,
+    const char *buf, size_t len) {
+    size_t nwrite = 0;
+    while (nwrite < len) {
+        ns16550_putc_poll(base, *buf++);
+        nwrite++;
+    }
+}
+
+static int ns16550_polled_getchar(rtems_termios_device_context *base) {
+   struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
+        struct ns16550_priv, base);
+    uint8_t status;
+    status = readb_relaxed(platdata->port + NS16550_LINE_STATUS);
+    if (status & SP_LSR_RDY) 
+        return (int)readb_relaxed(platdata->port + NS16550_RECEIVE_BUFFER);
+    return -1;
+}
+
 static const rtems_termios_device_flow ns16550_flowctrl_ops RTEMS_UNUSED = {
     .stop_remote_tx  = ns16550_flowctrl_stoptx,
     .start_remote_tx = ns16550_flowctrl_starttx
@@ -419,9 +445,16 @@ static const rtems_termios_device_flow ns16550_flowctrl_ops RTEMS_UNUSED = {
 static const rtems_termios_device_handler ns16550_ops = {
     .first_open     = ns16550_open,
     .last_close     = ns16550_close,
-    .write          = ns16550_xmit_start,
     .set_attributes = ns16550_set_termios,
+ #ifdef USE_INTR_MODE   
+    .write          = ns16550_xmit_start,
+    .poll_read      = NULL,
     .mode           = TERMIOS_IRQ_DRIVEN
+#else
+    .write          = ns16550_polled_xmit_start,
+    .poll_read      = ns16550_polled_getchar,
+    .mode           = TERMIOS_POLLED
+#endif
 };
 
 static int ns16550_serial_preprobe(struct drvmgr_dev *dev) {
