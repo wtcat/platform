@@ -36,6 +36,7 @@ struct ns16550_priv {
     const struct ns16550_info *info;
 };
 
+#define USE_INTR_MODE
 #define NS16550_DEFAULT_BDR console_default_baudrate
 #define SP_FIFO_SIZE 16
 
@@ -245,20 +246,16 @@ static void ns16550_isr(void *arg) {
 static void ns16550_txintr_enable(struct ns16550_priv *platdata) {
     rtems_interrupt_lock_context ctx;
     rtems_termios_device_lock_acquire(&platdata->base, &ctx);
-    writeb_relaxed(SP_INT_TX_ENABLE, platdata->port + NS16550_INTERRUPT_ENABLE);
-    platdata->txintr = true;
+    writeb(SP_INT_TX_ENABLE, platdata->port + NS16550_INTERRUPT_ENABLE);
     rtems_termios_device_lock_release(&platdata->base, &ctx);
 }
 
-static bool ns16550_txintr_disable(struct ns16550_priv *platdata) {
+static void ns16550_txintr_disable(struct ns16550_priv *platdata) {
     rtems_interrupt_lock_context ctx;
     rtems_termios_device_lock_acquire(&platdata->base, &ctx);
-    writeb_relaxed(NS16550_ENABLE_ALL_INTR_EXCEPT_TX, 
+    writeb(NS16550_ENABLE_ALL_INTR_EXCEPT_TX, 
         platdata->port + NS16550_INTERRUPT_ENABLE);
-    bool old = platdata->txintr;
-    platdata->txintr = false;
     rtems_termios_device_lock_release(&platdata->base, &ctx);
-    return old;
 }
 
 static bool ns16550_open(struct rtems_termios_tty *tty,
@@ -289,7 +286,7 @@ static void ns16550_putc_poll(rtems_termios_device_context *base,
         struct ns16550_priv, base);
     rtems_interrupt_lock_context ctx;
     uint32_t status;
-    bool tx_ena = ns16550_txintr_disable(platdata);
+    uint8_t mask = readb(platdata->port + NS16550_INTERRUPT_ENABLE);
     do {
         rtems_termios_device_lock_acquire(base, &ctx);
         uint32_t status = readb_relaxed(platdata->port + NS16550_LINE_STATUS);
@@ -300,8 +297,7 @@ static void ns16550_putc_poll(rtems_termios_device_context *base,
         }
         rtems_termios_device_lock_release(base, &ctx);
     } while (true);
-    if (tx_ena)
-        ns16550_txintr_enable(platdata);
+    writeb(mask, platdata->port + NS16550_INTERRUPT_ENABLE);
 }
 
 static void ns16550_flowctrl_starttx(rtems_termios_device_context *base) {
