@@ -88,20 +88,19 @@ static void timer_set_prescaler(struct dmtimer_priv *priv,
         writel_relaxed(rv, priv->base + DMTIMER_TCLR);
     }
 }
+
 static void timer_reset(struct drvmgr_dev *dev) {
     struct dmtimer_priv *priv = dev->priv;
-    printk("%s: Resetting timer ...\n", dev->name);
     /* Reset timer */
     writel(0x1, priv->base + DMTIMER_TIOCP_CFG);
     while(readl_relaxed(priv->base + DMTIMER_TIOCP_CFG) & 0x1);
     timer_set_prescaler(priv, priv->prescaler);
-    printk("%s: Reset done ...\n", dev->name);
 }
 
 static void timer_start(struct drvmgr_dev *dev) {
     struct dmtimer_priv *priv = dev->priv;
     uint32_t rv = readl_relaxed(priv->base + DMTIMER_TCLR);
-    rv |= TCLR_ST;
+    rv |= TCLR_ST | TCLR_AR;
     /* Reload counter from load register */
     writel_relaxed(1, priv->base + DMTIMER_TTGR); 
     writel_relaxed(rv, priv->base + DMTIMER_TCLR);
@@ -130,7 +129,7 @@ static int timer_get_freq(struct drvmgr_dev *dev, uint32_t *basefreq,
     struct dmtimer_priv *priv = dev->priv;
     if (basefreq)
         *basefreq = TIMER_CLKSRC_FREQ / (priv->prescaler + 1);
-    if (*tickrate) {
+    if (tickrate) {
         uint32_t v = readl_relaxed(priv->base + DMTIMER_TLDR);
         *tickrate = TIMER_MAX_COUNT - v;
     }
@@ -165,6 +164,11 @@ static uint32_t timer_get_widthmask(struct drvmgr_dev *dev) {
     return TIMER_MAX_COUNT;
 }
 
+static void timer_irq_ack(struct drvmgr_dev *dev) {
+    struct dmtimer_priv *priv = dev->priv;
+    writel_relaxed(0x2, priv->base + DMTIMER_IRQSTS);
+}
+
 static void timer_dump_regs(struct drvmgr_dev *dev) {
     struct dmtimer_priv *priv = dev->priv;
     timer_dump_registers(dev->name, priv->base);
@@ -181,6 +185,7 @@ static const struct timlib_ops hw_timer_ops = {
     .unreg_intr = timer_irq_uninstall,
     .get_counter = timer_get_counter,
     .get_widthmask = timer_get_widthmask,
+    .ack = timer_irq_ack,
     .dump = timer_dump_regs
 };
 

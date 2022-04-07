@@ -16,7 +16,7 @@ toolchain_prefix = "${target_cpu}-rtems${target_version}-"
 
 gcc_toolchain("rtems") {
   spec_flags = "${LD_FLAGS}"
-  common_flags = "-Wall -Wimplicit-function-declaration -Wstrict-prototypes -fno-common -fdata-sections -ffunction-sections"
+  common_flags = "-Wall -fno-common -fdata-sections -ffunction-sections"
   extra_cppflags = spec_flags + common_flags
   extra_cflags = "-std=gnu17"
   extra_cxxflags = "-std=c++17"

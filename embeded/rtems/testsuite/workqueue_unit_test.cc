@@ -2,10 +2,13 @@
 #include <rtems/sysinit.h>
 
 #include "component/workqueue.h"
+#include "gtest/gtest.h"
 
 
 #define K_MSEC(n)      WQ_MSEC(n)
 #define SLEEP_MS(msec) rtems_task_wake_after(WQ_MSEC(msec))
+
+extern "C"{
 
 static volatile int test_phase;
 
@@ -26,18 +29,13 @@ static void test_task_2(struct work_struct *work) {
 
 static struct work_struct test_work_1 = WORK_INITIALIZER(test_task_1);
 static struct work_struct test_work_2 = WORK_INITIALIZER(test_task_2);
+}
 
-int main(void) {
-    rtems_task_priority prio;
-    rtems_status_code sc;
-    sc = rtems_task_set_priority(rtems_task_self(), 100, &prio);
-    _Assert(sc == RTEMS_SUCCESSFUL);
-    printf("******** Workqueue test start **********\n");
+TEST(workqueue, schedule) {
+    ASSERT_TRUE(test_phase == 0);
     schedule_work(&test_work_1);
     SLEEP_MS(10);
     cancel_work_sync(&test_work_1);
     SLEEP_MS(3000);
-    _Assert(test_phase == 5);
-    printf("******** Workqueue test end **********\n");
-    return 0;
+    ASSERT_TRUE(test_phase == 5);
 }

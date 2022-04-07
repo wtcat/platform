@@ -26,6 +26,7 @@ struct timlib_ops {
     /* Down-forward count value */
     uint32_t (*get_counter)(struct drvmgr_dev *dev);
     uint32_t (*get_widthmask)(struct drvmgr_dev *dev);
+    void (*ack)(struct drvmgr_dev *dev);
     void (*dump)(struct drvmgr_dev *dev);
 };
 
@@ -70,8 +71,6 @@ static inline int timlib_set_freq(struct drvmgr_dev *dev,
 static inline int timlib_get_freq(struct drvmgr_dev *dev,
     uint32_t *basefreq, uint32_t *tickrate) {
     _Assert(dev != NULL);
-    _Assert(basefreq != NULL);
-    _Assert(tickrate != NULL);
     struct timlib_priv *t = (struct timlib_priv *)dev->priv;
     return t->ops->get_freq(dev, basefreq, tickrate);
 }
@@ -112,6 +111,12 @@ static inline void timlib_dump(struct drvmgr_dev *dev) {
         t->ops->dump(dev);
 }
 
+static inline void timlib_irq_ack(struct drvmgr_dev *dev) {
+    _Assert(dev != NULL);
+    struct timlib_priv *t = (struct timlib_priv *)dev->priv;
+    t->ops->ack(dev);
+}
+
 static inline struct drvmgr_dev *timlib_open(const char *name) {
     struct drvmgr_dev *dev = drvmgr_dev_by_name(name);
     if (dev) {
@@ -125,9 +130,12 @@ static inline struct drvmgr_dev *timlib_open(const char *name) {
 }
 
 static inline void timlib_close(struct drvmgr_dev *dev) {
-    timlib_stop(dev);
-    timlib_unregister_intr(dev);
-    dev->state = 0;
+    struct timlib_priv *t = (struct timlib_priv *)dev->priv;
+    if (t->state) {
+        timlib_stop(dev);
+        timlib_unregister_intr(dev);
+        t->state = 0;
+    }
 }
 
 #ifdef __cplusplus

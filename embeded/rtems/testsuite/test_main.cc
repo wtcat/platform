@@ -3,6 +3,8 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <strings.h>
+#include <limits.h>
 #include <rtems.h>
 
 #include "gtest/gtest.h"
@@ -21,16 +23,30 @@
 //     return memcpy(dup, string, len);
 // }
 
-extern "C" int main(void) {
+extern "C" {
+
+int flsl(long i) {
+	if (i == 0)
+		return 0;
+	return (sizeof(i) * CHAR_BIT - __builtin_clzl(i));
+}
+
+static uint32_t change_prio(uint32_t pri) {
     rtems_task_priority prio;
     rtems_status_code sc;
+    sc = rtems_task_set_priority(rtems_task_self(), pri, &prio);
+    _Assert(sc == RTEMS_SUCCESSFUL);
+    return prio;
+}
+
+int main(void) {
     int argc = 1;
     char *argv[] = {(char *)" "};
-    sc = rtems_task_set_priority(rtems_task_self(), 100, &prio);
-    _Assert(sc == RTEMS_SUCCESSFUL);
-    (void) prio;
 
+    change_prio(100);
     printf("Running main() from %s\n", __FILE__);
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
+
+} //extern "C"
