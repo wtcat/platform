@@ -90,7 +90,11 @@
  *   href="https://en.cppreference.com/w/c/types/limits">SIZE_MAX</a>.
  * @endparblock
  */
-#define CONFIGURE_BDBUF_CACHE_MEMORY_SIZE 65536
+#if defined(__rtems_libbsd__)
+#define CONFIGURE_BDBUF_CACHE_MEMORY_SIZE (256ul * 1024)
+#else
+#define CONFIGURE_BDBUF_CACHE_MEMORY_SIZE (64ul * 1024)
+#endif
 
 /* Generated from spec:/acfg/if/bdbuf-max-read-ahead-blocks */
 
@@ -143,7 +147,7 @@
  *   href="https://en.cppreference.com/w/c/types/integer">UINT32_MAX</a>.
  * @endparblock
  */
-#define CONFIGURE_BDBUF_MAX_WRITE_BLOCKS 16
+#define CONFIGURE_BDBUF_MAX_WRITE_BLOCKS 64
 
 /* Generated from spec:/acfg/if/bdbuf-read-ahead-task-priority */
 
@@ -160,7 +164,11 @@
  * priority.  The set of valid task priorities depends on the scheduler
  * configuration.
  */
+#if defined(__rtems_libbsd__)
+#define CONFIGURE_BDBUF_READ_AHEAD_TASK_PRIORITY 100
+#else
 #define CONFIGURE_BDBUF_READ_AHEAD_TASK_PRIORITY 15
+#endif
 
 /* Generated from spec:/acfg/if/bdbuf-task-stack-size */
 
@@ -189,7 +197,7 @@
  *   href="https://en.cppreference.com/w/c/types/integer">uintptr_t</a>.
  * @endparblock
  */
-#define CONFIGURE_BDBUF_TASK_STACK_SIZE 8192
+#define CONFIGURE_BDBUF_TASK_STACK_SIZE 4096
 
 /* Generated from spec:/acfg/if/bdbuf-swapout-block-hold */
 
@@ -254,7 +262,7 @@
  * priority.  The set of valid task priorities depends on the scheduler
  * configuration.
  */
-#ifdef __rtems_libbsd__
+#if defined(__rtems_libbsd__)
 #define CONFIGURE_SWAPOUT_TASK_PRIORITY 100
 #else
 #define CONFIGURE_SWAPOUT_TASK_PRIORITY 15
