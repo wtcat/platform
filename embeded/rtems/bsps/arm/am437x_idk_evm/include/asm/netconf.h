@@ -12,7 +12,7 @@
     "telnetd_enable=\"YES\"\n"          \
     "telnetd_options=\"-v -C 1\"\n"   \
     "ftpd_enable=\"YES\"\n"                    \
-    "ftpd_options=\"-v -p 21 -C 1\"\n"
+    "ftpd_options=\"-v -p 21 -C 2\"\n"
 
 /*
  * libbsd configure options
