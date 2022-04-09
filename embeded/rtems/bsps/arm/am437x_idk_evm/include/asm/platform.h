@@ -254,7 +254,11 @@
  * priority.  The set of valid task priorities depends on the scheduler
  * configuration.
  */
+#ifdef __rtems_libbsd__
+#define CONFIGURE_SWAPOUT_TASK_PRIORITY 100
+#else
 #define CONFIGURE_SWAPOUT_TASK_PRIORITY 15
+#endif
 
 /* Generated from spec:/acfg/if/bdbuf-swapout-worker-tasks */
 
@@ -2734,7 +2738,7 @@
  * The default value of three file descriptors allows RTEMS to support standard
  * input, output, and error I/O streams on ``/dev/console``.
  */
-#define CONFIGURE_MAXIMUM_FILE_DESCRIPTORS 32
+#define CONFIGURE_MAXIMUM_FILE_DESCRIPTORS 128
 
 /* Generated from spec:/acfg/if/max-processors */
 
@@ -4808,4 +4812,7 @@
  */
 //#define CONFIGURE_TASK_STACK_FROM_ALLOCATOR
 
+#if defined(__rtems_libbsd__)
+#define CONFIGURE_MEDIA_SERVICE
+#endif
 #endif /* BSP_ASM_PLATFORM_H_ */

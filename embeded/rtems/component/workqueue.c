@@ -19,7 +19,11 @@ struct helper_work_struct {
     rtems_id holder;
 };
 
-#define SYSWQ_PRIO  10
+#if defined(__rtems_libbsd__)
+#define SYSWQ_PRIO  100
+#else
+#define SYSWQ_PRIO  14
+#endif
 #define SYSWQ_STKSZ 4096
 
 #define SYSWQ_ATTRIBUTE (RTEMS_LOCAL)

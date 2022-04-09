@@ -226,8 +226,7 @@ static void ns16550_isr(void *arg) {
             else
                 break;
         }
-        if (i > 0) 
-            rtems_termios_enqueue_raw_characters(platdata->tty, buf, i);
+        rtems_termios_enqueue_raw_characters(platdata->tty, buf, i);
         if (platdata->total && ns16550_tx_empty(platdata)) {
             size_t current = platdata->current;
             platdata->buf += current;
@@ -237,7 +236,6 @@ static void ns16550_isr(void *arg) {
                     platdata->remaining);
             } else {
                 rtems_termios_dequeue_characters(platdata->tty, platdata->total);
-                platdata->total = 0;
             }
         }
     } while (!(readb_relaxed(platdata->port + NS16550_INTERRUPT_ID) & SP_IID_0));
@@ -245,6 +243,7 @@ static void ns16550_isr(void *arg) {
 
 static void ns16550_txintr_enable(struct ns16550_priv *platdata) {
     rtems_interrupt_lock_context ctx;
+    //printk("Enter: 0x%x\n", __builtin_return_address(0));
     rtems_termios_device_lock_acquire(&platdata->base, &ctx);
     writeb(SP_INT_TX_ENABLE, platdata->port + NS16550_INTERRUPT_ENABLE);
     rtems_termios_device_lock_release(&platdata->base, &ctx);
@@ -252,6 +251,7 @@ static void ns16550_txintr_enable(struct ns16550_priv *platdata) {
 
 static void ns16550_txintr_disable(struct ns16550_priv *platdata) {
     rtems_interrupt_lock_context ctx;
+    //printk("Exit: 0x%x\n", __builtin_return_address(0));
     rtems_termios_device_lock_acquire(&platdata->base, &ctx);
     writeb(NS16550_ENABLE_ALL_INTR_EXCEPT_TX, 
         platdata->port + NS16550_INTERRUPT_ENABLE);

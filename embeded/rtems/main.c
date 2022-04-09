@@ -8,6 +8,7 @@
 #include <rtems/imfs.h>
 #include <rtems/shell.h>
 #include <rtems/bspIo.h>
+#include <rtems/media.h>
 
 #include <bsp/stackalloc.h>
 #include "bsp/sysconf.h"
@@ -18,7 +19,36 @@
 #include <machine/rtems-bsd-config.h>
 #endif
 
-static int sysfile_add(const char *pathname, int mode,
+#define SYS_ERROR(fmt, ...) \
+  rtems_panic("System Error***: "fmt"(%s:%d)", ##__VA_ARGS__, \
+    __func__, __LINE__)
+
+#ifdef CONFIGURE_MEDIA_SERVICE
+static rtems_status_code 
+media_listener(rtems_media_event event, rtems_media_state state, 
+    const char *src, const char *dest, void *arg)
+{
+    if (event == RTEMS_MEDIA_EVENT_MOUNT &&
+        state == RTEMS_MEDIA_STATE_SUCCESS) {
+        symlink(dest, "/home");
+    }
+    return RTEMS_SUCCESSFUL;
+}
+
+static int media_service_setup(void) {
+  rtems_status_code sc;
+  sc = rtems_media_initialize();
+  if (sc == RTEMS_SUCCESSFUL) {
+    sc = rtems_media_server_initialize(110, 4096,
+      RTEMS_DEFAULT_MODES, RTEMS_DEFAULT_ATTRIBUTES);
+    if (sc == RTEMS_SUCCESSFUL) 
+      rtems_media_listener_add(media_listener, NULL);
+  }
+  return rtems_status_code_to_errno(sc);
+}
+#endif
+
+static int sysfile_create(const char *pathname, int mode,
     const char *content) {
     if (access(pathname, F_OK) < 0) {
         return IMFS_make_linearfile(pathname, mode, 
@@ -27,30 +57,30 @@ static int sysfile_add(const char *pathname, int mode,
     return 0;
 }
 
-static void etc_init(void) {
+static void environment_load(void) {
 #ifdef CONFIG_JOEL_SCRIPT_CONTENT
-    if (!sysfile_add("/etc/start.joel", 0777, 
+    if (!sysfile_create("/etc/start.joel", 0777, 
       CONFIG_JOEL_SCRIPT_CONTENT)) {
         char *script[] = {"/etc/start.joel"};
       rtems_shell_script_file(0, script);
     }
 #endif
 #ifdef CONFIGURE_ETC_RC_CONF_CONTENT
-    sysfile_add("/etc/rc.conf", 0666, 
+    sysfile_create("/etc/rc.conf", 0666, 
       CONFIGURE_ETC_RC_CONF_CONTENT);
 #endif
 #ifdef CONFIG_DYNMAIC_LIB_CONTENT
-    sysfile_add("/etc/libdl.conf", 0666, 
+    sysfile_create("/etc/libdl.conf", 0666, 
       CONFIG_DYNMAIC_LIB_CONTENT);
 #endif
-    sync();
 }
 
-static void libbsd_init(void) {
+static void libbsd_setup(void) {
 #if defined(__rtems_libbsd__)
   rtems_task_priority prio;
   rtems_task_set_priority(RTEMS_SELF, 110, &prio);
   (void) prio;
+  rtems_bsd_setlogpriority("debug");
   if (rtems_bsd_initialize())
     rtems_panic("LIBBSD initialize failed\n");
   rtems_task_wake_after(RTEMS_MILLISECONDS_TO_TICKS(1000));
@@ -63,10 +93,17 @@ int RTEMS_WEAK app_main(void) {
 }
 
 static rtems_task Init(rtems_task_argument arg) {
-  ramblk_init();
-  shell_init(NULL);
-  etc_init();
-  libbsd_init();
+  int err = ramblk_init();
+  if (err) 
+    SYS_ERROR("Create ramdisk failed: %d\n", err);
+  err = shell_init(NULL);
+  if (err) 
+    SYS_ERROR("Shell initialize failed: %d\n", err);
+  err = media_service_setup();
+  if (err)
+    SYS_ERROR("Media service start failed: %d\n", err);
+  environment_load();
+  libbsd_setup();
   app_main();
   rtems_task_exit();
 }
