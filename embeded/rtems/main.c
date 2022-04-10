@@ -80,7 +80,6 @@ static void libbsd_setup(void) {
   rtems_task_priority prio;
   rtems_task_set_priority(RTEMS_SELF, 110, &prio);
   (void) prio;
-  rtems_bsd_setlogpriority("debug");
   if (rtems_bsd_initialize())
     rtems_panic("LIBBSD initialize failed\n");
   rtems_task_wake_after(RTEMS_MILLISECONDS_TO_TICKS(1000));
@@ -99,9 +98,11 @@ static rtems_task Init(rtems_task_argument arg) {
   err = shell_init(NULL);
   if (err) 
     SYS_ERROR("Shell initialize failed: %d\n", err);
+#ifdef CONFIGURE_MEDIA_SERVICE
   err = media_service_setup();
   if (err)
     SYS_ERROR("Media service start failed: %d\n", err);
+#endif
   environment_load();
   libbsd_setup();
   app_main();
