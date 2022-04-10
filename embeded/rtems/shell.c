@@ -111,6 +111,9 @@ static rtems_shell_cmd_t shell_reboot_command = {
 #endif /* CONFIG_SHELL_REBOOT */
 
 static void shell_commands_register(void) {
+#ifdef CONFIGURE_DEBUGGER
+    BSD_SHELL_COMMAND(DEBUGGER);
+#endif
 #ifdef CONFIGURE_SHELL_COMMAND_XMODEM
     SHELL_COMMAND_ADD(xmodem);
 #endif

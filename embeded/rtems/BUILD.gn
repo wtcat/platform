@@ -50,6 +50,10 @@ executable("rtems") {
       libs += ["telnetd"]
     }
   }
+  if (use_debugger) {
+    defines += ["CONFIGURE_DEBUGGER"]
+    libs += ["debugger"]
+  }
 }
 
 # Binary and uboot image generate

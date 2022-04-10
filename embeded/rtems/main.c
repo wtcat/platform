@@ -10,6 +10,10 @@
 #include <rtems/bspIo.h>
 #include <rtems/media.h>
 
+#ifdef CONFIGURE_DEBUGGER
+#include <rtems/rtems-debugger-remote-tcp.h>
+#endif
+
 #include <bsp/stackalloc.h>
 #include "bsp/sysconf.h"
 #include "bsp/init.h"
@@ -95,6 +99,7 @@ static rtems_task Init(rtems_task_argument arg) {
   int err = ramblk_init();
   if (err) 
     SYS_ERROR("Create ramdisk failed: %d\n", err);
+    
   err = shell_init(NULL);
   if (err) 
     SYS_ERROR("Shell initialize failed: %d\n", err);
@@ -105,6 +110,9 @@ static rtems_task Init(rtems_task_argument arg) {
 #endif
   environment_load();
   libbsd_setup();
+#ifdef CONFIGURE_DEBUGGER
+  rtems_debugger_register_tcp_remote();
+#endif
   app_main();
   rtems_task_exit();
 }

@@ -5,6 +5,9 @@ declare_args() {
   #Libbsd
   use_libbsd = false
 
+  #Debugger
+  use_debugger = false
+
   #Bsp stack allocator
   use_stack_allocator = true
 
