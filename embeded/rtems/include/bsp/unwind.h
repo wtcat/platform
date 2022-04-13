@@ -5,10 +5,27 @@
  * Copyright (C) 2008 ARM Limited
  */
 
+/*
+ * CopyRight (C) 2022 wtcat
+ */
+
 #ifndef __ASM_UNWIND_H
 #define __ASM_UNWIND_H
 
-#ifndef __ASSEMBLY__
+#include <rtems/score/cpu.h>
+#include <rtems/print.h>
+
+#ifdef __cplusplus
+extern "C"{
+#endif
+
+#ifdef CONFIG_ARM_UNWIND
+#define UNWIND(code...)		code
+#else
+#define UNWIND(code...)
+#endif
+
+struct _Thread_Control;
 
 /* Unwind reason code according the the ARM EABI documents */
 enum unwind_reason_code {
@@ -31,20 +48,10 @@ struct unwind_table {
 	unsigned long end_addr;
 };
 
-extern struct unwind_table *unwind_table_add(unsigned long start,
-					     unsigned long size,
-					     unsigned long text_addr,
-					     unsigned long text_size);
-extern void unwind_table_del(struct unwind_table *tab);
-extern void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk,
-			     const char *loglvl);
+void unwind_backtrace(rtems_printer *printer, CPU_Exception_frame *regs,
+	struct _Thread_Control *tsk);
 
-#endif	/* !__ASSEMBLY__ */
-
-#ifdef CONFIG_ARM_UNWIND
-#define UNWIND(code...)		code
-#else
-#define UNWIND(code...)
+#ifdef __cplusplus
+}
 #endif
-
 #endif	/* __ASM_UNWIND_H */

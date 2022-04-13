@@ -21,6 +21,8 @@ declare_args() {
   use_media = false
 
   use_rtl = false
+
+  use_backtrace = false
 }
 
 # BSD-Net

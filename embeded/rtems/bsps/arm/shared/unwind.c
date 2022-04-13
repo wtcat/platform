@@ -19,6 +19,7 @@
  
 #include <rtems/score/cpu.h>
 #include <rtems/score/percpu.h>
+#include <rtems/score/thread.h>
 #include <rtems/printer.h>
 #include <rtems/bspIo.h>
 
@@ -79,6 +80,11 @@ enum regs {
 #define unlikely(x) RTEMS_PREDICT_FALSE(x)
 #endif
 
+#define THREAD_SIZE 4096
+#ifndef ALIGN
+#define ALIGN(v, s) (((v) + ((s) - 1)) & ~(s))
+#endif
+
 extern char bsp_section_text_begin[];
 extern char bsp_section_text_end[];
 
@@ -86,13 +92,28 @@ extern const struct unwind_idx __exidx_start[];
 extern const struct unwind_idx __exidx_end[];
 static const struct unwind_idx *origin_unwind_idx;
 
+#define thread_saved_fp(tsk) \
+	(unsigned long)(tsk)->Registers.register_fp
+#define thread_saved_sp(tsk) \
+	(unsigned long)(tsk)->Registers.register_sp
+#define thread_saved_pc(tsk) \
+	(unsigned long)(tsk)->Registers.register_lr
+
+static unsigned long current_stack_pointer(void) {
+	unsigned long stkptr;
+	__asm__ volatile ("mov %[stkptr], sp\n"
+		: [stkptr] "=r" (stkptr)
+	);
+	return stkptr;
+}
+
 
 /* Dummy functions to avoid linker complaints */
-void __aeabi_unwind_cpp_pr0(void) {}
+//void __aeabi_unwind_cpp_pr0(void) {}
 void __aeabi_unwind_cpp_pr1(void) {}
 void __aeabi_unwind_cpp_pr2(void) {}
 
-static void dump_backtrace(rtems_printer *printer, unsigned long where
+static void dump_backtrace(rtems_printer *printer, unsigned long where,
 	unsigned long pc, unsigned long sp) {
 	(void)sp;
 	rtems_printf(printer, "<0x%lx> <= <0x%lx>\n", where, pc);
@@ -441,28 +462,23 @@ static int unwind_frame(struct stackframe *frame) {
 	return URC_OK;
 }
 
-_Thread_Executing
-
 void unwind_backtrace(rtems_printer *printer, CPU_Exception_frame *regs,
 	struct _Thread_Control *tsk) {
 	struct stackframe frame;
-
 	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
 	if (tsk == NULL)
 		tsk = _Thread_Executing;
-
 	if (regs) {
-		frame.fp = regs->register_fp;
-		frame.sp = regs->register_sp;
-		frame.lr = regs->register_lr;
-		frame.pc = regs->register_pc;
+		frame.fp = (unsigned long)regs->register_r11;
+		frame.sp = (unsigned long)regs->register_sp;
+		frame.lr = (unsigned long)regs->register_lr;
+		frame.pc = (unsigned long)regs->register_pc;
 		/* PC might be corrupted, use LR in that case. */
-		if (!kernel_text_address(regs->register_pc))
-			frame.pc = regs->register_lr;
+		if (!kernel_text_address((unsigned long)regs->register_pc))
+			frame.pc = (unsigned long)regs->register_lr;
 	} else if (tsk == _Thread_Executing) {
-	
 		frame.fp = (unsigned long)__builtin_frame_address(0);
-		frame.sp = current_stack_pointer;
+		frame.sp = current_stack_pointer();
 		frame.lr = (unsigned long)__builtin_return_address(0);
 		frame.pc = (unsigned long)unwind_backtrace;
 	} else {

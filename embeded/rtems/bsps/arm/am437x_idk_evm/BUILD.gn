@@ -1,10 +1,12 @@
 import("//gn/toolchain/rtems/rtems.gni")
 
 component("board") {
-  deps = []
+  defines = ["CONFIG_AM43XX"]
   include_dirs = [
     "include"
   ]
+  deps = []
+
   sources = [
     "am43xx.c",
     "console.c",
@@ -15,7 +17,9 @@ component("board") {
     # "clock.c",
     # "clock_am43xx.c"
   ]
-  defines = ["CONFIG_AM43XX"]
+  if (use_backtrace) {
+    sources += ["//embeded/rtems/bsps/arm/shared/unwind.c"]
+  }
   if (use_libbsd) {
     deps += ["bsd:bsd_drivers"]
   }

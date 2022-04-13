@@ -43,10 +43,18 @@ gcc_toolchain("rtems") {
 
 config("rtems_config") {
     include_dirs = ["//embeded/rtems/include"]
+    defines = []
     if (use_libbsd) {
-      defines = ["__rtems_libbsd__"]
+      defines += ["__rtems_libbsd__"]
     }
     cflags = CC_FLAGS
     ldflags = CC_FLAGS
     asmflags = CC_FLAGS
+
+    if (use_backtrace) {
+      cflags += [
+        "-funwind-tables",
+        "-mpoke-function-name"
+      ]
+    }
 }

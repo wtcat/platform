@@ -9,12 +9,12 @@
 #include <rtems/shell.h>
 #include <rtems/bspIo.h>
 #include <rtems/media.h>
-
 #ifdef CONFIGURE_DEBUGGER
 #include <rtems/rtems-debugger-remote-tcp.h>
 #endif
 
 #include <bsp/stackalloc.h>
+#include <bsp/default-initial-extension.h>
 #include "bsp/sysconf.h"
 #include "bsp/init.h"
 
