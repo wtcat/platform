@@ -10,6 +10,7 @@
 #include <bsp/arm-cp15-start.h>
 #include <bsp/arm-a9mpcore-start.h>
 
+#if defined(CONFIGURE_BACKTRACE)
 #include "bsp/unwind.h"
 
 void bsp_fatal_extension(rtems_fatal_source source,
@@ -18,10 +19,12 @@ void bsp_fatal_extension(rtems_fatal_source source,
     printk("fatal source: %s\n", rtems_fatal_source_text(source));
     if (source == RTEMS_FATAL_SOURCE_EXCEPTION) {
       rtems_printer printer;
+      rtems_exception_frame_print( (const rtems_exception_frame *)error);
       rtems_print_printer_printk(&printer);
       unwind_backtrace(&printer, (CPU_Exception_frame *)error, NULL);
     }
 }
+#endif
 
 /*
  * User mmu configure infomation

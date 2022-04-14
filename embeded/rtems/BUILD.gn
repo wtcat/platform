@@ -54,6 +54,9 @@ executable("rtems") {
     defines += ["CONFIGURE_DEBUGGER"]
     libs += ["debugger"]
   }
+  if (use_backtrace) {
+    defines +=["CONFIGURE_BACKTRACE"]
+  }
 }
 
 # Binary and uboot image generate

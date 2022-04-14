@@ -18,6 +18,7 @@ component("board") {
     # "clock_am43xx.c"
   ]
   if (use_backtrace) {
+    defines += ["CONFIGURE_BACKTRACE=1"]
     sources += ["//embeded/rtems/bsps/arm/shared/unwind.c"]
   }
   if (use_libbsd) {
