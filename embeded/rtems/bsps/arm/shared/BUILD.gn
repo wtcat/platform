@@ -1,0 +1,10 @@
+import("//gn/toolchain/rtems/rtems.gni")
+
+component("shared") {
+    defines = []
+    sources = ["fatal.c"]
+    if (use_backtrace) {
+        defines += ["CONFIGURE_BACKTRACE"]
+        sources += ["unwind.c"]
+    }
+}

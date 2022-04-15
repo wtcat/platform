@@ -14,7 +14,6 @@
 #endif
 
 #include <bsp/stackalloc.h>
-//#include <bsp/default-initial-extension.h>
 #include "bsp/sysconf.h"
 #include "bsp/init.h"
 
