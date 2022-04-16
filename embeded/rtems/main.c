@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include <rtems.h>
+#include <rtems/thread.h>
 #include <rtems/imfs.h>
 #include <rtems/shell.h>
 #include <rtems/bspIo.h>
@@ -22,18 +23,28 @@
 #include <machine/rtems-bsd-config.h>
 #endif
 
+#define TIMEOUT_MS(ms) RTEMS_MILLISECONDS_TO_TICKS(ms)
 #define SYS_ERROR(fmt, ...) \
   rtems_panic("System Error***: "fmt"(%s:%d)", ##__VA_ARGS__, \
     __func__, __LINE__)
 
 #ifdef CONFIGURE_MEDIA_SERVICE
+
+#if defined (__rtems_libbsd__)
+static rtems_binary_semaphore bsd_completed_sem = 
+    RTEMS_BINARY_SEMAPHORE_INITIALIZER("mount");
+#endif
+
 static rtems_status_code 
 media_listener(rtems_media_event event, rtems_media_state state, 
     const char *src, const char *dest, void *arg)
 {
-    if (event == RTEMS_MEDIA_EVENT_MOUNT &&
-        state == RTEMS_MEDIA_STATE_SUCCESS) {
+    if (event == RTEMS_MEDIA_EVENT_MOUNT) {
+      if (state == RTEMS_MEDIA_STATE_SUCCESS) 
         symlink(dest, "/home");
+    #if defined (__rtems_libbsd__)
+      rtems_binary_semaphore_post(&bsd_completed_sem);
+    #endif
     }
     return RTEMS_SUCCESSFUL;
 }
@@ -61,9 +72,9 @@ static int sysfile_create(const char *pathname, int mode,
 }
 
 static void environment_load(void) {
-#ifdef CONFIG_JOEL_SCRIPT_CONTENT
+#ifdef CONFIGURE_SCRIPT_CONTENT
     if (!sysfile_create("/etc/start.joel", 0777, 
-      CONFIG_JOEL_SCRIPT_CONTENT)) {
+      CONFIGURE_SCRIPT_CONTENT)) {
         char *script[] = {"/etc/start.joel"};
       rtems_shell_script_file(0, script);
     }
@@ -72,9 +83,9 @@ static void environment_load(void) {
     sysfile_create("/etc/rc.conf", 0666, 
       CONFIGURE_ETC_RC_CONF_CONTENT);
 #endif
-#ifdef CONFIG_DYNMAIC_LIB_CONTENT
+#ifdef CONFIGURE_LIB_CONTENT
     sysfile_create("/etc/libdl.conf", 0666, 
-      CONFIG_DYNMAIC_LIB_CONTENT);
+      CONFIGURE_LIB_CONTENT);
 #endif
 }
 
@@ -85,8 +96,10 @@ static void libbsd_setup(void) {
   (void) prio;
   if (rtems_bsd_initialize())
     rtems_panic("LIBBSD initialize failed\n");
-  rtems_task_wake_after(RTEMS_MILLISECONDS_TO_TICKS(1000));
-  rtems_bsd_run_etc_rc_conf(RTEMS_MILLISECONDS_TO_TICKS(5000), true);
+#ifdef CONFIGURE_MEDIA_SERVICE
+  rtems_binary_semaphore_wait(&bsd_completed_sem);
+#endif
+  rtems_bsd_run_etc_rc_conf(TIMEOUT_MS(5000), true);
 #endif/* __rtems_libbsd__ */
 }
 
@@ -98,7 +111,6 @@ static rtems_task Init(rtems_task_argument arg) {
   int err = ramblk_init();
   if (err) 
     SYS_ERROR("Create ramdisk failed: %d\n", err);
-    
   err = shell_init(NULL);
   if (err) 
     SYS_ERROR("Shell initialize failed: %d\n", err);

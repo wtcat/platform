@@ -1,12 +1,12 @@
 #ifndef AM43XX_IDK_EVM_SHELLCONF_H_
 #define AM43XX_IDK_EVM_SHELLCONF_H_
 
-#define CONFIG_SHELL_STACKSZ 4096
+#define CONFIGURE_SHELL_STACKSZ 4096
 
-#define CONFIG_DYNMAIC_LIB_CONTENT \
+#define CONFIGURE_LIB_CONTENT \
     "/etc/libdl*.a\n"
     
-#define CONFIG_JOEL_SCRIPT_CONTENT \
+#define CONFIGURE_SCRIPT_CONTENT \
     "#! joel -t JOEL -p 110 -s 8192\n" \
     "mkdir /temp\n" \
     "mkdos /dev/ram0\n" \

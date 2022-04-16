@@ -21,17 +21,17 @@
 #define SHELL_STACKSZ  (32 * 1024)
 #else // !__rtems_libbsd__
 
-#ifndef CONFIG_SHELL_STACKSZ
+#ifndef CONFIGURE_SHELL_STACKSZ
 #define SHELL_STACKSZ  (4 * 1024)
 #else 
-#define SHELL_STACKSZ  CONFIG_SHELL_STACKSZ
+#define SHELL_STACKSZ  CONFIGURE_SHELL_STACKSZ
 #endif 
 #endif //__rtems_libbsd__
 
-#ifndef CONFIG_SHELL_TASKPRIO
+#ifndef CONFIGURE_SHELL_TASKPRIO
 #define SHELL_PRIO  (CONFIGURE_MAXIMUM_PRIORITY - 3)
 #else
-#define SHELL_PRIO CONFIG_SHELL_TASKPRIO
+#define SHELL_PRIO CONFIGURE_SHELL_TASKPRIO
 #endif
 
 /* Macro to send VT100 commands. */
