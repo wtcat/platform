@@ -37,8 +37,7 @@ static rtems_binary_semaphore bsd_completed_sem =
 
 static rtems_status_code 
 media_listener(rtems_media_event event, rtems_media_state state, 
-    const char *src, const char *dest, void *arg)
-{
+    const char *src, const char *dest, void *arg) {
     if (event == RTEMS_MEDIA_EVENT_MOUNT) {
       if (state == RTEMS_MEDIA_STATE_SUCCESS) 
         symlink(dest, "/home");

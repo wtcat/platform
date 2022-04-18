@@ -10,7 +10,8 @@
 #define PRM_RSTCTRL			(PRCM_BASE + 0x4000)
 #define PRM_RSTST			(PRM_RSTCTRL + 4)
 
-#define PER_REG(ofs) (CM_PER + (ofs)) 
+#define PER_REG(ofs)  (CM_PER + (ofs)) 
+#define WKUP_REG(ofs) (CM_WKUP + (ofs)) 
 #define nIRQ(n) ((n) + 32)
 
 /*
@@ -100,14 +101,17 @@ TEMPLATE_RESOURCE(timer4, "ti,am4372-timer", DRVMGR_BUS_TYPE_PLATFORM, 0,
 TEMPLATE_RESOURCE(i2c0, "ti,am4372-i2c", DRVMGR_BUS_TYPE_PLATFORM, 0,
   	TRN("REG0", DRVMGR_KT_INT, 0x44e0b000),
 	TRN("IRQ0", DRVMGR_KT_INT, nIRQ(70)),
+	TRN("CLKCTRL", DRVMGR_KT_INT, WKUP_REG(0x340))
 );
 TEMPLATE_RESOURCE(i2c1, "ti,am4372-i2c", DRVMGR_BUS_TYPE_PLATFORM, 0,
   	TRN("REG0", DRVMGR_KT_INT, 0x4802a000),
 	TRN("IRQ0", DRVMGR_KT_INT, nIRQ(71)),
+	TRN("CLKCTRL", DRVMGR_KT_INT, WKUP_REG(0x4a8))
 );
 TEMPLATE_RESOURCE(i2c2, "ti,am4372-i2c", DRVMGR_BUS_TYPE_PLATFORM, 0,
   	TRN("REG0", DRVMGR_KT_INT, 0x4819c000),
 	TRN("IRQ0", DRVMGR_KT_INT, nIRQ(30)),
+	TRN("CLKCTRL", DRVMGR_KT_INT, WKUP_REG(0x4b0))
 );
 
 TEMPLATE_RESOURCES_REGISTER(platform_resources,
@@ -115,5 +119,6 @@ TEMPLATE_RESOURCES_REGISTER(platform_resources,
 	RN(gpio0), RN(gpio1), RN(gpio2), RN(gpio3), RN(gpio4), RN(gpio5),
 	RN(gpio_keys),
 	RN(timer2), RN(timer3), RN(timer4),
+	RN(i2c0), RN(i2c1), RN(i2c2),
 	NULL
 );

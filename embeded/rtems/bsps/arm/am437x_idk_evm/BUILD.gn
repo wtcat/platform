@@ -9,6 +9,7 @@ component("board") {
   sources = [
     "am43xx.c",
     "console.c",
+    "i2c.c",
     "gpio.c",
     "gpio_keys.c",
     "timers.c",
