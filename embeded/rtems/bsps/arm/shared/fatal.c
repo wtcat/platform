@@ -31,12 +31,12 @@ void bsp_fatal_extension(rtems_fatal_source source, bool unused,
     #endif //BSP_VERBOSE_FATAL_EXTENSION
 #if (BSP_PRINT_EXCEPTION_CONTEXT) || BSP_VERBOSE_FATAL_EXTENSION
     if (source == RTEMS_FATAL_SOURCE_EXCEPTION) {
-        rtems_exception_frame_print((const rtems_exception_frame *)code);
     #ifdef CONFIGURE_BACKTRACE
         rtems_printer printer;
         rtems_print_printer_printk(&printer);
-        unwind_backtrace(&printer, (rtems_exception_frame *)code, NULL);
+        __unwind_backtrace(&printer, (rtems_exception_frame *)code, NULL);
     #endif
+        rtems_exception_frame_print((const rtems_exception_frame *)code);
     }
 #endif
 #if BSP_VERBOSE_FATAL_EXTENSION

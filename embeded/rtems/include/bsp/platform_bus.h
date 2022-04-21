@@ -45,7 +45,7 @@ extern "C"{
 
 
 #define RN(node) (const struct bus_resource *)(&node)
-#define TRN(rname, type, value) {rname, type, {value}}
+#define TRN(rname, type, value) {rname, type, {.ptr = (void *)value}}
 #define TEMPLATE_RESOURCE(_name, _compatible, _parent, _parent_busid, ...) \
 	static const struct resoruce_##_name {\
 		RESOURCE_BASE_DECLARE } \

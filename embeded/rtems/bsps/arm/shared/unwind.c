@@ -16,55 +16,30 @@
 /*
  * CopyRight (C) 2022 wtcat
  */
- 
+
 #include <rtems/score/cpu.h>
 #include <rtems/score/percpu.h>
 #include <rtems/score/thread.h>
 #include <rtems/printer.h>
 #include <rtems/bspIo.h>
 
+#include <unwind.h>
+
 #include "bsp/unwind.h"
 
-
-struct unwind_ctrl_block {
-	unsigned long vrs[16];		/* virtual register set */
-	const unsigned long *insn;	/* pointer to the current instructions word */
-	unsigned long sp_high;		/* highest value of sp allowed */
-	/*
-	 * 1 : check for stack overflow for each register pop.
-	 * 0 : save overhead if there is plenty of stack remaining.
-	 */
-	int check_each_pop;
-	int entries;			/* number of entries left to interpret */
-	int byte;			/* current byte number in the instructions word */
-};
-
-struct stackframe {
-	unsigned long fp;
-	unsigned long sp;
-	unsigned long lr;
-	unsigned long pc;
-};
-
 enum regs {
-#ifdef __thumb2__
-	FP = 7,
-#else
 	FP = 11,
-#endif
 	SP = 13,
 	LR = 14,
 	PC = 15
 };
 
-/* Convert a prel31 symbol to an absolute address */
-#define prel31_to_addr(ptr)				\
-({							\
-	/* sign-extend to 32 bits */			\
+//#define DEBUG_ON
+
+#define prel31_to_addr(ptr)	({\
 	long offset = (((long)*(ptr)) << 1) >> 1;	\
 	(unsigned long)(ptr) + offset;			\
 })
-
 
 #ifdef DEBUG_ON
 #define pr_debug(fmt, ...) printk(fmt, ##__VA_ARGS__)
@@ -88,9 +63,8 @@ enum regs {
 extern char bsp_section_text_begin[];
 extern char bsp_section_text_end[];
 
-extern const struct unwind_idx __exidx_start[];
-extern const struct unwind_idx __exidx_end[];
-static const struct unwind_idx *origin_unwind_idx;
+extern const unwind_index_t __exidx_start[];
+extern const unwind_index_t __exidx_end[];
 
 #define thread_saved_fp(tsk) \
 	(unsigned long)(tsk)->Registers.register_fp
@@ -99,7 +73,7 @@ static const struct unwind_idx *origin_unwind_idx;
 #define thread_saved_pc(tsk) \
 	(unsigned long)(tsk)->Registers.register_lr
 
-static unsigned long current_stack_pointer(void) {
+static inline unsigned long current_stack_pointer(void) {
 	unsigned long stkptr;
 	__asm__ volatile ("mov %[stkptr], sp\n"
 		: [stkptr] "=r" (stkptr)
@@ -107,17 +81,15 @@ static unsigned long current_stack_pointer(void) {
 	return stkptr;
 }
 
+static unsigned long thread_stack_end(struct _Thread_Control *tsk) {
+	Stack_Control *stk = &tsk->Start.Initial_stack;
+	return (unsigned long)stk->area + stk->size;
+}
 
 /* Dummy functions to avoid linker complaints */
 //void __aeabi_unwind_cpp_pr0(void) {}
 void __aeabi_unwind_cpp_pr1(void) {}
 void __aeabi_unwind_cpp_pr2(void) {}
-
-static void dump_backtrace(rtems_printer *printer, unsigned long where,
-	unsigned long pc, unsigned long sp) {
-	(void)sp;
-	rtems_printf(printer, "<0x%lx> <= <0x%lx>\n", where, pc);
-}
 
 static bool kernel_text_address(unsigned long addr) {
 	if (addr >= (unsigned long)bsp_section_text_begin &&
@@ -126,345 +98,251 @@ static bool kernel_text_address(unsigned long addr) {
 	return false;
 }
 
-/*
- * Binary search in the unwind index. The entries are
- * guaranteed to be sorted in ascending order by the linker.
- *
- * start = first entry
- * origin = first entry with positive offset (or stop if there is no such entry)
- * stop - 1 = last entry
- */
-static const struct unwind_idx *search_index(unsigned long addr,
-				       const struct unwind_idx *start,
-				       const struct unwind_idx *origin,
-				       const struct unwind_idx *stop) {
-	unsigned long addr_prel31;
-
-	pr_debug("%s(%08lx, %p, %p, %p)\n",
-			__func__, addr, start, origin, stop);
-
-	/*
-	 * only search in the section with the matching sign. This way the
-	 * prel31 numbers can be compared as unsigned longs.
-	 */
-	if (addr < (unsigned long)start)
-		/* negative offsets: [start; origin) */
-		stop = origin;
-	else
-		/* positive offsets: [origin; stop) */
-		start = origin;
-
-	/* prel31 for address relavive to start */
-	addr_prel31 = (addr - (unsigned long)start) & 0x7fffffff;
-
-	while (start < stop - 1) {
-		const struct unwind_idx *mid = start + ((stop - start) >> 1);
-
-		/*
-		 * As addr_prel31 is relative to start an offset is needed to
-		 * make it relative to mid.
-		 */
-		if (addr_prel31 - ((unsigned long)mid - (unsigned long)start) <
-				mid->addr_offset)
-			stop = mid;
-		else {
-			/* keep addr_prel31 relative to start */
-			addr_prel31 -= ((unsigned long)mid -
-					(unsigned long)start);
-			start = mid;
-		}
+static const char *kernel_symbols(unsigned long addr) {
+#define SYMBOL_MAGIC 0xFF000000ul
+	unsigned long *ptr= (unsigned long *)(addr - 4);
+	if ((*ptr & SYMBOL_MAGIC) == SYMBOL_MAGIC) {
+		unsigned long ofs = *ptr & ~SYMBOL_MAGIC;
+		return (char *)ptr - ofs;
 	}
-
-	if (likely(start->addr_offset <= addr_prel31))
-		return start;
-	else {
-		pr_warn("unwind: Unknown symbol address %08lx\n", addr);
-		return NULL;
-	}
+	return "Unknown";
 }
 
-static const struct unwind_idx *unwind_find_origin(
-	const struct unwind_idx *start, const struct unwind_idx *stop) {
-	pr_debug("%s(%p, %p)\n", __func__, start, stop);
-	while (start < stop) {
-		const struct unwind_idx *mid = start + ((stop - start) >> 1);
+static const struct unwind_index *
+unwind_search_index(const unwind_index_t *start, 
+	const unwind_index_t *end, uint32_t ip) {
+	const struct unwind_index *middle;
 
-		if (mid->addr_offset >= 0x40000000)
-			/* negative offset */
-			start = mid + 1;
+	/* Perform a binary search of the unwind index */
+	while (start < end - 1) {
+		middle = start + ((end - start + 1) >> 1);
+		if (ip < prel31_to_addr(&middle->addr_offset))
+			end = middle;
 		else
-			/* positive offset */
-			stop = mid;
+			start = middle;
 	}
-	pr_debug("%s -> %p\n", __func__, stop);
-	return stop;
+	return start;
 }
 
-static const struct unwind_idx *unwind_find_idx(unsigned long addr) {
-	const struct unwind_idx *idx;
+static int unwind_get_next_byte(unwind_control_block_t *ucb) {
+	int instruction;
 
-	pr_debug("%s(%08lx)\n", __func__, addr);
+	/* Are there more instructions */
+	if (ucb->remaining == 0)
+		return -1;
 
-	if (kernel_text_address(addr)) {
-		if (unlikely(!origin_unwind_idx)) {
-			origin_unwind_idx =
-				unwind_find_origin(__exidx_start, __exidx_end);		
-		}
+	/* Extract the current instruction */
+	instruction = ((*ucb->current) >> (ucb->byte << 3)) & 0xff;
 
-		/* main unwind table */
-		idx = search_index(addr, __exidx_start,
-				   origin_unwind_idx, __exidx_end);   
-	} else {
-		idx = NULL;
+	/* Move the next byte */
+	--ucb->byte;
+	if (ucb->byte < 0) {
+		++ucb->current;
+		ucb->byte = 3;
 	}
-	pr_debug("%s: idx = %p\n", __func__, idx);
-	return idx;
+	--ucb->remaining;
+	return instruction;
 }
 
-static unsigned long unwind_get_byte(struct unwind_ctrl_block *ctrl) {
-	unsigned long ret;
+static int unwind_control_block_init(unwind_control_block_t *ucb, 
+	const uint32_t *instructions, const backtrace_frame_t *frame) {
+	/* Initialize control block */
+	memset(ucb, 0, sizeof(unwind_control_block_t));
+	ucb->current = instructions;
 
-	if (ctrl->entries <= 0) {
-		pr_warn("unwind: Corrupt unwind table\n");
-		return 0;
-	}
-
-	ret = (*ctrl->insn >> (ctrl->byte * 8)) & 0xff;
-
-	if (ctrl->byte == 0) {
-		ctrl->insn++;
-		ctrl->entries--;
-		ctrl->byte = 3;
+	/* Is the a short unwind description */
+	if ((*instructions & 0xff000000) == 0x80000000) {
+		ucb->remaining = 3;
+		ucb->byte = 2;
+	/* Is the a long unwind description */
+	} else if ((*instructions & 0xff000000) == 0x81000000) {
+		ucb->remaining = ((*instructions & 0x00ff0000) >> 14) + 2;
+		ucb->byte = 1;
 	} else
-		ctrl->byte--;
+		return -1;
 
-	return ret;
-}
-
-/* Before poping a register check whether it is feasible or not */
-static int unwind_pop_register(struct unwind_ctrl_block *ctrl,
-	unsigned long **vsp, unsigned int reg) {
-	if (unlikely(ctrl->check_each_pop))
-		if (*vsp >= (unsigned long *)ctrl->sp_high)
-			return -URC_FAILURE;
-
-	ctrl->vrs[reg] = *(*vsp)++;
-	return URC_OK;
-}
-
-/* Helper functions to execute the instructions */
-static int unwind_exec_pop_subset_r4_to_r13(
-	struct unwind_ctrl_block *ctrl, unsigned long mask) {
-	unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
-	int load_sp, reg = 4;
-
-	load_sp = mask & (1 << (13 - 4));
-	while (mask) {
-		if (mask & 1)
-			if (unwind_pop_register(ctrl, &vsp, reg))
-				return -URC_FAILURE;
-		mask >>= 1;
-		reg++;
+	/* Initialize the virtual register set */
+	if (frame) {
+		ucb->vrs[7] = frame->fp;
+		ucb->vrs[13] = frame->sp;
+		ucb->vrs[14] = frame->lr;
+		ucb->vrs[15] = 0;
 	}
-	if (!load_sp)
-		ctrl->vrs[SP] = (unsigned long)vsp;
-
-	return URC_OK;
+	return 0;
 }
 
-static int unwind_exec_pop_r4_to_rN(
-	struct unwind_ctrl_block *ctrl, unsigned long insn) {
-	unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
-	int reg;
+static int unwind_execute_instruction(unwind_control_block_t *ucb) {
+	int instruction;
+	uint32_t mask;
+	uint32_t reg;
+	uint32_t *vsp;
 
-	/* pop R4-R[4+bbb] */
-	for (reg = 4; reg <= 4 + (insn & 7); reg++)
-		if (unwind_pop_register(ctrl, &vsp, reg))
-				return -URC_FAILURE;
+	/* Consume all instruction byte */
+	while ((instruction = unwind_get_next_byte(ucb)) != -1) {
+		if ((instruction & 0xc0) == 0x00) {
+			/* vsp = vsp + (xxxxxx << 2) + 4 */
+			ucb->vrs[13] += ((instruction & 0x3f) << 2) + 4;
+		} else if ((instruction & 0xc0) == 0x40) {
+			/* vsp = vsp - (xxxxxx << 2) - 4 */
+			ucb->vrs[13] -= ((instruction & 0x3f) << 2) - 4;
+		} else if ((instruction & 0xf0) == 0x80) {
+			/* pop under mask {r15-r12},{r11-r4} or refuse to unwind */
+			instruction = instruction << 8 | unwind_get_next_byte(ucb);
 
-	if (insn & 0x8)
-		if (unwind_pop_register(ctrl, &vsp, 14))
-				return -URC_FAILURE;
+			/* Check for refuse to unwind */
+			if (instruction == 0x8000)
+				return 0;
 
-	ctrl->vrs[SP] = (unsigned long)vsp;
+			/* Pop registers using mask */
+			vsp = (uint32_t *)ucb->vrs[13];
+			mask = instruction & 0xfff;
+			reg = 4;
+			while (mask != 0) {
+				if ((mask & 0x001) != 0)
+					ucb->vrs[reg] = *vsp++;
+				mask = mask >> 1;
+				++reg;
+			}
 
-	return URC_OK;
-}
+			/* Update the vrs sp as usual if r13 (sp) was not in the mask,
+			 * otherwise leave the popped r13 as is. */
+			if ((mask & (1 << (13 - 4))) == 0)
+				ucb->vrs[13] = (uint32_t)vsp;
+		} else if ((instruction & 0xf0) == 0x90 && instruction != 0x9d && instruction != 0x9f) {
+			/* vsp = r[nnnn] */
+			ucb->vrs[13] = ucb->vrs[instruction & 0x0f];
+		} else if ((instruction & 0xf0) == 0xa0) {
+			/* pop r4-r[4+nnn] or pop r4-r[4+nnn], r14*/
+			vsp = (uint32_t *)ucb->vrs[13];
+			for (reg = 4; reg <= (instruction & 0x07) + 4; ++reg)
+				ucb->vrs[reg] = *vsp++;
+			if (instruction & 0x08)
+				ucb->vrs[14] = *vsp++;
+			ucb->vrs[13] = (uint32_t)vsp;
+		} else if (instruction == 0xb0) {
+			/* finished */
+			if (ucb->vrs[15] == 0)
+				ucb->vrs[15] = ucb->vrs[14];
+			return 0;
+		} else if (instruction == 0xb1) {
+			/* pop register under mask {r3,r2,r1,r0} */
+			vsp = (uint32_t *)ucb->vrs[13];
+			mask = unwind_get_next_byte(ucb);
 
-static int unwind_exec_pop_subset_r0_to_r3(
-	struct unwind_ctrl_block *ctrl, unsigned long mask) {
-	unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
-	int reg = 0;
+			reg = 0;
+			while (mask != 0) {
+				if ((mask & 0x01) != 0)
+					ucb->vrs[reg] = *vsp++;
+				mask = mask >> 1;
+				++reg;
+			}
+			ucb->vrs[13] = (uint32_t)vsp;
 
-	/* pop R0-R3 according to mask */
-	while (mask) {
-		if (mask & 1)
-			if (unwind_pop_register(ctrl, &vsp, reg))
-				return -URC_FAILURE;
-		mask >>= 1;
-		reg++;
+		} else if (instruction == 0xb2) {
+			/* vps = vsp + 0x204 + (uleb128 << 2) */
+			ucb->vrs[13] += 0x204 + (unwind_get_next_byte(ucb) << 2);
+		} else if (instruction == 0xb3 || instruction == 0xc8 || instruction == 0xc9) {
+			/* pop VFP double-precision registers */
+			vsp = (uint32_t *)ucb->vrs[13];
+
+			/* D[ssss]-D[ssss+cccc] or D[16+sssss]-D[16+ssss+cccc] as pushed by VPUSH or FSTMFDX */
+			vsp += 2 * ((unwind_get_next_byte(ucb) & 0x0f) + 1);
+			if (instruction == 0xb3) {
+				/* as pushed by FSTMFDX */
+				vsp++;
+			}
+			ucb->vrs[13] = (uint32_t)vsp;
+		} else if ((instruction & 0xf8) == 0xb8 || (instruction & 0xf8) == 0xd0) {
+			/* pop VFP double-precision registers */
+			vsp = (uint32_t *)ucb->vrs[13];
+
+			/* D[8]-D[8+nnn] as pushed by VPUSH or FSTMFDX */
+			vsp += 2 * ((instruction & 0x07) + 1);
+			if ((instruction & 0xf8) == 0xb8) {
+				/* as pushed by FSTMFDX */
+				vsp++;
+			}
+			ucb->vrs[13] = (uint32_t)vsp;
+		} else
+			return -1;
 	}
-	ctrl->vrs[SP] = (unsigned long)vsp;
-
-	return URC_OK;
+	return instruction != -1;
 }
 
-/*
- * Execute the current unwind instruction.
- */
-static int unwind_exec_insn(struct unwind_ctrl_block *ctrl) {
-	unsigned long insn = unwind_get_byte(ctrl);
-	int ret = URC_OK;
+static int unwind_frame(backtrace_frame_t *frame) {
+	unwind_control_block_t ucb;
+	const unwind_index_t *index;
+	const uint32_t *instructions;
+	unsigned long high, low;
+	int result;
 
-	pr_debug("%s: insn = %08lx\n", __func__, insn);
-
-	if ((insn & 0xc0) == 0x00)
-		ctrl->vrs[SP] += ((insn & 0x3f) << 2) + 4;
-	else if ((insn & 0xc0) == 0x40)
-		ctrl->vrs[SP] -= ((insn & 0x3f) << 2) + 4;
-	else if ((insn & 0xf0) == 0x80) {
-		unsigned long mask;
-
-		insn = (insn << 8) | unwind_get_byte(ctrl);
-		mask = insn & 0x0fff;
-		if (mask == 0) {
-			pr_warn("unwind: 'Refuse to unwind' instruction %04lx\n",
-				insn);
-			return -URC_FAILURE;
-		}
-
-		ret = unwind_exec_pop_subset_r4_to_r13(ctrl, mask);
-		if (ret)
-			goto error;
-	} else if ((insn & 0xf0) == 0x90 &&
-		   (insn & 0x0d) != 0x0d)
-		ctrl->vrs[SP] = ctrl->vrs[insn & 0x0f];
-	else if ((insn & 0xf0) == 0xa0) {
-		ret = unwind_exec_pop_r4_to_rN(ctrl, insn);
-		if (ret)
-			goto error;
-	} else if (insn == 0xb0) {
-		if (ctrl->vrs[PC] == 0)
-			ctrl->vrs[PC] = ctrl->vrs[LR];
-		/* no further processing */
-		ctrl->entries = 0;
-	} else if (insn == 0xb1) {
-		unsigned long mask = unwind_get_byte(ctrl);
-
-		if (mask == 0 || mask & 0xf0) {
-			pr_warn("unwind: Spare encoding %04lx\n",
-				(insn << 8) | mask);
-			return -URC_FAILURE;
-		}
-
-		ret = unwind_exec_pop_subset_r0_to_r3(ctrl, mask);
-		if (ret)
-			goto error;
-	} else if (insn == 0xb2) {
-		unsigned long uleb128 = unwind_get_byte(ctrl);
-
-		ctrl->vrs[SP] += 0x204 + (uleb128 << 2);
-	} else {
-		pr_warn("unwind: Unhandled instruction %02lx\n", insn);
-		return -URC_FAILURE;
-	}
-
-	pr_debug("%s: fp = %08lx sp = %08lx lr = %08lx pc = %08lx\n", __func__,
-		 ctrl->vrs[FP], ctrl->vrs[SP], ctrl->vrs[LR], ctrl->vrs[PC]);
-
-error:
-	return ret;
-}
-
-/*
- * Unwind a single frame starting with *sp for the symbol at *pc. It
- * updates the *pc and *sp with the new values.
- */
-static int unwind_frame(struct stackframe *frame) {
-	unsigned long low;
-	const struct unwind_idx *idx;
-	struct unwind_ctrl_block ctrl;
-
-	/* store the highest address on the stack to avoid crossing it*/
 	low = frame->sp;
-	ctrl.sp_high = ALIGN(low, THREAD_SIZE);
+	high = frame->top;
+	/* Search the unwind index for the matching unwind table */
+	index = unwind_search_index(__exidx_start, __exidx_end, frame->pc);
+	if (index == NULL)
+		return -1;
 
-	pr_debug("%s(pc = %08lx lr = %08lx sp = %08lx)\n", __func__,
-		 frame->pc, frame->lr, frame->sp);
+	/* Make sure we can unwind this frame */
+	if (index->insn == 0x00000001)
+		return 0;
 
-	if (!kernel_text_address(frame->pc))
-		return -URC_FAILURE;
+	/* Get the pointer to the first unwind instruction */
+	if (index->insn & 0x80000000)
+		instructions = &index->insn;
+	else
+		instructions = (uint32_t *)prel31_to_addr(&index->insn);
 
-	idx = unwind_find_idx(frame->pc);
-	if (!idx) {
-		pr_warn("unwind: Index not found %08lx\n", frame->pc);
-		return -URC_FAILURE;
+	/* Initialize the unwind control block */
+	if (unwind_control_block_init(&ucb, instructions, frame) < 0)
+		return -1;
+
+	/* Execute the unwind instructions TODO range check the stack pointer */
+	while ((result = unwind_execute_instruction(&ucb)) > 0) {
+		if (ucb.vrs[SP] < low || ucb.vrs[SP] >= high)
+			return -1;
 	}
+	if (result == -1)
+		return -1;
 
-	ctrl.vrs[FP] = frame->fp;
-	ctrl.vrs[SP] = frame->sp;
-	ctrl.vrs[LR] = frame->lr;
-	ctrl.vrs[PC] = 0;
+	/* Set the virtual pc to the virtual lr if this is the first unwind */
+	if (ucb.vrs[15] == 0)
+		ucb.vrs[15] = ucb.vrs[14];
 
-	if (idx->insn == 1)
-		/* can't unwind */
-		return -URC_FAILURE;
-	else if ((idx->insn & 0x80000000) == 0)
-		/* prel31 to the unwind table */
-		ctrl.insn = (unsigned long *)prel31_to_addr(&idx->insn);
-	else if ((idx->insn & 0xff000000) == 0x80000000)
-		/* only personality routine 0 supported in the index */
-		ctrl.insn = &idx->insn;
-	else {
-		pr_warn("unwind: Unsupported personality routine %08lx in the index at %p\n",
-			idx->insn, idx);
-		return -URC_FAILURE;
-	}
+	/* We are done if current frame pc is equal to the virtual pc, prevent infinite loop */
+	if (frame->pc == ucb.vrs[15])
+		return 0;
 
-	/* check the personality routine */
-	if ((*ctrl.insn & 0xff000000) == 0x80000000) {
-		ctrl.byte = 2;
-		ctrl.entries = 1;
-	} else if ((*ctrl.insn & 0xff000000) == 0x81000000) {
-		ctrl.byte = 1;
-		ctrl.entries = 1 + ((*ctrl.insn & 0x00ff0000) >> 16);
-	} else {
-		pr_warn("unwind: Unsupported personality routine %08lx at %p\n",
-			*ctrl.insn, ctrl.insn);
-		return -URC_FAILURE;
-	}
-
-	ctrl.check_each_pop = 0;
-
-	while (ctrl.entries > 0) {
-		int urc;
-		if ((ctrl.sp_high - ctrl.vrs[SP]) < sizeof(ctrl.vrs))
-			ctrl.check_each_pop = 1;
-		urc = unwind_exec_insn(&ctrl);
-		if (urc < 0)
-			return urc;
-		if (ctrl.vrs[SP] < low || ctrl.vrs[SP] >= ctrl.sp_high)
-			return -URC_FAILURE;
-	}
-
-	if (ctrl.vrs[PC] == 0)
-		ctrl.vrs[PC] = ctrl.vrs[LR];
-
-	/* check for infinite loop */
-	if (frame->pc == ctrl.vrs[PC] && frame->sp == ctrl.vrs[SP])
-		return -URC_FAILURE;
-
-	frame->fp = ctrl.vrs[FP];
-	frame->sp = ctrl.vrs[SP];
-	frame->lr = ctrl.vrs[LR];
-	frame->pc = ctrl.vrs[PC];
-
-	return URC_OK;
+	/* Update the frame */
+	frame->fp = ucb.vrs[7];
+	frame->sp = ucb.vrs[13];
+	frame->lr = ucb.vrs[14];
+	frame->pc = ucb.vrs[15];
+	return 1;
 }
 
-void unwind_backtrace(rtems_printer *printer, CPU_Exception_frame *regs,
+static void backtrace_info(rtems_printer *printer) {
+	rtems_printf(printer, "\n***[Call Stack Dump] =>\n");
+}
+
+static void dump_backtrace(rtems_printer *printer, unsigned long pc,
+	unsigned long fnaddr) {
+	const char *sym = kernel_symbols(fnaddr);
+	rtems_printf(printer, "\t<0x%lx>(%s)\n", pc, sym);
+}
+
+const char *unwind_kernel_symbols(unsigned long pc) {
+	const unwind_index_t *index = unwind_search_index(__exidx_start, 
+		__exidx_end, pc);
+	if (index)
+		return kernel_symbols(prel31_to_addr(&index->addr_offset));
+	return "Unknown"; 
+}
+
+void __unwind_backtrace(rtems_printer *printer, CPU_Exception_frame *regs,
 	struct _Thread_Control *tsk) {
-	struct stackframe frame;
+	const unwind_index_t *index;
+	backtrace_frame_t frame;
 	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
 	if (tsk == NULL)
 		tsk = _Thread_Executing;
@@ -480,25 +358,24 @@ void unwind_backtrace(rtems_printer *printer, CPU_Exception_frame *regs,
 		frame.fp = (unsigned long)__builtin_frame_address(0);
 		frame.sp = current_stack_pointer();
 		frame.lr = (unsigned long)__builtin_return_address(0);
-		frame.pc = (unsigned long)unwind_backtrace;
+		frame.pc = (unsigned long)&__unwind_backtrace;
 	} else {
 		/* task blocked in __switch_to */
 		frame.fp = thread_saved_fp(tsk);
 		frame.sp = thread_saved_sp(tsk);
-		/*
-		 * The function calling __switch_to cannot be a leaf function
-		 * so LR is recovered from the stack.
-		 */
 		frame.lr = 0;
 		frame.pc = thread_saved_pc(tsk);
 	}
-
-	while (1) {
-		unsigned long where = frame.pc;
-		int urc = unwind_frame(&frame);
-		if (urc < 0)
+	backtrace_info(printer);
+	frame.top = thread_stack_end(tsk);
+	do {
+		if (frame.pc == 0 || frame.pc == 0x00000001) {
+			rtems_printf(printer, "<reached end of unwind table>\n");
 			break;
-		dump_backtrace(printer, where, frame.pc, frame.sp - 4);
-	}
+		}
+		index = unwind_search_index(__exidx_start, __exidx_end, frame.pc);
+		frame.pc = (frame.pc >> 1) << 1;
+		dump_backtrace(printer, frame.pc, prel31_to_addr(&index->addr_offset));
+	} while (unwind_frame(&frame));
 }
 

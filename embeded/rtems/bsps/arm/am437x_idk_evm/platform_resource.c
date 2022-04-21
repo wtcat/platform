@@ -1,5 +1,8 @@
 #include "bsp/platform_bus.h"
+#include "bsp/asm/pinctrl.h"
 
+/* Control Module */
+#define CTRL_MODULE 		0x44E10000
 
 /* PRCM Base Address */
 #define PRCM_BASE			0x44DF0000
@@ -114,7 +117,28 @@ TEMPLATE_RESOURCE(i2c2, "ti,am4372-i2c", DRVMGR_BUS_TYPE_PLATFORM, 0,
 	TRN("CLKCTRL", DRVMGR_KT_INT, WKUP_REG(0x4b0))
 );
 
+/*
+ * Pin-ctrl
+ */
+static const struct pinctrl am437x_pads[] = {
+	//AM4372_IOPAD(0x988, PIN_INPUT | SLEWCTRL_FAST | MUX_MODE0), /* i2c0_sda.i2c0_sda */
+	//AM4372_IOPAD(0x98c, PIN_INPUT | SLEWCTRL_FAST | MUX_MODE0), /* i2c0_scl.i2c0_scl */	
+
+	// AM4372_IOPAD(0x988, PIN_INPUT_PULLDOWN | MUX_MODE7),
+	// AM4372_IOPAD(0x98c, PIN_INPUT_PULLDOWN | MUX_MODE7),
+	AM4372_IOPAD(0x9e8, PIN_INPUT | SLEWCTRL_FAST | MUX_MODE3), /* cam1_data1.i2c2_scl */
+	AM4372_IOPAD(0x9ec, PIN_INPUT | SLEWCTRL_FAST | MUX_MODE3), /* cam1_data0.i2c2_sda */
+
+	PINCTRL_TERMINAL
+};
+
+TEMPLATE_RESOURCE(pin_ctrl, "pinctrl-single,pins", DRVMGR_BUS_TYPE_PLATFORM, 0,
+  	TRN("REG0", DRVMGR_KT_INT, CTRL_MODULE),
+	TRN("pins", DRVMGR_KT_POINTER, am437x_pads)
+);
+
 TEMPLATE_RESOURCES_REGISTER(platform_resources,
+	RN(pin_ctrl),
     RN(ttyS0), RN(ttyS1), RN(ttyS2), RN(ttyS3), RN(ttyS4), 
 	RN(gpio0), RN(gpio1), RN(gpio2), RN(gpio3), RN(gpio4), RN(gpio5),
 	RN(gpio_keys),

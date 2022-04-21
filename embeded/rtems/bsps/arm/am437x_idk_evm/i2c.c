@@ -128,6 +128,12 @@ struct i2c_clockrate {
 #define devdbg(...)
 #endif
 
+static void am437x_i2c_regs_dump(struct i2c_private *i2c) {
+	volatile struct i2c_regs *regs = i2c->regs;
+	printk("[I2C Register]:\n");
+	printk("\tI2C_SYSS = 0x%x\n", regs->I2C_SYSS);
+}
+
 static int am437x_i2c_set_clock(i2c_bus *bus, 
 	unsigned long clock) {
 	struct i2c_private *i2c = (struct i2c_private *)bus;
@@ -156,7 +162,8 @@ static int am437x_i2c_reset(struct i2c_private *i2c) {
 		rtems_counter_delay_nanoseconds(100000);
 	}
 	if ( timeout <= 0 ) {
-		printk("ERROR: Timeout in soft-reset\n");
+		printk("[%s] ERROR(%s): Timeout in soft-reset\n", 
+			__func__, i2c->dev->name);
 		return ETIMEDOUT;
 	}
 	/* Disable again after reset */
@@ -388,28 +395,28 @@ static int i2c_probe(struct drvmgr_dev *dev) {
 		goto _free;
 	i2c->clkctrl = prop->i;
     i2c->regs = (volatile struct i2c_regs *)devp->base;
+	i2c->dev = dev;
 	dev->priv = i2c;
-	i2c_bus_init(&i2c->bus);
 
 	/* Enable module and reset */
 	writeb(0x2, i2c->clkctrl);
 	ret = am437x_i2c_reset(i2c);
-	if (ret) {
-		devdbg("i2c: reset timed out\n");
-		goto _destory;
-	}
+	if (ret) 
+		goto _free;
     ret = drvmgr_interrupt_register(dev, 0, dev->name, 
 		am437x_i2c_interrupt, i2c);
     if (ret) {
         devdbg("Register irq for %s failed\n", dev->name);
-        goto _destory;
+        goto _free;
     }
 	ret = platform_bus_device_register(dev, &i2c_bus_ops, 
 		DRVMGR_BUS_TYPE_I2C);
 	if (ret) {
 		devdbg("Register I2C bus device（%s） failed\n", dev->name);
-		goto _destory;
+		goto _remove_irq;
 	}
+	am437x_i2c_set_clock(&i2c->bus, 400000);
+	i2c_bus_init(&i2c->bus);
 	i2c->bus.transfer = am437x_i2c_transfer;
 	i2c->bus.set_clock = am437x_i2c_set_clock;
 	i2c->bus.destroy = am437x_i2c_destroy;
@@ -419,6 +426,8 @@ static int i2c_probe(struct drvmgr_dev *dev) {
 	return 0;
 _destory:
 	i2c_bus_destroy(&i2c->bus);
+_remove_irq:
+	drvmgr_interrupt_unregister(dev, 0, am437x_i2c_interrupt, i2c);
 _free:
 	free(i2c);
 	return ret;

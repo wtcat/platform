@@ -13,44 +13,47 @@
 #define __ASM_UNWIND_H
 
 #include <rtems/score/cpu.h>
-#include <rtems/print.h>
-
+#include <rtems/printer.h>
 #ifdef __cplusplus
 extern "C"{
 #endif
 
-#ifdef CONFIG_ARM_UNWIND
-#define UNWIND(code...)		code
-#else
-#define UNWIND(code...)
-#endif
+typedef struct backtrace_frame
+{
+	uint32_t fp;
+	uint32_t sp;
+	uint32_t lr;
+	uint32_t pc;
+	uint32_t top;
+} backtrace_frame_t;
 
-struct _Thread_Control;
+typedef struct backtrace
+{
+	void *function;
+	void *address;
+	const char *name;
+} backtrace_t;
 
-/* Unwind reason code according the the ARM EABI documents */
-enum unwind_reason_code {
-	URC_OK = 0,			/* operation completed successfully */
-	URC_CONTINUE_UNWIND = 8,
-	URC_FAILURE = 9			/* unspecified failure of some kind */
-};
+typedef struct unwind_control_block
+{
+	uint32_t vrs[16];
+	const uint32_t *current;
+	int remaining;
+	int byte;
+} unwind_control_block_t;
 
-struct unwind_idx {
-	unsigned long addr_offset;
-	unsigned long insn;
-};
+typedef struct unwind_index
+{
+	uint32_t addr_offset;
+	uint32_t insn;
+} unwind_index_t;
 
-struct unwind_table {
-//	struct list_head list;
-	const struct unwind_idx *start;
-	const struct unwind_idx *origin;
-	const struct unwind_idx *stop;
-	unsigned long begin_addr;
-	unsigned long end_addr;
-};
+const char *unwind_kernel_symbols(unsigned long pc);
+void __unwind_backtrace(rtems_printer *printer, 
+	CPU_Exception_frame *regs, struct _Thread_Control *tsk);
 
-void unwind_backtrace(rtems_printer *printer, CPU_Exception_frame *regs,
-	struct _Thread_Control *tsk);
-
+#define unwind_backtrace(printer) __unwind_backtrace(printer, NULL, NULL)
+	
 #ifdef __cplusplus
 }
 #endif
