@@ -50,8 +50,8 @@ executable("rtems") {
       libs += ["telnetd"]
     }
   }
-  if (use_debugger) {
-    defines += ["CONFIGURE_DEBUGGER"]
+  if (use_gdbserver) {
+    defines += ["CONFIGURE_GDBSERVER"]
     libs += ["debugger"]
   }
 }

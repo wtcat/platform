@@ -1,0 +1,9 @@
+{
+    "name": "assist",
+    "owner": "embedthis",
+    "description": "Build Assist",
+    "version": "1.0.0",
+    "license": "UNLICENSED",
+    "export": false,
+    "origin": "embedthis/assist"
+}

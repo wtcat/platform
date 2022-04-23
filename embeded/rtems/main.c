@@ -10,7 +10,7 @@
 #include <rtems/shell.h>
 #include <rtems/bspIo.h>
 #include <rtems/media.h>
-#ifdef CONFIGURE_DEBUGGER
+#ifdef CONFIGURE_GDBSERVER
 #include <rtems/rtems-debugger-remote-tcp.h>
 #endif
 
@@ -120,7 +120,7 @@ static rtems_task Init(rtems_task_argument arg) {
 #endif
   environment_load();
   libbsd_setup();
-#ifdef CONFIGURE_DEBUGGER
+#ifdef CONFIGURE_GDBSERVER
   rtems_debugger_register_tcp_remote();
 #endif
   app_main();

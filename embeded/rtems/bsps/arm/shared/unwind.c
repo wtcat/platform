@@ -34,7 +34,7 @@ enum regs {
 	PC = 15
 };
 
-//#define DEBUG_ON
+#define DEBUG_ON
 
 #define prel31_to_addr(ptr)	({\
 	long offset = (((long)*(ptr)) << 1) >> 1;	\
@@ -276,16 +276,23 @@ static int unwind_frame(backtrace_frame_t *frame) {
 	unsigned long high, low;
 	int result;
 
+	pr_debug("%s(pc = %08lx lr = %08lx sp = %08lx)\n", __func__,
+		 frame->pc, frame->lr, frame->sp);
 	low = frame->sp;
 	high = frame->top;
 	/* Search the unwind index for the matching unwind table */
 	index = unwind_search_index(__exidx_start, __exidx_end, frame->pc);
-	if (index == NULL)
+	if (index == NULL) {
+		pr_debug("unwind: Index not found %08lx\n", frame->pc);
 		return -1;
+	}
 
 	/* Make sure we can unwind this frame */
-	if (index->insn == 0x00000001)
+	if (index->insn == 0x00000001) {
+		pr_debug("Invalid instruction {offset=0x%x, insn = 0x%x}\n", 
+			index->addr_offset,index->insn);
 		return 0;
+	}
 
 	/* Get the pointer to the first unwind instruction */
 	if (index->insn & 0x80000000)
@@ -299,11 +306,15 @@ static int unwind_frame(backtrace_frame_t *frame) {
 
 	/* Execute the unwind instructions TODO range check the stack pointer */
 	while ((result = unwind_execute_instruction(&ucb)) > 0) {
-		if (ucb.vrs[SP] < low || ucb.vrs[SP] >= high)
+		if (ucb.vrs[SP] < low || ucb.vrs[SP] >= high) {
+			pr_debug("Stack limit reached (ucb.vrs[SP] = 0x%x)\n", ucb.vrs[SP]);
 			return -1;
+		}
 	}
-	if (result == -1)
+	if (result == -1) {
+		pr_debug("unwind_execute_instruction: %d\n", result);
 		return -1;
+	}
 
 	/* Set the virtual pc to the virtual lr if this is the first unwind */
 	if (ucb.vrs[15] == 0)

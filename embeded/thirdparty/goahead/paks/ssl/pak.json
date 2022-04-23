@@ -1,0 +1,23 @@
+{
+    "name": "ssl",
+    "description": "SSL Interface",
+    "title": "SSL Interface",
+    "version": "1.0.0",
+    "keywords": [
+        "me",
+        "ssl"
+    ],
+    "author": {
+        "name": "Michael O'Brien",
+        "email": "mob@embedthis.com"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/embedthis/ssl.git"
+    },
+    "bugs": {
+        "url": "http://github.com/embedthis/ssl/issues"
+    },
+    "licenses": "MIT",
+    "origin": "embedthis/ssl"
+}

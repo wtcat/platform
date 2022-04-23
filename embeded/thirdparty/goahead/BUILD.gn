@@ -1,0 +1,33 @@
+component("goahead") {
+    component_type == "static_library"
+    sources = [
+        "src/socket.c",
+        "src/alloc.c",
+        "src/action.c",
+        "src/crypt.c",
+        "src/auth.c",
+        "src/options.c",
+        "src/file.c",
+        "src/route.c",
+        "src/upload.c",
+        "src/fs.c",
+        "src/time.c",
+        "src/utils/gopass.c",
+        "src/utils/webcomp.c",
+        "src/runtime.c",
+        "src/js.c",
+        "src/osdep.c",
+        "src/mbedtls/mbedtls.c",
+        "src/jst.c",
+        "src/http.c",
+        "src/goahead.c",
+        "src/cgi.c",
+        "src/rom.c",
+        # "src/goahead-openssl/goahead-openssl.c",
+        # "src/goahead-mbedtls/goahead-mbedtls.c",
+        # "paks/goahead-mbedtls/goahead-mbedtls.c",
+        # "paks/goahead-openssl/goahead-openssl.c",
+        # "paks/mbedtls/dist/mbedtls.c"
+    ]
+
+}

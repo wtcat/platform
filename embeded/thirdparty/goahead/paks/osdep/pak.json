@@ -1,0 +1,29 @@
+{
+    "name": "osdep",
+    "description": "O/S Dependent Layer",
+    "version": "1.0.3",
+    "keywords": [
+        "osdep",
+        "me"
+    ],
+    "author": {
+        "name": "Michael O'Brien",
+        "email": "mob@embedthis.com"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/embedthis/osdep.git"
+    },
+    "bugs": {
+        "url": "http://github.com/embedthis/osdep/issues"
+    },
+    "licenses": "Commercial",
+    "files": [
+        "dist/",
+        "doc/api/"
+    ],
+    "devDependencies": {
+        "pak": ">=0.11.3"
+    },
+    "origin": "embedthis/osdep"
+}

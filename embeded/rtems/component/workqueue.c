@@ -20,7 +20,7 @@ struct helper_work_struct {
 };
 
 #if defined(__rtems_libbsd__)
-#define SYSWQ_PRIO  100
+#define SYSWQ_PRIO  99
 #else
 #define SYSWQ_PRIO  14
 #endif
