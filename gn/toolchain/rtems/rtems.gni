@@ -6,7 +6,7 @@ declare_args() {
   use_libbsd = false
 
   #Debugger
-  use_debugger = false
+  use_gdbserver = false
 
   #Bsp stack allocator
   use_stack_allocator = true
