@@ -34,7 +34,7 @@ enum regs {
 	PC = 15
 };
 
-#define DEBUG_ON
+//#define DEBUG_ON
 
 #define prel31_to_addr(ptr)	({\
 	long offset = (((long)*(ptr)) << 1) >> 1;	\
