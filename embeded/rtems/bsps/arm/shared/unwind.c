@@ -333,13 +333,13 @@ static int unwind_frame(backtrace_frame_t *frame) {
 }
 
 static void backtrace_info(rtems_printer *printer) {
-	rtems_printf(printer, "\n***[Call Stack Dump] =>\n");
+	rtems_printf(printer, "\n[Backtrace Dump] =>\n");
 }
 
 static void dump_backtrace(rtems_printer *printer, unsigned long pc,
-	unsigned long fnaddr) {
+	unsigned long fnaddr, int level) {
 	const char *sym = kernel_symbols(fnaddr);
-	rtems_printf(printer, "\t<0x%lx>(%s)\n", pc, sym);
+	rtems_printf(printer, " [%2d] - <0x%lx>@ %s\n", level, pc, sym);
 }
 
 const char *unwind_kernel_symbols(unsigned long pc) {
@@ -354,6 +354,7 @@ void __unwind_backtrace(rtems_printer *printer, CPU_Exception_frame *regs,
 	struct _Thread_Control *tsk) {
 	const unwind_index_t *index;
 	backtrace_frame_t frame;
+	int level = 0;
 	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
 	if (tsk == NULL)
 		tsk = _Thread_Executing;
@@ -386,7 +387,8 @@ void __unwind_backtrace(rtems_printer *printer, CPU_Exception_frame *regs,
 		}
 		index = unwind_search_index(__exidx_start, __exidx_end, frame.pc);
 		frame.pc = (frame.pc >> 1) << 1;
-		dump_backtrace(printer, frame.pc, prel31_to_addr(&index->addr_offset));
+		dump_backtrace(printer, frame.pc, prel31_to_addr(&index->addr_offset), level);
+		level++;
 	} while (unwind_frame(&frame));
 }
 
