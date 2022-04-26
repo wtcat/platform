@@ -1,10 +1,12 @@
+# Unit Test
+
 component("testsuite") {
     include_dirs = [
-        "//embeded/googletest/include",
-        "//embeded/googletest"
+        "//embeded/thirdparty/googletest/include",
+        "//embeded/thirdparty/googletest"
     ]
     sources = [
-        "//embeded/googletest/src/gtest-all.cc",
+        "//embeded/thirdparty/googletest/src/gtest-all.cc",
         "test_main.cc",
         "workqueue_unit_test.cc",
         "timlib_unit_test.cc"
