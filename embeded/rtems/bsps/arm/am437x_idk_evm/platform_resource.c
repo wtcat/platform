@@ -118,6 +118,18 @@ TEMPLATE_RESOURCE(i2c2, "ti,am4372-i2c", DRVMGR_BUS_TYPE_PLATFORM, 0,
 );
 
 /*
+ * SPI
+ */
+TEMPLATE_RESOURCE(spi0, "ti,am4372-mcspi", DRVMGR_BUS_TYPE_PLATFORM, 0,
+  	TRN("REG0", DRVMGR_KT_INT, 0x48030000),
+	TRN("IRQ0", DRVMGR_KT_INT, nIRQ(65)),
+	TRN("CLKCTRL", DRVMGR_KT_INT, PER_REG(0x500)),
+	TRN("mode", DRVMGR_KT_INT, 0),
+	TRN("speed", DRVMGR_KT_INT, 48000000),
+	TRN("word-length", DRVMGR_KT_INT, 16)
+);
+
+/*
  * Pin-ctrl
  */
 static const struct pinctrl am437x_pads[] = {

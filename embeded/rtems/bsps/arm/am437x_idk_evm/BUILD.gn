@@ -10,6 +10,7 @@ component("board") {
     "am43xx.c",
     "console.c",
     "i2c.c",
+    "spi.c",
     "pinctrl.c",
     "gpio.c",
     "gpio_keys.c",

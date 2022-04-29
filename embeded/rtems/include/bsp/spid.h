@@ -14,11 +14,11 @@ extern "C"{
 #endif
 
 static inline ssize_t spi_master_transfer(struct drvmgr_dev *dev, 
-    spi_ioc_transfer *msgs, uint32_t msg_count) {
+    spi_ioc_transfer *msgs, uint32_t n) {
     spi_bus *bus = (spi_bus *)dev->priv;
     int err;
     rtems_recursive_mutex_lock(&bus->mutex);
-    err = bus->transfer(bus, &msgs, msg_count);
+    err = bus->transfer(bus, &msgs, n);
     rtems_recursive_mutex_unlock(&bus->mutex);
     return err == 0? msg.len: -err;  
 }
