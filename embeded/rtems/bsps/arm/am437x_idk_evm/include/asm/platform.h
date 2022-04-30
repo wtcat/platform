@@ -1591,7 +1591,7 @@
  * This device driver simply provides entry points that return successful and
  * is primarily a test fixture. It is supported by all BSPs.
  */
-//#define CONFIGURE_APPLICATION_NEEDS_STUB_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_STUB_DRIVER
 
 /* Generated from spec:/acfg/if/appl-needs-timer-driver */
 

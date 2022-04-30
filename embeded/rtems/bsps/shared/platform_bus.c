@@ -235,7 +235,7 @@ int platform_dev_populate_on_bus(struct drvmgr_bus *bus,
 		if (!(*r)->compatible)
 			continue;
 		if ((*r)->parent_bus != bus->bus_type ||
-			(*r)->parent_busid != bus->dev->minor_bus)
+			strcmp((*r)->parent_name, bus->dev->name))
 			continue;
 		ret = platform_dev_register(bus, *r);
 		if (ret)

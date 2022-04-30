@@ -35,27 +35,35 @@ extern "C"{
 
 #define DRVMGR_WARN "DRVMGR_WARNING: " 
 
+
 /* Bus resource class */
 #define RESOURCE_BASE_DECLARE \
 	const char *compatible; \
 	const char *name; \
 	int parent_bus; \
-	int parent_busid; \
+	const char *parent_name; \
 	const struct drvmgr_key keys[];
 
 
 #define RN(node) (const struct bus_resource *)(&node)
 #define TRN(rname, type, value) {rname, type, {.ptr = (void *)value}}
-#define TEMPLATE_RESOURCE(_name, _compatible, _parent, _parent_busid, ...) \
+#define __TEMPLATE_RESOURCE(_name, _compatible, _parent, _parent_name, ...) \
 	static const struct resoruce_##_name {\
 		RESOURCE_BASE_DECLARE } \
 		_name = { \
 			.compatible = _compatible, \
 			.name = "/dev/"#_name, \
 			.parent_bus = _parent, \
-			.parent_busid = _parent_busid, \
+			.parent_name = _parent_name, \
 			.keys = { __VA_ARGS__, DRVMGR_KEY_EMPTY } \
 		}
+
+#define TEMPLATE_RESOURCE(_name, _compatible, _parent, _parent_name, ...) \
+	__TEMPLATE_RESOURCE(_name, _compatible, _parent, "/dev/"#_parent_name, __VA_ARGS__)
+
+#define PLATFORM_RESOURCE(_name, _compatible, ...) \
+	__TEMPLATE_RESOURCE(_name, _compatible, DRVMGR_BUS_TYPE_PLATFORM, \
+		"root bus", __VA_ARGS__)
 
 #define TEMPLATE_RESOURCES_REGISTER(_name, ...) \
 	static void platform_resource_##_name##_register(void) { \
@@ -183,7 +191,7 @@ devcie_get_property(struct drvmgr_dev *dev, const char *prop) {
 		RTEMS_SYSINIT_ORDER_MIDDLE \
 	)
 
-#define PLATFORM_RESOURCE(name) \
+#define PLATFORM_RESOURCE_REGISTER(name) \
 	static const struct bus_resource __res_##name; \
 	platform_devres_init(__res_##name); \
 	static const struct bus_resource __res_##name
