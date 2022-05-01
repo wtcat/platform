@@ -31,7 +31,14 @@ static int tpic2810_output(struct drvmgr_dev *dev, uint32_t bitmask,
     return err;
 }
 
+static int tpic2810_set(struct drvmgr_dev *dev, int pin, int val) {
+    if (pin > 7)
+        return -EINVAL;
+    return tpic2810_output(dev, 1u << pin, val);
+}
+
 static const struct gpio_operations tpic2810_gpio_ops = {
+    .set_pin = tpic2810_set,
 	.set_port = tpic2810_output,
 };
 
