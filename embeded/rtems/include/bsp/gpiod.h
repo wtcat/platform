@@ -26,40 +26,51 @@ extern "C"{
 
 struct gpio_operations {
 	int (*configure)(struct drvmgr_dev *dev, int pin, unsigned int mode);
+    int (*set_port)(struct drvmgr_dev *dev, uint32_t mask, uint32_t value);
+    int (*get_port)(struct drvmgr_dev *dev, uint32_t mask, uint32_t *value);
 	int (*set_pin)(struct drvmgr_dev *dev, int pin, int val);
 	int (*get_pin)(struct drvmgr_dev *dev, int pin);
-    void (*dump)(struct drvmgr_dev *dev);
 };
+
+#define GET_GPIOD_OPS(dev) (const struct gpio_operations *)(*(void **)(dev)->priv)
 
 static inline int gpiod_configure(struct drvmgr_dev *dev, int pin, 
 	unsigned int mode) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
-    const struct gpio_operations *ops = *(void **)dev->priv;
+    const struct gpio_operations *ops = GET_GPIOD_OPS(dev);
     return ops->configure(dev, pin, mode);
+}
+
+static inline int gpiod_write(struct drvmgr_dev *dev, uint32_t mask, 
+    uint32_t val) {
+    _Assert(dev != NULL);
+    _Assert(dev->priv != NULL);
+    const struct gpio_operations *ops = GET_GPIOD_OPS(dev);
+    return ops->set_port(dev, mask, val);
+}
+
+static inline int gpiod_read(struct drvmgr_dev *dev, uint32_t mask, 
+    uint32_t *val) {
+    _Assert(dev != NULL);
+    _Assert(dev->priv != NULL);
+    const struct gpio_operations *ops = GET_GPIOD_OPS(dev);
+    return ops->get_port(dev, mask, val);
 }
 
 static inline int gpiod_setpin(struct drvmgr_dev *dev, int pin, 
 	int val) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
-    const struct gpio_operations *ops = *(void **)dev->priv;
+    const struct gpio_operations *ops = GET_GPIOD_OPS(dev);
     return ops->set_pin(dev, pin, val);
 }
 
 static inline int gpiod_getpin(struct drvmgr_dev *dev, int pin) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
-    const struct gpio_operations *ops = *(void **)dev->priv;
+    const struct gpio_operations *ops = GET_GPIOD_OPS(dev);
     return ops->get_pin(dev, pin);
-}
-
-static inline void gpiod_dump(struct drvmgr_dev *dev) {
-    _Assert(dev != NULL);
-    _Assert(dev->priv != NULL);
-    const struct gpio_operations *ops = *(void **)dev->priv;
-    if (ops->dump)
-        ops->dump(dev);
 }
 
 #ifdef __cplusplus

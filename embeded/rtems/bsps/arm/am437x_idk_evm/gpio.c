@@ -52,6 +52,7 @@ struct gpio_priv {
 #define OMAP_GPIO_IRQSTATUS_CLR_0  0x003c
 #define OMAP_GPIO_IRQSTATUS_CLR_1  0x0040
 
+#ifdef DEBUG_ON
 static void gpio_bus_dump(struct drvmgr_dev *dev) {
 	struct gpio_priv *platdata = dev->priv;
 	printk("GPIO DUMP(0x%x):\n", platdata->base);
@@ -80,6 +81,7 @@ static void gpio_bus_dump(struct drvmgr_dev *dev) {
 	printk("	OMAP_GPIO_IRQSTATUS_SET_1 = 0x%x\n", 
 		readl_relaxed(platdata->base + OMAP_GPIO_IRQSTATUS_SET_1));
 }
+#endif
 
 static void gpio_bus_set_dir(struct drvmgr_dev *dev, int pin, 
 	int input) {
@@ -182,6 +184,29 @@ static int gpio_bus_getpin(struct drvmgr_dev *dev, int pin) {
 	return !!(v & BIT(pin));
 }
 
+static int gpio_bus_setport(struct drvmgr_dev *dev, uint32_t mask,
+	 uint32_t val) {
+	struct gpio_priv *platdata = dev->priv;
+	rtems_interrupt_lock_context lock_context;
+	rtems_interrupt_lock_acquire(&platdata->lock, &lock_context);
+	uint32_t v = readl_relaxed(platdata->base + OMAP_GPIO_DATAOUT);
+	v = (v & ~mask) | val;
+	writel_relaxed(v, platdata->base + OMAP_GPIO_DATAOUT);
+	rtems_interrupt_lock_release(&platdata->lock, &lock_context);
+	return 0;
+}
+
+static int gpio_bus_getport(struct drvmgr_dev *dev, uint32_t mask,
+	 uint32_t *val) {
+	struct gpio_priv *platdata = dev->priv;
+	rtems_interrupt_lock_context lock_context;
+	rtems_interrupt_lock_acquire(&platdata->lock, &lock_context);
+	uint32_t v = readl_relaxed(platdata->base + OMAP_GPIO_DATAIN);
+	*val = v & mask;
+	rtems_interrupt_lock_release(&platdata->lock, &lock_context);
+	return 0;
+}
+
 static void gpio_bus_default_isr(void *arg) {
 	printk("Please install GPIO ISR\n");
 }
@@ -268,9 +293,10 @@ static void gpio_bus_isr(void *arg) {
 
 static const struct gpio_operations gpio_ops = {
 	.configure = gpio_bus_configure,
+	.set_port = gpio_bus_setport,
+	.get_port = gpio_bus_getport,
 	.get_pin = gpio_bus_getpin,
-	.set_pin = gpio_bus_setpin,
-	.dump = gpio_bus_dump
+	.set_pin = gpio_bus_setpin
 };
 
 static struct drvmgr_bus_ops gpio_bus_ops = {

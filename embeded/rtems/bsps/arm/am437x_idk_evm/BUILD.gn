@@ -15,6 +15,7 @@ component("board") {
     "gpio.c",
     "gpio_keys.c",
     "timers.c",
+    "tpic2810.c",
     "platform_resource.c"
     # "clock.c",
     # "clock_am43xx.c"

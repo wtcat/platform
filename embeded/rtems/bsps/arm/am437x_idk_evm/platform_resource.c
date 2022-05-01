@@ -109,7 +109,14 @@ PLATFORM_RESOURCE(i2c0, "ti,am4372-i2c",
 PLATFORM_RESOURCE(i2c2, "ti,am4372-i2c",
   	TRN("REG0", DRVMGR_KT_INT, 0x4819c000),
 	TRN("IRQ0", DRVMGR_KT_INT, nIRQ(30)),
-	TRN("CLKCTRL", DRVMGR_KT_INT, WKUP_REG(0x4b0))
+	TRN("CLKCTRL", DRVMGR_KT_INT, PER_REG(0x4b0))
+);
+
+/*
+ * Digital Output
+ */
+TEMPLATE_RESOURCE(tpic2810, "ti,tpic2810", DRVMGR_BUS_TYPE_I2C, i2c2,
+  	TRN("REG0", DRVMGR_KT_INT, 0x60)
 );
 
 /*
@@ -151,5 +158,6 @@ TEMPLATE_RESOURCES_REGISTER(platform_resources,
 	RN(gpio_keys),
 	RN(timer2), RN(timer3), RN(timer4),
 	RN(i2c0), RN(i2c2),
+	RN(tpic2810),
 	NULL
 );

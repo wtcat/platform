@@ -9,6 +9,7 @@ component("testsuite") {
         "//embeded/thirdparty/googletest/src/gtest-all.cc",
         "test_main.cc",
         "workqueue_unit_test.cc",
-        "timlib_unit_test.cc"
+        "timlib_unit_test.cc",
+        "tpic2810_unit_test.cc"
     ]
 }

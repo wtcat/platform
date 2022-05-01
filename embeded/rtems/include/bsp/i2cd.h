@@ -22,34 +22,39 @@ static inline int i2c_master_set_clock(struct drvmgr_dev *dev,
 }
 
 static inline ssize_t i2c_master_transfer(struct drvmgr_dev *dev, i2c_msg *msgs,
-    uint32_t msg_count, uint32_t flags) {
+    uint32_t n, uint32_t flags) {
     i2c_bus *bus = (i2c_bus *)dev->priv;
-    if (bus->ten_bit_address)
-        msg.flags |= I2C_M_TEN;
-    int err = i2c_bus_do_transfer(bus, &msg, msg_count, flags);
-    return err == 0? msg.len: -err;  
+    return i2c_bus_do_transfer(bus, msgs, n, flags);
 }
 
 static inline ssize_t i2c_master_write(struct drvmgr_dev *dev, const void *buffer,
     size_t size, uint16_t addr) {
+    i2c_bus *bus = (i2c_bus *)dev->priv;
     i2c_msg msg = {
         .addr = addr,
         .flags = 0,
         .len = (uint16_t)size,
         .buf = RTEMS_DECONST(void *, buffer)
     };
-    return i2c_master_transfer(dev, &msg, 1, 0);
+    if (bus->ten_bit_address)
+        msg.flags |= I2C_M_TEN;
+    int err = i2c_master_transfer(dev, &msg, 1, 0);
+    return err == 0? msg.len: -err;
 }
 
 static inline ssize_t i2c_master_read(struct drvmgr_dev *dev, void *buffer,
     size_t size, uint16_t addr) {
+    i2c_bus *bus = (i2c_bus *)dev->priv;
     i2c_msg msg = {
         .addr = addr,
         .flags = I2C_M_RD,
         .len = (uint16_t)size,
         .buf = buffer
     };
-    return i2c_master_transfer(dev, &msg, 1, 0);
+    if (bus->ten_bit_address)
+        msg.flags |= I2C_M_TEN;
+    int err = i2c_master_transfer(dev, &msg, 1, 0);
+    return err == 0? msg.len: -err;
 }
 
 #ifdef __cplusplus

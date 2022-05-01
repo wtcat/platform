@@ -11,6 +11,9 @@
 #include "bsp/platform_bus.h"
 #include "bsp/io.h"
 
+
+//#define DEBUG_ON
+
 struct i2c_regs {
 	uint32_t I2C_REVNB_LO;
 	uint32_t I2C_REVNB_HI;
