@@ -336,6 +336,20 @@ static void backtrace_info(rtems_printer *printer) {
 	rtems_printf(printer, "\n[Backtrace Dump] =>\n");
 }
 
+static void dump_stack(rtems_printer *printer, unsigned long sp, 
+	struct _Thread_Control *tsk) {
+	unsigned long top = sp + 0x100;
+	if (tsk) {
+		if (top > thread_stack_end(tsk))
+			top = thread_stack_end(tsk);
+	}
+	rtems_printf(printer, "\n[Stack Dump] =>\n");
+	while (sp < top) {
+		rtems_printf(printer, "0x%x: 0x%x\n", sp, *(uint32_t *)sp);
+		sp += sizeof(void *);
+	}
+}
+
 static void dump_backtrace(rtems_printer *printer, unsigned long pc,
 	unsigned long fnaddr, int level) {
 	const char *sym = kernel_symbols(fnaddr);
@@ -390,5 +404,7 @@ void __unwind_backtrace(rtems_printer *printer, CPU_Exception_frame *regs,
 		dump_backtrace(printer, frame.pc, prel31_to_addr(&index->addr_offset), level);
 		level++;
 	} while (unwind_frame(&frame));
+	if (regs)
+		dump_stack(printer, regs->register_sp, tsk);
 }
 
