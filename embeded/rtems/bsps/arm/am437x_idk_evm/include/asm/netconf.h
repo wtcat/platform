@@ -3,6 +3,7 @@
 
 #if defined(__rtems_libbsd__)
 #define CONFIGURE_FDT
+#if 0
 #define CONFIGURE_ETC_RC_CONF_CONTENT \
     "syslog_priority=\"debug\"\n"    \
     "hostname=\"www.rtems.org\"\n"   \
@@ -13,7 +14,20 @@
     "telnetd_options=\"-v -C 1\"\n"   \
     "ftpd_enable=\"YES\"\n"                    \
     "ftpd_options=\"-v -p 21 -C 2\"\n"
-
+#else
+#define CONFIGURE_ETC_RC_CONF_CONTENT \
+    "syslog_priority=\"info\"\n"    \
+    "hostname=\"www.rtems.org\"\n"   \
+    "ifconfig_cpsw0=\"DHCP\"\n" \
+    "dhcpcd_priority=\"110\"\n"        \
+    "dhcpcd_options=\"-4\"\n"   \
+    "defaultrouter=\"192.168.1.1\"\n" \
+    "defaultroute_delay=\"5\"\n"        \
+    "telnetd_enable=\"YES\"\n"          \
+    "telnetd_options=\"-v -C 1\"\n"   \
+    "ftpd_enable=\"YES\"\n"                    \
+    "ftpd_options=\"-v -p 21 -C 2\"\n"
+#endif
 /*
  * libbsd configure options
  */

@@ -200,7 +200,7 @@ int shell_init(rtems_shell_login_check_t login_check) {
 #if defined(CONFIGURE_SHELL_COMMANDS_INIT)
     rtems_status_code sc;
     shell_commands_register();
-    sc = rtems_shell_init("SHLL", SHELL_STACKSZ, SHELL_PRIO,
+    sc = rtems_shell_init("root", SHELL_STACKSZ, SHELL_PRIO,
         CONSOLE_DEVICE_NAME, false, false, login_check);
     return rtems_status_code_to_errno(sc);
 #else
