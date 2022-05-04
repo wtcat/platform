@@ -71,7 +71,7 @@ if (use_bin) {
         entryaddr = uboot_enaddr
       }
       input = "rtems"
-      comp = "none"
+      comp = "gzip"
       arch = target_cpu
       deps = [":binary"]
     }

@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include <rtems/bspIo.h>
 #include <rtems/sysinit.h>
 
@@ -75,9 +76,11 @@ uint32_t bsp_fdt_map_intr(const uint32_t *intr,
 }
 
 void bsp_reset(void) {
+    uint32_t level;
     printk("System reseting...\n");
-    while (1)
-      writel(RST_GLOBAL_WARM_SW, PRM_DEVICE + RST_GLOBAL_WARM_SW);
+    // sync();
+    rtems_interrupt_disable(level);
+    writel(RST_GLOBAL_WARM_SW, PRM_DEVICE);
 }
 
 /* LIBBSD PHY DRIVER */

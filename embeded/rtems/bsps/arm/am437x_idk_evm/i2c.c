@@ -131,6 +131,7 @@ struct i2c_clockrate {
 #define devdbg(...)
 #endif
 
+#ifdef DEBUG_ON
 static void am437x_i2c_regs_dump(struct i2c_private *i2c) {
 	volatile struct i2c_regs *regs = i2c->regs;
 	printk("[I2C Register]:\n");
@@ -138,6 +139,7 @@ static void am437x_i2c_regs_dump(struct i2c_private *i2c) {
 	printk("  I2C_REVNB_HI = 0x%x\n", regs->I2C_REVNB_HI);
 	printk("  I2C_SYSS = 0x%x\n", regs->I2C_SYSS);
 }
+#endif
 
 static int am437x_i2c_set_clock(i2c_bus *bus, 
 	unsigned long clock) {
@@ -406,7 +408,9 @@ static int i2c_probe(struct drvmgr_dev *dev) {
 	/* Enable module and reset */
 	writeb(0x2, i2c->clkctrl);
 	ret = am437x_i2c_reset(i2c);
+#ifdef DEBUG_ON
 	am437x_i2c_regs_dump(i2c);
+#endif
 	if (ret) 
 		goto _free;
     ret = drvmgr_interrupt_register(dev, 0, dev->name, 
