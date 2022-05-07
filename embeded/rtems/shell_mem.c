@@ -9,6 +9,9 @@
  *
  */
 
+#include "bsp/sysconf.h"
+
+#ifdef CONFIGURE_SHELL_COMMANDS_MEM
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
@@ -219,6 +222,7 @@ static int shell_cmd_mwb(int argc, char **argv) {
 	return ret;
 }
 
+
 static rtems_shell_cmd_t shell_mdw_command = {
     "mdw",
     "display memory by word: mdw address [,count]",
@@ -273,3 +277,4 @@ static void shell_mem_register(void) {
 RTEMS_SYSINIT_ITEM(shell_mem_register, 
 	RTEMS_SYSINIT_STD_FILE_DESCRIPTORS + 10, 
 	RTEMS_SYSINIT_ORDER_MIDDLE);
+#endif /* CONFIGURE_SHELL_COMMANDS_MEM */
