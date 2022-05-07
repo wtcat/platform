@@ -23,6 +23,7 @@ executable("rtems") {
   sources = [
     "main.c",
     "shell.c",
+    "shell_mem.c",
     "ram0.c"
   ]
   deps = [
