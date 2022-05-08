@@ -392,18 +392,18 @@ void __unwind_backtrace(rtems_printer *printer, CPU_Exception_frame *regs,
 		frame.lr = 0;
 		frame.pc = thread_saved_pc(tsk);
 	}
-	// backtrace_info(printer);
-	// frame.top = thread_stack_end(tsk);
-	// do {
-	// 	if (frame.pc == 0 || frame.pc == 0x00000001) {
-	// 		rtems_printf(printer, "<reached end of unwind table>\n");
-	// 		break;
-	// 	}
-	// 	index = unwind_search_index(__exidx_start, __exidx_end, frame.pc);
-	// 	frame.pc = (frame.pc >> 1) << 1;
-	// 	dump_backtrace(printer, frame.pc, prel31_to_addr(&index->addr_offset), level);
-	// 	level++;
-	// } while (unwind_frame(&frame));
+	backtrace_info(printer);
+	frame.top = thread_stack_end(tsk);
+	do {
+		if (frame.pc == 0 || frame.pc == 0x00000001) {
+			rtems_printf(printer, "<reached end of unwind table>\n");
+			break;
+		}
+		index = unwind_search_index(__exidx_start, __exidx_end, frame.pc);
+		frame.pc = (frame.pc >> 1) << 1;
+		dump_backtrace(printer, frame.pc, prel31_to_addr(&index->addr_offset), level);
+		level++;
+	} while (unwind_frame(&frame));
 	if (regs)
 		dump_stack(printer, regs->register_sp, tsk);
 }

@@ -23,23 +23,27 @@
 
 struct printer_ctx {
 	rtems_printer printer;
-	void (*free)(void *);
+	void (*release)(void *);
 };
 
 #define MAX_LINE_LENGTH_BYTES (64)
 #define DEFAULT_LINE_LENGTH_BYTES (16)
 #define DISP_LINE_LEN	16
 
+static void fprinter_release(void *context) {
+	fflush(context);
+	fclose(context);
+}
+
 static void printer_acquire(int argc, char **argv,
 	struct printer_ctx *ctx) {
-	ctx->free = NULL;
 	if (argc == 5) {
 		if (argv[3][0] == '>') {
 			if (strncmp(argv[4], "/dev", 4)) {
-				FILE *fp = fopen(argv[4], "w");
+				FILE *fp = fopen(argv[4], "w+");
 				if (fp != NULL) {
 					rtems_print_printer_fprintf(&ctx->printer, fp);
-					ctx->free = (void (*)(void *))fclose;
+					ctx->release = fprinter_release;
 					return;
 				}
 			}
@@ -48,12 +52,13 @@ static void printer_acquire(int argc, char **argv,
 			printf("Error***: Invalid redirect format\n");
 		}
 	}
+	ctx->release = NULL;
 	rtems_print_printer_printf(&ctx->printer);
 }
 
 static void printer_release(struct printer_ctx *ctx) {
-	if (ctx->free)
-		ctx->free(&ctx->printer.context);
+	if (ctx->release)
+		ctx->release(ctx->printer.context);
 }
 
 static void print_buffer(const rtems_printer *printer, const char *addr, 
