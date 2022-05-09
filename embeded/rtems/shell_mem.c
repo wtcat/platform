@@ -139,7 +139,6 @@ static int do_mem_mw(const rtems_printer *printer, int width,
 
 	addr = strtoul(argv[1], NULL, 16);
 	writeval = strtoul(argv[2], NULL, 16);
-
 	if (argc == 4)
 		count = strtoul(argv[3], NULL, 16);
 	else
@@ -155,7 +154,6 @@ static int do_mem_mw(const rtems_printer *printer, int width,
 			*((uint8_t *)buf) = (uint8_t)writeval;
 		buf += width;
 	}
-
 	return 0;
 }
 
@@ -166,14 +164,11 @@ static int do_mem_md(const rtems_printer *printer, int width,
 
 	if (argc < 2)
 		return -EINVAL;
-
 	addr = strtoul(argv[1], NULL, 16);
-
-	if (argc == 3)
+	if (argc == 3 || (argc == 5 && *argv[3] == '>'))
 		count = strtoul(argv[2], NULL, 16);
 	else
 		count = 1;
-
 	print_buffer(printer, (char *)addr, width, count, 
 		DISP_LINE_LEN / width, -1);
 	return 0;
