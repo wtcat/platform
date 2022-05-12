@@ -7,4 +7,6 @@ component("shared") {
         defines += ["CONFIGURE_BACKTRACE"]
         sources += ["unwind.c"]
     }
+    deps = ["//embeded/rtems/bsps/arm/shared/wind"]
+
 }

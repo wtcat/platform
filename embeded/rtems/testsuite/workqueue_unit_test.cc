@@ -5,6 +5,7 @@
 #include "gtest/gtest.h"
 
 #include "bsp/unwind.h"
+#include "bsp/unwarminder.h"
 
 
 #define K_MSEC(n)      WQ_MSEC(n)
@@ -18,6 +19,7 @@ static void __attribute__((noinline)) func_a(void) {
     rtems_printer printer;
     rtems_print_printer_printf(&printer);
     unwind_backtrace(&printer);
+    unwind_backtrace_thread_dump(&printer);
 }
 
 static void __attribute__((noinline)) func_b(void) {
