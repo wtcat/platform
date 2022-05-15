@@ -1,5 +1,5 @@
 #include "bsp/platform_bus.h"
-#include "bsp/asm/pinctrl.h"
+#include "bsp/board/pinctrl.h"
 
 /* Control Module */
 #define CTRL_MODULE 		0x44E10000

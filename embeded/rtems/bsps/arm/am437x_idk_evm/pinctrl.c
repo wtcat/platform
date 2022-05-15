@@ -3,7 +3,7 @@
 #include "bsp/platform_bus.h"
 #include "bsp/io.h"
 
-#include "bsp/asm/pinctrl.h"
+#include "bsp/board/pinctrl.h"
 
 #ifdef DEBUG_ON
 #define pr_debug(fmt, ...) printk(fmt, ##__VA_ARGS__)

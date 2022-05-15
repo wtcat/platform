@@ -1,5 +1,5 @@
 #include <rtems/ramdisk.h>
-#include "bsp/sysconf.h"
+#include "bsp/board/sysconf.h"
 
 struct ram_block {
     uint32_t blksz;

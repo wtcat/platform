@@ -49,11 +49,9 @@ typedef struct unwind_index
 } unwind_index_t;
 
 const char *unwind_kernel_symbols(unsigned long pc);
-void __unwind_backtrace(rtems_printer *printer, 
+void __stack_backtrace(rtems_printer *printer, 
 	CPU_Exception_frame *regs, struct _Thread_Control *tsk);
 
-#define unwind_backtrace(printer) __unwind_backtrace(printer, NULL, NULL)
-	
 #ifdef __cplusplus
 }
 #endif

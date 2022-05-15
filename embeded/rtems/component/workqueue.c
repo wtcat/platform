@@ -12,7 +12,7 @@
 
 #include "component/atomic.h"
 #include "component/workqueue.h"
-#include "bsp/sysconf.h"
+#include "bsp/board/sysconf.h"
 
 struct helper_work_struct {
     struct work_struct work;

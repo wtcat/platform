@@ -8,7 +8,7 @@
 
 #ifdef CONFIGURE_BACKTRACE
 #include <rtems/printer.h>
-#include "bsp/unwind.h"
+#include "bsp/asm/unwind.h"
 #endif
 
 void bsp_fatal_extension(rtems_fatal_source source, bool unused,
@@ -34,7 +34,7 @@ void bsp_fatal_extension(rtems_fatal_source source, bool unused,
     #ifdef CONFIGURE_BACKTRACE
         rtems_printer printer;
         rtems_print_printer_printk(&printer);
-        __unwind_backtrace(&printer, (rtems_exception_frame *)code, NULL);
+        __stack_backtrace(&printer, (rtems_exception_frame *)code, NULL);
     #endif
         rtems_exception_frame_print((const rtems_exception_frame *)code);
     }

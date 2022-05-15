@@ -5,8 +5,10 @@ component("shared") {
     sources = ["fatal.c"]
     if (use_backtrace) {
         defines += ["CONFIGURE_BACKTRACE"]
-        sources += ["unwind.c"]
+        if (use_backtrace_unwind) {
+            sources += ["unwind.c"]
+        } else {
+            sources += ["stacktrace.c"]
+        }
     }
-    deps = ["//embeded/rtems/bsps/arm/shared/wind"]
-
 }

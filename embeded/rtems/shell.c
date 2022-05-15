@@ -14,7 +14,7 @@
 #include <bsp/irq-info.h>
 
 #include "shell/shell_vt100.h"
-#include "bsp/sysconf.h"
+#include "bsp/board/sysconf.h"
 
 
 #if defined(__rtems_libbsd__)

@@ -15,7 +15,7 @@
 #endif
 
 #include <bsp/stackalloc.h>
-#include "bsp/sysconf.h"
+#include "bsp/board/sysconf.h"
 #include "bsp/init.h"
 
 #if defined (__rtems_libbsd__)

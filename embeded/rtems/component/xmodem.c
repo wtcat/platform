@@ -1,4 +1,4 @@
-#include "bsp/sysconf.h"
+#include "bsp/board/sysconf.h"
 #ifdef CONFIGURE_SHELL_COMMAND_XMODEM
 #include <unistd.h>
 #include <fcntl.h>

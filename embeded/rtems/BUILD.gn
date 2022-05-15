@@ -81,12 +81,16 @@ if (use_bin) {
 
 # Build pre-precess action
 group("preprocess") {
-  basepath = rebase_path("//embeded/rtems")
-  srcpath = "${basepath}/bsps/${target_cpu}/${target_board}/include/asm"
-  dstpath = "${basepath}/include/bsp/asm"
+  base_path = rebase_path("//embeded/rtems")
+  common_path = "${base_path}/bsps/${target_cpu}"
+  board_path = "${common_path}/${target_board}/include"
+  asm_path   = "${base_path}/bsps/${target_cpu}/include"
+  dst_asm_path   = "${base_path}/include/bsp/asm"
+  dst_board_path = "${base_path}/include/bsp/board"
   inputargs = [
-    "rm -rf ${dstpath}",
-    "ln -s  ${srcpath} ${dstpath}"
+    "rm -rf ${dst_asm_path} ${dst_board_path}",
+    "ln -s  ${asm_path} ${dst_asm_path}",
+    "ln -s  ${board_path} ${dst_board_path}"
   ]
   exec_script("//gn/utils/shell.py", inputargs)
 }

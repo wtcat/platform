@@ -4,9 +4,7 @@
 #include "component/workqueue.h"
 #include "gtest/gtest.h"
 
-#include "bsp/unwind.h"
-#include "bsp/unwarminder.h"
-
+#include "bsp/asm/stacktrace.h"
 
 #define K_MSEC(n)      WQ_MSEC(n)
 #define SLEEP_MS(msec) rtems_task_wake_after(WQ_MSEC(msec))
@@ -18,8 +16,7 @@ static volatile int test_phase;
 static void __attribute__((noinline)) func_a(void) {
     rtems_printer printer;
     rtems_print_printer_printf(&printer);
-    unwind_backtrace(&printer);
-    unwind_backtrace_thread_dump(&printer);
+    stack_backtrace(&printer);
 }
 
 static void __attribute__((noinline)) func_b(void) {

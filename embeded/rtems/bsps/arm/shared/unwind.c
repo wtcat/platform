@@ -23,18 +23,21 @@
 #include <rtems/printer.h>
 #include <rtems/bspIo.h>
 
-#include <unwind.h>
+#include "bsp/asm/unwind.h"
 
-#include "bsp/unwind.h"
+
+//#define DEBUG_ON
 
 enum regs {
+#if defined(__thumb2__) || defined(__thumb__)
+	FP = 7,
+#else
 	FP = 11,
+#endif
 	SP = 13,
 	LR = 14,
 	PC = 15
 };
-
-//#define DEBUG_ON
 
 #define prel31_to_addr(ptr)	({\
 	long offset = (((long)*(ptr)) << 1) >> 1;	\
@@ -364,7 +367,7 @@ const char *unwind_kernel_symbols(unsigned long pc) {
 	return "Unknown"; 
 }
 
-void __unwind_backtrace(rtems_printer *printer, CPU_Exception_frame *regs,
+void __stack_backtrace(rtems_printer *printer, CPU_Exception_frame *regs,
 	struct _Thread_Control *tsk) {
 	const unwind_index_t *index;
 	backtrace_frame_t frame;

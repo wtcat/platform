@@ -9,7 +9,7 @@
  *
  */
 
-#include "bsp/sysconf.h"
+#include "bsp/board/sysconf.h"
 
 #ifdef CONFIGURE_SHELL_COMMANDS_MEM
 #include <errno.h>
