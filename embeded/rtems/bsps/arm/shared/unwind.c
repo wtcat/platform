@@ -387,7 +387,7 @@ void __stack_backtrace(rtems_printer *printer, CPU_Exception_frame *regs,
 		frame.fp = (unsigned long)__builtin_frame_address(0);
 		frame.sp = current_stack_pointer();
 		frame.lr = (unsigned long)__builtin_return_address(0);
-		frame.pc = (unsigned long)&__unwind_backtrace;
+		frame.pc = (unsigned long)&__stack_backtrace;
 	} else {
 		/* task blocked in __switch_to */
 		frame.fp = thread_saved_fp(tsk);

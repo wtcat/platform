@@ -17,10 +17,6 @@ struct trace_data {
     int level;
 };
 
-#if defined(__thumb2__) || defined(__thumb__)
-#define CONFIG_CC_IS_CLANG
-#endif
-
 #define thread_saved_fp(tsk) \
 	(unsigned long)(tsk)->Registers.register_fp
 #define thread_saved_sp(tsk) \

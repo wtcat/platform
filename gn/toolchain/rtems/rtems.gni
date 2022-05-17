@@ -25,6 +25,13 @@ declare_args() {
   use_backtrace = false
 }
 
+if (use_backtrace) {
+  declare_args() {
+    #Unwind backtrace
+    use_backtrace_unwind = true
+  }
+}
+
 # BSD-Net
 if (use_libbsd) {
   declare_args() {
