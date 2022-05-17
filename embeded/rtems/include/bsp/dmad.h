@@ -11,8 +11,8 @@
 #ifndef BSP_DMAD_H_
 #define BSP_DMAD_H_
 
-#include <stdbool.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <drvmgr/drvmgr.h>
 
 #include "component/atomic.h"
@@ -209,6 +209,8 @@ struct dma_operations {
     int (*dma_stop)(struct drvmgr_dev *dev, uint32_t channel);
     int (*dma_get_status)(struct drvmgr_dev *dev, uint32_t channel,
 				struct dma_status *status);
+    int (*dma_memcpy)(struct drvmgr_dev *dev, int channel, 
+                dma_addr_t src, dma_addr_t dst, size_t size, unsigned tx_flags);
     bool (*dma_chan_filter)(struct drvmgr_dev *dev, int channel, 
                 void *filter_param);
 };
@@ -297,6 +299,77 @@ static inline int dma_stop(struct drvmgr_dev *dev, uint32_t channel) {
 }
 
 /**
+ * @brief DMA channel filter.
+ *
+ * filter channel by attribute
+ *
+ * @param dev  Pointer to the device structure for the driver instance.
+ * @param channel  channel number
+ * @param filter_param filter attribute
+ *
+ * @retval Negative errno code if not support
+ *
+ */
+static inline int dma_chan_filter(struct drvmgr_dev *dev,
+    int channel, void *filter_param) {
+    _Assert(dev != NULL);
+    _Assert(dev->priv != NULL);
+    const struct dma_operations *ops = DMAD_OPS(dev);
+	if (ops->chan_filter) 
+		return ops->chan_filter(dev, channel, filter_param);
+	return -ENOSYS;
+}
+
+/**
+ * @brief get current runtime status of DMA transfer
+ *
+ * Implementations must check the validity of the channel ID passed in and
+ * return -EINVAL if it is invalid or -ENOSYS if not supported.
+ *
+ * @param dev     Pointer to the device structure for the driver instance.
+ * @param channel Numeric identification of the channel where the transfer was
+ *                being processed
+ * @param stat   a non-NULL dma_status object for storing DMA status
+ *
+ * @retval non-negative if successful.
+ * @retval Negative errno code if failure.
+ */
+static inline int dma_get_status(struct drvmgr_dev *dev, uint32_t channel,
+	struct dma_status *stat) {
+    _Assert(dev != NULL);
+    _Assert(dev->priv != NULL);
+    const struct dma_operations *ops = DMAD_OPS(dev);
+	if (ops->get_status) 
+		return ops->get_status(dev, channel, stat);
+	return -ENOSYS;
+}
+
+/**
+ * @brief Reload buffer(s) for a DMA channel
+ *
+ * @param dev     Pointer to the device structure for the driver instance.
+ * @param channel Numeric identification of the channel to configure
+ *                selected channel
+ * @param src     source address for the DMA transfer
+ * @param dst     destination address for the DMA transfer
+ * @param size    size of DMA transfer
+ * @param flags   flags of DMA transfer
+ *
+ * @retval 0 if successful.
+ * @retval Negative errno code if failure.
+ */
+static inline int dma_memcpy(struct drvmgr_dev *dev, uint32_t channel,
+	dma_addr_t src, dma_addr_t dst, size_t size, unsigned int flags) {
+    _Assert(dev != NULL);
+    _Assert(dev->priv != NULL);
+	const struct dma_operations *ops = DMAD_OPS(dev);
+	if (ops->dma_memcpy)
+		return ops->dma_memcpy(dev, channel, src, dst, size, flags);
+	return -ENOSYS;
+}
+
+#if 0
+/**
  * @brief request DMA channel.
  *
  * request DMA channel resources
@@ -351,52 +424,7 @@ static inline void dma_release_channel(struct drvmgr_dev *dev,
 	if (channel < dma_ctx->dma_channels) 
 		atomic_clear_bit(dma_ctx->atomic, channel);
 }
-
-/**
- * @brief DMA channel filter.
- *
- * filter channel by attribute
- *
- * @param dev  Pointer to the device structure for the driver instance.
- * @param channel  channel number
- * @param filter_param filter attribute
- *
- * @retval Negative errno code if not support
- *
- */
-static inline int dma_chan_filter(struct drvmgr_dev *dev,
-    int channel, void *filter_param) {
-    _Assert(dev != NULL);
-    _Assert(dev->priv != NULL);
-    const struct dma_operations *ops = DMAD_OPS(dev);
-	if (ops->chan_filter) 
-		return ops->chan_filter(dev, channel, filter_param);
-	return -ENOSYS;
-}
-
-/**
- * @brief get current runtime status of DMA transfer
- *
- * Implementations must check the validity of the channel ID passed in and
- * return -EINVAL if it is invalid or -ENOSYS if not supported.
- *
- * @param dev     Pointer to the device structure for the driver instance.
- * @param channel Numeric identification of the channel where the transfer was
- *                being processed
- * @param stat   a non-NULL dma_status object for storing DMA status
- *
- * @retval non-negative if successful.
- * @retval Negative errno code if failure.
- */
-static inline int dma_get_status(struct drvmgr_dev *dev, uint32_t channel,
-	struct dma_status *stat) {
-    _Assert(dev != NULL);
-    _Assert(dev->priv != NULL);
-    const struct dma_operations *ops = DMAD_OPS(dev);
-	if (ops->get_status) 
-		return ops->get_status(dev, channel, stat);
-	return -ENOSYS;
-}
+#endif // 0
 
 #ifdef __cplusplus
 }
