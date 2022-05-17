@@ -6,11 +6,11 @@
 
 #include "gtest/gtest.h"
 
-extern "C" int flsl(long i) {
-	if (i == 0)
-		return 0;
-	return (sizeof(i) * CHAR_BIT - __builtin_clzl(i));
-}
+// extern "C" int flsl(long i) {
+// 	if (i == 0)
+// 		return 0;
+// 	return (sizeof(i) * CHAR_BIT - __builtin_clzl(i));
+// }
 
 extern "C" int app_main(void) {
     int argc = 1;

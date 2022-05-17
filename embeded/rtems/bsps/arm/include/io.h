@@ -20,10 +20,21 @@
 #ifndef __ASM_ARM_IO_H
 #define __ASM_ARM_IO_H
 
+#include <stdint.h>
+
+#include "bsp/byteorder.h"
 #include "bsp/asm/barriers.h"
 
 #ifdef __cplusplus
 extern "C"{
+#endif
+
+#ifndef __force
+#define __force
+#endif
+
+#ifndef __io
+#define __io volatile
 #endif
 
 /*
@@ -132,11 +143,11 @@ static inline void __raw_readsl(unsigned long addr, void *data, int longlen)
  * accesses.
  */
 #define readb_relaxed(c)	({ uint8_t  __r = __raw_readb(c); __r; })
-#define readw_relaxed(c)	({ uint16_t __r = le16_to_cpu((__force __le16) \
+#define readw_relaxed(c)	({ uint16_t __r = le16_to_cpu((__force uint16_t) \
 						__raw_readw(c)); __r; })
-#define readl_relaxed(c)	({ uint32_t __r = le32_to_cpu((__force __le32) \
+#define readl_relaxed(c)	({ uint32_t __r = le32_to_cpu((__force uint32_t) \
 						__raw_readl(c)); __r; })
-#define readq_relaxed(c)	({ uint64_t __r = le64_to_cpu((__force __le64) \
+#define readq_relaxed(c)	({ uint64_t __r = le64_to_cpu((__force uint64_t) \
 						__raw_readq(c)); __r; })
 
 #define writeb_relaxed(v, c)	((void)__raw_writeb((v), (c)))
@@ -262,7 +273,7 @@ static inline void __raw_readsl(unsigned long addr, void *data, int longlen)
  *    PCI:  D0-D7   D8-D15 D16-D23 D24-D31
  *    ARM: D24-D31 D16-D23  D8-D15  D0-D7
  *
- * The machine specific io.h include defines __io to translate an "IO"
+ * The machine specific io.h include defines __IO to translate an "IO"
  * address to a memory address.
  *
  * Note that we prevent GCC re-ordering or caching values in expressions
@@ -271,22 +282,22 @@ static inline void __raw_readsl(unsigned long addr, void *data, int longlen)
  *
  * The {in,out}[bwl] macros are for emulating x86-style PCI/ISA IO space.
  */
-#ifdef __io
-#define outb(v,p)			__raw_writeb(v,__io(p))
-#define outw(v,p)			__raw_writew(cpu_to_le16(v),__io(p))
-#define outl(v,p)			__raw_writel(cpu_to_le32(v),__io(p))
+#ifdef __IO
+#define outb(v,p)			__raw_writeb(v,__IO(p))
+#define outw(v,p)			__raw_writew(cpu_to_le16(v),__IO(p))
+#define outl(v,p)			__raw_writel(cpu_to_le32(v),__IO(p))
 
-#define inb(p)	({ unsigned int __v = __raw_readb(__io(p)); __v; })
-#define inw(p)	({ unsigned int __v = le16_to_cpu(__raw_readw(__io(p))); __v; })
-#define inl(p)	({ unsigned int __v = le32_to_cpu(__raw_readl(__io(p))); __v; })
+#define inb(p)	({ unsigned int __v = __raw_readb(__IO(p)); __v; })
+#define inw(p)	({ unsigned int __v = le16_to_cpu(__raw_readw(__IO(p))); __v; })
+#define inl(p)	({ unsigned int __v = le32_to_cpu(__raw_readl(__IO(p))); __v; })
 
-#define outsb(p,d,l)			__raw_writesb(__io(p),d,l)
-#define outsw(p,d,l)			__raw_writesw(__io(p),d,l)
-#define outsl(p,d,l)			__raw_writesl(__io(p),d,l)
+#define outsb(p,d,l)			__raw_writesb(__IO(p),d,l)
+#define outsw(p,d,l)			__raw_writesw(__IO(p),d,l)
+#define outsl(p,d,l)			__raw_writesl(__IO(p),d,l)
 
-#define insb(p,d,l)			__raw_readsb(__io(p),d,l)
-#define insw(p,d,l)			__raw_readsw(__io(p),d,l)
-#define insl(p,d,l)			__raw_readsl(__io(p),d,l)
+#define insb(p,d,l)			__raw_readsb(__IO(p),d,l)
+#define insw(p,d,l)			__raw_readsw(__IO(p),d,l)
+#define insl(p,d,l)			__raw_readsl(__IO(p),d,l)
 #endif
 
 #define outb_p(val,port)		outb((val),(port))
