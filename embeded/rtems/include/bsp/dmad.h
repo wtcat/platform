@@ -15,16 +15,20 @@
 #include <stdbool.h>
 #include <drvmgr/drvmgr.h>
 
-#include "component/atomic.h"
+#include "component/bitops.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#if (sizeof(void*) == 4)
+typedef uint32_t dma_addr_t;
+#else
+typedef uint64_t dma_addr_t;
+#endif
+
 /* magic code to identify context content */
 #define DMA_MAGIC 0x47494749
-
-#define DMAD_OPS(dev) *((const struct dma_operations **)(dev)->priv)
 
 enum dma_channel_direction {
 	MEMORY_TO_MEMORY = 0x0,
@@ -84,13 +88,8 @@ enum dma_channel_filter {
  *     reserved           [ 13 : 15 ]
  */
 struct dma_block_config {
-#ifdef CONFIG_DMA_64BIT
-	uint64_t source_address;
-	uint64_t dest_address;
-#else
-	uint32_t source_address;
-	uint32_t dest_address;
-#endif
+	dma_addr_t source_address;
+	dma_addr_t dest_address;
 	uint32_t source_gather_interval;
 	uint32_t dest_scatter_interval;
 	uint16_t dest_scatter_count;
@@ -196,7 +195,7 @@ struct dma_status {
 struct dma_context {
 	int32_t magic;
 	int dma_channels;
-	uint32_t *atomic;
+	unsigned long *atomic;
 };
 
 /* DMA operations */
@@ -215,6 +214,20 @@ struct dma_operations {
                 void *filter_param);
 };
 
+/* DMA driver private data */
+struct dmad_private {
+	const struct dma_operations *ops;
+	struct dma_context context;
+};
+
+#define dmad_get_operations(dev) \
+	({ struct dmad_private *_priv = (struct dmad_private *)((dev)->priv); \
+	   _priv->ops; })
+
+#define dmad_get_context(dev)    \
+	({ struct dmad_private *_priv = (struct dmad_private *)((dev)->priv); \
+	   &_priv->context; })
+
 /**
  * @brief Configure individual channel for DMA transfer.
  *
@@ -230,7 +243,7 @@ static inline int dma_configure(struct drvmgr_dev *dev, uint32_t channel,
     struct dma_config *config) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
-	const struct dma_operations *ops = DMAD_OPS(dev);
+	const struct dma_operations *ops = dmad_get_operations(dev);
 	return ops->configure(dev, channel, config);
 }
 
@@ -251,7 +264,7 @@ static inline int dma_reload(struct drvmgr_dev *dev, uint32_t channel,
 	dma_addr_t src, dma_addr_t dst, size_t size) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
-	const struct dma_operations *ops = DMAD_OPS(dev);
+	const struct dma_operations *ops = dmad_get_operations(dev);
 	if (ops->reload)
 		return ops->reload(dev, channel, src, dst, size);
 	return -ENOSYS;
@@ -274,7 +287,7 @@ static inline int dma_reload(struct drvmgr_dev *dev, uint32_t channel,
 static inline int dma_start(struct drvmgr_dev *dev, uint32_t channel) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
-	const struct dma_operations *ops = DMAD_OPS(dev);
+	const struct dma_operations *ops = dmad_get_operations(dev);
 	return ops->start(dev, channel);
 }
 
@@ -294,7 +307,7 @@ static inline int dma_start(struct drvmgr_dev *dev, uint32_t channel) {
 static inline int dma_stop(struct drvmgr_dev *dev, uint32_t channel) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
-	const struct dma_operations *ops = DMAD_OPS(dev);
+	const struct dma_operations *ops = dmad_get_operations(dev);
 	return ops->stop(dev, channel);
 }
 
@@ -314,7 +327,7 @@ static inline int dma_chan_filter(struct drvmgr_dev *dev,
     int channel, void *filter_param) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
-    const struct dma_operations *ops = DMAD_OPS(dev);
+    const struct dma_operations *ops = dmad_get_operations(dev);
 	if (ops->chan_filter) 
 		return ops->chan_filter(dev, channel, filter_param);
 	return -ENOSYS;
@@ -338,7 +351,7 @@ static inline int dma_get_status(struct drvmgr_dev *dev, uint32_t channel,
 	struct dma_status *stat) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
-    const struct dma_operations *ops = DMAD_OPS(dev);
+    const struct dma_operations *ops = dmad_get_operations(dev);
 	if (ops->get_status) 
 		return ops->get_status(dev, channel, stat);
 	return -ENOSYS;
@@ -362,13 +375,12 @@ static inline int dma_memcpy(struct drvmgr_dev *dev, uint32_t channel,
 	dma_addr_t src, dma_addr_t dst, size_t size, unsigned int flags) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
-	const struct dma_operations *ops = DMAD_OPS(dev);
+	const struct dma_operations *ops = dmad_get_operations(dev);
 	if (ops->dma_memcpy)
 		return ops->dma_memcpy(dev, channel, src, dst, size, flags);
 	return -ENOSYS;
 }
 
-#if 0
 /**
  * @brief request DMA channel.
  *
@@ -387,9 +399,8 @@ static inline int dma_request_channel(struct drvmgr_dev *dev,
 	int channel = -EINVAL;
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
-    const struct dma_operations *ops = DMAD_OPS(dev);
-	/* dma_context shall be the first one in dev data */
-	struct dma_context *dma_ctx = (struct dma_context *)dev->data;
+    const struct dma_operations *ops = dmad_get_operations(dev);
+	struct dma_context *dma_ctx = dmad_get_context(dev);
 	if (dma_ctx->magic != DMA_MAGIC)
 		return channel;
 	for (i = 0; i < dma_ctx->dma_channels; i++) {
@@ -397,7 +408,6 @@ static inline int dma_request_channel(struct drvmgr_dev *dev,
 			channel = i;
 			if (ops->chan_filter &&
 			    !ops->chan_filter(dev, channel, filter_param)) {
-                atomic_clear_rel_32(dma_ctx->atomic, (1u << channel));
 				atomic_clear_bit(dma_ctx->atomic, channel);
 				continue;
 			}
@@ -418,13 +428,13 @@ static inline int dma_request_channel(struct drvmgr_dev *dev,
  */
 static inline void dma_release_channel(struct drvmgr_dev *dev,
     uint32_t channel) {
-	struct dma_context *dma_ctx = (struct dma_context *)dev->data;
+	struct dma_context *dma_ctx = dmad_get_context(dev);
 	if (dma_ctx->magic != DMA_MAGIC) 
 		return;
 	if (channel < dma_ctx->dma_channels) 
 		atomic_clear_bit(dma_ctx->atomic, channel);
 }
-#endif // 0
+
 
 #ifdef __cplusplus
 }

@@ -1,20 +1,37 @@
 /*
+ * TI EDMA DMA engine driver
+ *
+ * Copyright 2012 Texas Instruments
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation version 2.
+ *
+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+ * kind, whether express or implied; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/*
  * Copyright (c) 2022 wtcat
  */
 #include <rtems/bspIo.h>
-#include "component/findbit.h"
+#include <rtems/rtems/intr.h>
 
 #include "bsp/platform_bus.h"
 #include "bsp/dmad.h"
-#include "bsp/io.h"
+
+#define dev_dbg(dev, fmt, ...)
+#define dev_warn dev_err
+#define dev_err(dev, fmt, ...) printk(fmt, ##__VA_ARGS__)
 
 
-#ifndef BIT
-#define BIT(n) (0x1ul << (n))
-#endif
-#ifndef __iomem
-#define __iomem
-#endif
+#define EDMA_CTLR_CHAN(ctlr, chan)	(((ctlr) << 16) | (chan))
+#define EDMA_CTLR(i)			((i) >> 16)
+#define EDMA_CHAN_SLOT(i)		((i) & 0xffff)
+
+#define EDMA_FILTER_PARAM(ctlr, chan)	((int[]) { EDMA_CTLR_CHAN(ctlr, chan) })
 
 /* Offsets matching "struct edmacc_param" */
 #define PARM_OPT		0x00
@@ -113,6 +130,15 @@
 #define EDMA_CONT_PARAMS_FIXED_EXACT	 1002
 #define EDMA_CONT_PARAMS_FIXED_NOT_EXACT 1003
 
+
+enum dma_event_q {
+	EVENTQ_0 = 0,
+	EVENTQ_1 = 1,
+	EVENTQ_2 = 2,
+	EVENTQ_3 = 3,
+	EVENTQ_DEFAULT = -1
+};
+
 /*
  * 64bit array registers are split into two 32bit registers:
  * reg0: channel/event 0-31
@@ -134,7 +160,7 @@ struct edmacc_param {
 	uint32_t link_bcntrld;
 	uint32_t src_dst_cidx;
 	uint32_t ccnt;
-} RTEMS_PACKED;
+} __packed;
 
 /* fields in edmacc_param.opt */
 #define SAM		BIT(0)
@@ -150,20 +176,20 @@ struct edmacc_param {
 #define ITCCHEN		BIT(23)
 
 struct edma_pset {
-	uint32_t			len;
+	uint32_t				len;
 	dma_addr_t			addr;
-	struct edmacc_param	param;
+	struct edmacc_param		param;
 };
 
 struct edma_desc {
 	struct virt_dma_desc		vdesc;
 	struct list_head		node;
-	enum dma_channel_direction	direction;
+	enum dma_transfer_direction	direction;
 	int				cyclic;
 	bool				polled;
 	int				absync;
 	int				pset_nr;
-	struct edma_chan *echan;
+	struct edma_chan		*echan;
 	int				processed;
 
 	/*
@@ -202,25 +228,24 @@ struct edma_tc {
 };
 
 struct edma_chan {
-	struct virt_dma_chan		vchan;
+//	struct virt_dma_chan		vchan;
 	struct list_head		node;
 	struct edma_desc		*edesc;
 	struct edma_cc			*ecc;
 	struct edma_tc			*tc;
 	int				ch_num;
-	bool				alloced;
-	bool				hw_triggered;
+	bool			alloced;
+	bool			hw_triggered;
 	int				slot[EDMA_MAX_SLOTS];
 	int				missed;
 	struct dma_slave_config		cfg;
 };
 
 struct edma_cc {
-	struct device			*dev;
-	struct edma_soc_info		*info;
-	void __iomem			*base;
-	int				id;
-	bool				legacy_mode;
+	struct dmad_private  dmaclass;
+	struct edma_soc_info	*info;
+	void				*base;
+	int		            id;
 
 	/* eDMA3 resource information */
 	unsigned			num_channels;
@@ -246,9 +271,6 @@ struct edma_cc {
 	 * and Linux must not touch it.
 	 */
 	unsigned long *channels_mask;
-
-	struct dma_device		dma_slave;
-	struct dma_device		*dma_memcpy;
 	struct edma_chan		*slave_chans;
 	struct edma_tc			*tc_list;
 	int				dummy_slot;
@@ -259,32 +281,6 @@ static const struct edmacc_param dummy_paramset = {
 	.link_bcntrld = 0xffff,
 	.ccnt = 1,
 };
-
-#define EDMA_BINDING_LEGACY	0
-#define EDMA_BINDING_TPCC	1
-static const uint32_t edma_binding_type[] = {
-	[EDMA_BINDING_LEGACY] = EDMA_BINDING_LEGACY,
-	[EDMA_BINDING_TPCC] = EDMA_BINDING_TPCC,
-};
-
-static const struct of_device_id edma_of_ids[] = {
-	{
-		.compatible = "ti,edma3",
-		.data = &edma_binding_type[EDMA_BINDING_LEGACY],
-	},
-	{
-		.compatible = "ti,edma3-tpcc",
-		.data = &edma_binding_type[EDMA_BINDING_TPCC],
-	},
-	{}
-};
-MODULE_DEVICE_TABLE(of, edma_of_ids);
-
-static const struct of_device_id edma_tptc_of_ids[] = {
-	{ .compatible = "ti,edma3-tptc", },
-	{}
-};
-MODULE_DEVICE_TABLE(of, edma_tptc_of_ids);
 
 static inline unsigned int edma_read(struct edma_cc *ecc, int offset)
 {
@@ -845,6 +841,42 @@ static void edma_execute(struct edma_chan *echan)
 	}
 }
 
+static int edma_terminate_all(struct dma_chan *chan)
+{
+	struct edma_chan *echan = to_edma_chan(chan);
+	unsigned long flags;
+	LIST_HEAD(head);
+
+	spin_lock_irqsave(&echan->vchan.lock, flags);
+
+	/*
+	 * Stop DMA activity: we assume the callback will not be called
+	 * after edma_dma() returns (even if it does, it will see
+	 * echan->edesc is NULL and exit.)
+	 */
+	if (echan->edesc) {
+		edma_stop(echan);
+		/* Move the cyclic channel back to default queue */
+		if (!echan->tc && echan->edesc->cyclic)
+			edma_assign_channel_eventq(echan, EVENTQ_DEFAULT);
+
+		vchan_terminate_vdesc(&echan->edesc->vdesc);
+		echan->edesc = NULL;
+	}
+
+	vchan_get_all_descriptors(&echan->vchan, &head);
+	spin_unlock_irqrestore(&echan->vchan.lock, flags);
+	vchan_dma_desc_free_list(&echan->vchan, &head);
+
+	return 0;
+}
+
+static void edma_synchronize(struct dma_chan *chan)
+{
+	struct edma_chan *echan = to_edma_chan(chan);
+
+	vchan_synchronize(&echan->vchan);
+}
 
 static int edma_slave_config(struct dma_chan *chan,
 	struct dma_slave_config *cfg)
@@ -864,6 +896,24 @@ static int edma_slave_config(struct dma_chan *chan,
 	return 0;
 }
 
+static int edma_dma_pause(struct dma_chan *chan)
+{
+	struct edma_chan *echan = to_edma_chan(chan);
+
+	if (!echan->edesc)
+		return -EINVAL;
+
+	edma_pause(echan);
+	return 0;
+}
+
+static int edma_dma_resume(struct dma_chan *chan)
+{
+	struct edma_chan *echan = to_edma_chan(chan);
+
+	edma_resume(echan);
+	return 0;
+}
 
 /*
  * A PaRAM set configuration abstraction used by other modes
@@ -879,7 +929,7 @@ static int edma_slave_config(struct dma_chan *chan,
 static int edma_config_pset(struct dma_chan *chan, struct edma_pset *epset,
 			    dma_addr_t src_addr, dma_addr_t dst_addr, uint32_t burst,
 			    unsigned int acnt, unsigned int dma_length,
-			    enum dma_channel_direction direction)
+			    enum dma_transfer_direction direction)
 {
 	struct edma_chan *echan = to_edma_chan(chan);
 	struct device *dev = chan->device->dev;
@@ -943,19 +993,19 @@ static int edma_config_pset(struct dma_chan *chan, struct edma_pset *epset,
 
 	epset->len = dma_length;
 
-	if (direction == MEMORY_TO_PERIPHERAL) {
+	if (direction == DMA_MEM_TO_DEV) {
 		src_bidx = acnt;
 		src_cidx = cidx;
 		dst_bidx = 0;
 		dst_cidx = 0;
 		epset->addr = src_addr;
-	} else if (direction == PERIPHERAL_TO_MEMORY)  {
+	} else if (direction == DMA_DEV_TO_MEM)  {
 		src_bidx = 0;
 		src_cidx = 0;
 		dst_bidx = acnt;
 		dst_cidx = cidx;
 		epset->addr = dst_addr;
-	} else if (direction == MEMORY_TO_MEMORY)  {
+	} else if (direction == DMA_MEM_TO_MEM)  {
 		src_bidx = acnt;
 		src_cidx = cidx;
 		dst_bidx = acnt;
@@ -991,7 +1041,7 @@ static int edma_config_pset(struct dma_chan *chan, struct edma_pset *epset,
 
 static struct dma_async_tx_descriptor *edma_prep_slave_sg(
 	struct dma_chan *chan, struct scatterlist *sgl,
-	unsigned int sg_len, enum dma_channel_direction direction,
+	unsigned int sg_len, enum dma_transfer_direction direction,
 	unsigned long tx_flags, void *context)
 {
 	struct edma_chan *echan = to_edma_chan(chan);
@@ -1006,11 +1056,11 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
 	if (unlikely(!echan || !sgl || !sg_len))
 		return NULL;
 
-	if (direction == PERIPHERAL_TO_MEMORY) {
+	if (direction == DMA_DEV_TO_MEM) {
 		src_addr = echan->cfg.src_addr;
 		dev_width = echan->cfg.src_addr_width;
 		burst = echan->cfg.src_maxburst;
-	} else if (direction == MEMORY_TO_PERIPHERAL) {
+	} else if (direction == DMA_MEM_TO_DEV) {
 		dst_addr = echan->cfg.dst_addr;
 		dev_width = echan->cfg.dst_addr_width;
 		burst = echan->cfg.dst_maxburst;
@@ -1052,7 +1102,7 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
 	/* Configure PaRAM sets for each SG */
 	for_each_sg(sgl, sg, sg_len, i) {
 		/* Get address for each SG */
-		if (direction == PERIPHERAL_TO_MEMORY)
+		if (direction == DMA_DEV_TO_MEM)
 			dst_addr = sg_dma_address(sg);
 		else
 			src_addr = sg_dma_address(sg);
@@ -1147,11 +1197,11 @@ static struct dma_async_tx_descriptor *edma_prep_dma_memcpy(
 
 	edesc->pset_nr = nslots;
 	edesc->residue = edesc->residue_stat = len;
-	edesc->direction = MEMORY_TO_MEMORY;
+	edesc->direction = DMA_MEM_TO_MEM;
 	edesc->echan = echan;
 
 	ret = edma_config_pset(chan, &edesc->pset[0], src, dest, 1,
-			       width, pset_len, MEMORY_TO_MEMORY);
+			       width, pset_len, DMA_MEM_TO_MEM);
 	if (ret < 0) {
 		kfree(edesc);
 		return NULL;
@@ -1183,7 +1233,7 @@ static struct dma_async_tx_descriptor *edma_prep_dma_memcpy(
 		pset_len = width = len % array_size;
 
 		ret = edma_config_pset(chan, &edesc->pset[1], src, dest, 1,
-				       width, pset_len, MEMORY_TO_MEMORY);
+				       width, pset_len, DMA_MEM_TO_MEM);
 		if (ret < 0) {
 			kfree(edesc);
 			return NULL;
@@ -1252,7 +1302,7 @@ edma_prep_dma_interleaved(struct dma_chan *chan,
 	if (!edesc)
 		return NULL;
 
-	edesc->direction = MEMORY_TO_MEMORY;
+	edesc->direction = DMA_MEM_TO_MEM;
 	edesc->echan = echan;
 	edesc->pset_nr = 1;
 
@@ -1278,7 +1328,7 @@ edma_prep_dma_interleaved(struct dma_chan *chan,
 
 static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
 	struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
-	size_t period_len, enum dma_channel_direction direction,
+	size_t period_len, enum dma_transfer_direction direction,
 	unsigned long tx_flags)
 {
 	struct edma_chan *echan = to_edma_chan(chan);
@@ -1293,12 +1343,12 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
 	if (unlikely(!echan || !buf_len || !period_len))
 		return NULL;
 
-	if (direction == PERIPHERAL_TO_MEMORY) {
+	if (direction == DMA_DEV_TO_MEM) {
 		src_addr = echan->cfg.src_addr;
 		dst_addr = buf_addr;
 		dev_width = echan->cfg.src_addr_width;
 		burst = echan->cfg.src_maxburst;
-	} else if (direction == MEMORY_TO_PERIPHERAL) {
+	} else if (direction == DMA_MEM_TO_DEV) {
 		src_addr = buf_addr;
 		dst_addr = echan->cfg.dst_addr;
 		dev_width = echan->cfg.dst_addr_width;
@@ -1384,7 +1434,7 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
 			return NULL;
 		}
 
-		if (direction == PERIPHERAL_TO_MEMORY)
+		if (direction == DMA_DEV_TO_MEM)
 			dst_addr += period_len;
 		else
 			src_addr += period_len;
@@ -1473,32 +1523,46 @@ static void edma_completion_handler(struct edma_chan *echan)
 /* eDMA interrupt handler */
 static void dma_irq_handler(void *data) {
 	struct edma_cc *ecc = data;
-	uint32_t sh_ier, sh_ipr, bank;
-	if (ecc->id < 0)
-		return;
+	int ctlr;
+	uint32_t sh_ier;
+	uint32_t sh_ipr;
+	uint32_t bank;
+
+	ctlr = ecc->id;
+	if (ctlr < 0)
+		return IRQ_NONE;
+
 	dev_vdbg(ecc->dev, "dma_irq_handler\n");
+
 	sh_ipr = edma_shadow0_read_array(ecc, SH_IPR, 0);
 	if (!sh_ipr) {
 		sh_ipr = edma_shadow0_read_array(ecc, SH_IPR, 1);
 		if (!sh_ipr)
-			return;
+			return IRQ_NONE;
 		sh_ier = edma_shadow0_read_array(ecc, SH_IER, 1);
 		bank = 1;
 	} else {
 		sh_ier = edma_shadow0_read_array(ecc, SH_IER, 0);
 		bank = 0;
 	}
+
 	do {
-		uint32_t slot = __ffs(sh_ipr);
+		uint32_t slot;
+		uint32_t channel;
+
+		slot = __ffs(sh_ipr);
 		sh_ipr &= ~(BIT(slot));
+
 		if (sh_ier & BIT(slot)) {
-			uint32_t channel = (bank << 5) | slot;
+			channel = (bank << 5) | slot;
 			/* Clear the corresponding IPR bits */
 			edma_shadow0_write_array(ecc, SH_ICR, bank, BIT(slot));
 			edma_completion_handler(&ecc->slave_chans[channel]);
 		}
-	} while(sh_ipr);
+	} while (sh_ipr);
+
 	edma_shadow0_write(ecc, SH_IEVAL, 1);
+	return IRQ_HANDLED;
 }
 
 static void edma_error_handler(struct edma_chan *echan)
@@ -1733,7 +1797,7 @@ static void edma_issue_pending(struct dma_chan *chan)
 
 static uint32_t edma_residue(struct edma_desc *edesc)
 {
-	bool dst = edesc->direction == PERIPHERAL_TO_MEMORY;
+	bool dst = edesc->direction == DMA_DEV_TO_MEM;
 	int loop_count = EDMA_MAX_TR_WAIT_LOOPS;
 	struct edma_chan *echan = edesc->echan;
 	struct edma_pset *pset = edesc->pset;
@@ -1883,13 +1947,57 @@ static bool edma_is_memcpy_channel(int ch_num, s32 *memcpy_channels)
 	return false;
 }
 
-#define EDMA_DMA_BUSWIDTHS	(BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) | \
-				 BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) | \
-				 BIT(DMA_SLAVE_BUSWIDTH_3_BYTES) | \
-				 BIT(DMA_SLAVE_BUSWIDTH_4_BYTES))
+static int edma_configure(struct drvmgr_dev *dev, uint32_t channel,
+    struct dma_config *config) {
+	struct edma_cc *cc = (struct edma_cc *)dev->priv;
+	if (channel > cc->num_channels)
+		return -EINVAL;
+	
 
-static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
-{
+	return 0;
+}
+
+static int edma_reload(struct drvmgr_dev *dev, uint32_t channel,
+	dma_addr_t src, dma_addr_t dst, size_t size) {
+	struct edma_cc *cc = (struct edma_cc *)dev->priv;
+	return 0;
+}
+
+static int edma_start(struct drvmgr_dev *dev, uint32_t channel) {
+	struct edma_cc *cc = (struct edma_cc *)dev->priv;
+
+	return 0;
+}
+
+static int edma_stop(struct drvmgr_dev *dev, uint32_t channel) {
+	struct edma_cc *cc = (struct edma_cc *)dev->priv;
+	return 0;
+}
+
+static int edma_chan_filter(struct drvmgr_dev *dev,
+    int channel, void *filter_param) {
+}
+
+static int edma_get_status(struct drvmgr_dev *dev, uint32_t channel,
+	struct dma_status *stat) {
+}
+
+static int dma_memcpy(struct drvmgr_dev *dev, uint32_t channel,
+	dma_addr_t src, dma_addr_t dst, size_t size, unsigned int flags) {
+	return 0;
+}
+
+static const struct dma_operations edma_operations = {
+	.configure = edma_configure,
+	.dma_reload = edma_reload,
+	.dma_start = edma_start,
+	.dma_stop = edma_stop,
+	.dma_memcpy = dma_memcpy,
+	.dma_get_status = edma_get_status,
+	.dma_chan_filter = edma_chan_filter
+};
+
+static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode) {
 	struct dma_device *s_ddev = &ecc->dma_slave;
 	struct dma_device *m_ddev = NULL;
 	s32 *memcpy_channels = ecc->info->memcpy_channels;
@@ -1906,7 +2014,7 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
 		dma_cap_set(DMA_INTERLEAVE, s_ddev->cap_mask);
 		s_ddev->device_prep_dma_memcpy = edma_prep_dma_memcpy;
 		s_ddev->device_prep_interleaved_dma = edma_prep_dma_interleaved;
-		s_ddev->directions = BIT(MEMORY_TO_MEMORY);
+		s_ddev->directions = BIT(DMA_MEM_TO_MEM);
 	}
 
 	s_ddev->device_prep_slave_sg = edma_prep_slave_sg;
@@ -1923,7 +2031,7 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
 
 	s_ddev->src_addr_widths = EDMA_DMA_BUSWIDTHS;
 	s_ddev->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
-	s_ddev->directions |= (BIT(PERIPHERAL_TO_MEMORY) | BIT(MEMORY_TO_PERIPHERAL));
+	s_ddev->directions |= (BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV));
 	s_ddev->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
 	s_ddev->max_burst = SZ_32K - 1; /* CIDX: 16bit signed */
 
@@ -1957,7 +2065,7 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
 
 		m_ddev->src_addr_widths = EDMA_DMA_BUSWIDTHS;
 		m_ddev->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
-		m_ddev->directions = BIT(MEMORY_TO_MEMORY);
+		m_ddev->directions = BIT(DMA_MEM_TO_MEM);
 		m_ddev->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
 
 		m_ddev->dev = ecc->dev;
@@ -1985,8 +2093,7 @@ ch_setup:
 }
 
 static int edma_setup_from_hw(struct device *dev, struct edma_soc_info *pdata,
-			      struct edma_cc *ecc)
-{
+	struct edma_cc *ecc) {
 	int i;
 	uint32_t value, cccfg;
 	s8 (*queue_priority_map)[2];
@@ -2052,204 +2159,24 @@ static int edma_setup_from_hw(struct device *dev, struct edma_soc_info *pdata,
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_OF)
-static int edma_xbar_event_map(struct device *dev, struct edma_soc_info *pdata,
-			       size_t sz)
+static bool edma_filter_fn(struct dma_chan *chan, void *param)
 {
-	const char pname[] = "ti,edma-xbar-event-map";
-	struct resource res;
-	void __iomem *xbar;
-	s16 (*xbar_chans)[2];
-	size_t nelm = sz / sizeof(s16);
-	uint32_t shift, offset, mux;
-	int ret, i;
+	bool match = false;
 
-	xbar_chans = devm_kcalloc(dev, nelm + 2, sizeof(s16), GFP_KERNEL);
-	if (!xbar_chans)
-		return -ENOMEM;
-
-	ret = of_address_to_resource(dev->of_node, 1, &res);
-	if (ret)
-		return -ENOMEM;
-
-	xbar = devm_ioremap(dev, res.start, resource_size(&res));
-	if (!xbar)
-		return -ENOMEM;
-
-	ret = of_property_read_u16_array(dev->of_node, pname, (u16 *)xbar_chans,
-					 nelm);
-	if (ret)
-		return -EIO;
-
-	/* Invalidate last entry for the other user of this mess */
-	nelm >>= 1;
-	xbar_chans[nelm][0] = -1;
-	xbar_chans[nelm][1] = -1;
-
-	for (i = 0; i < nelm; i++) {
-		shift = (xbar_chans[i][1] & 0x03) << 3;
-		offset = xbar_chans[i][1] & 0xfffffffc;
-		mux = readl(xbar + offset);
-		mux &= ~(0xff << shift);
-		mux |= xbar_chans[i][0] << shift;
-		writel(mux, (xbar + offset));
+	if (chan->device->dev->driver == &edma_driver.driver) {
+		struct edma_chan *echan = to_edma_chan(chan);
+		unsigned ch_req = *(unsigned *)param;
+		if (ch_req == echan->ch_num) {
+			/* The channel is going to be used as HW synchronized */
+			echan->hw_triggered = true;
+			match = true;
+		}
 	}
-
-	pdata->xbar_chans = (const s16 (*)[2]) xbar_chans;
-	return 0;
+	return match;
 }
 
-static struct edma_soc_info *edma_setup_info_from_dt(struct device *dev,
-						     bool legacy_mode)
-{
-	struct edma_soc_info *info;
-	struct property *prop;
-	int sz, ret;
-
-	info = devm_kzalloc(dev, sizeof(struct edma_soc_info), GFP_KERNEL);
-	if (!info)
-		return ERR_PTR(-ENOMEM);
-
-	if (legacy_mode) {
-		prop = of_find_property(dev->of_node, "ti,edma-xbar-event-map",
-					&sz);
-		if (prop) {
-			ret = edma_xbar_event_map(dev, info, sz);
-			if (ret)
-				return ERR_PTR(ret);
-		}
-		return info;
-	}
-
-	/* Get the list of channels allocated to be used for memcpy */
-	prop = of_find_property(dev->of_node, "ti,edma-memcpy-channels", &sz);
-	if (prop) {
-		const char pname[] = "ti,edma-memcpy-channels";
-		size_t nelm = sz / sizeof(s32);
-		s32 *memcpy_ch;
-
-		memcpy_ch = devm_kcalloc(dev, nelm + 1, sizeof(s32),
-					 GFP_KERNEL);
-		if (!memcpy_ch)
-			return ERR_PTR(-ENOMEM);
-
-		ret = of_property_read_u32_array(dev->of_node, pname,
-						 (uint32_t *)memcpy_ch, nelm);
-		if (ret)
-			return ERR_PTR(ret);
-
-		memcpy_ch[nelm] = -1;
-		info->memcpy_channels = memcpy_ch;
-	}
-
-	prop = of_find_property(dev->of_node, "ti,edma-reserved-slot-ranges",
-				&sz);
-	if (prop) {
-		const char pname[] = "ti,edma-reserved-slot-ranges";
-		uint32_t (*tmp)[2];
-		s16 (*rsv_slots)[2];
-		size_t nelm = sz / sizeof(*tmp);
-		struct edma_rsv_info *rsv_info;
-		int i;
-
-		if (!nelm)
-			return info;
-
-		tmp = kcalloc(nelm, sizeof(*tmp), GFP_KERNEL);
-		if (!tmp)
-			return ERR_PTR(-ENOMEM);
-
-		rsv_info = devm_kzalloc(dev, sizeof(*rsv_info), GFP_KERNEL);
-		if (!rsv_info) {
-			kfree(tmp);
-			return ERR_PTR(-ENOMEM);
-		}
-
-		rsv_slots = devm_kcalloc(dev, nelm + 1, sizeof(*rsv_slots),
-					 GFP_KERNEL);
-		if (!rsv_slots) {
-			kfree(tmp);
-			return ERR_PTR(-ENOMEM);
-		}
-
-		ret = of_property_read_u32_array(dev->of_node, pname,
-						 (uint32_t *)tmp, nelm * 2);
-		if (ret) {
-			kfree(tmp);
-			return ERR_PTR(ret);
-		}
-
-		for (i = 0; i < nelm; i++) {
-			rsv_slots[i][0] = tmp[i][0];
-			rsv_slots[i][1] = tmp[i][1];
-		}
-		rsv_slots[nelm][0] = -1;
-		rsv_slots[nelm][1] = -1;
-
-		info->rsv = rsv_info;
-		info->rsv->rsv_slots = (const s16 (*)[2])rsv_slots;
-
-		kfree(tmp);
-	}
-
-	return info;
-}
-
-static struct dma_chan *of_edma_xlate(struct of_phandle_args *dma_spec,
-				      struct of_dma *ofdma)
-{
-	struct edma_cc *ecc = ofdma->of_dma_data;
-	struct dma_chan *chan = NULL;
-	struct edma_chan *echan;
-	int i;
-
-	if (!ecc || dma_spec->args_count < 1)
-		return NULL;
-
-	for (i = 0; i < ecc->num_channels; i++) {
-		echan = &ecc->slave_chans[i];
-		if (echan->ch_num == dma_spec->args[0]) {
-			chan = &echan->vchan.chan;
-			break;
-		}
-	}
-
-	if (!chan)
-		return NULL;
-
-	if (echan->ecc->legacy_mode && dma_spec->args_count == 1)
-		goto out;
-
-	if (!echan->ecc->legacy_mode && dma_spec->args_count == 2 &&
-	    dma_spec->args[1] < echan->ecc->num_tc) {
-		echan->tc = &echan->ecc->tc_list[dma_spec->args[1]];
-		goto out;
-	}
-
-	return NULL;
-out:
-	/* The channel is going to be used as HW synchronized */
-	echan->hw_triggered = true;
-	return dma_get_slave_channel(chan);
-}
-#else
-static struct edma_soc_info *edma_setup_info_from_dt(struct device *dev,
-						     bool legacy_mode)
-{
-	return ERR_PTR(-EINVAL);
-}
-
-static struct dma_chan *of_edma_xlate(struct of_phandle_args *dma_spec,
-				      struct of_dma *ofdma)
-{
-	return NULL;
-}
-#endif
-
-
-static int edma_probe(struct platform_device *pdev)
-{
-	struct edma_soc_info	*info = pdev->dev.platform_data;
+static int edma_probe(struct drvmgr_dev *pdev) {
+	struct edma_soc_info*info = pdev->dev.platform_data;
 	s8			(*queue_priority_mapping)[2];
 	const s16		(*reserved)[2];
 	int			i, irq;
@@ -2507,23 +2434,23 @@ err_disable_pm:
 	return ret;
 }
 
-
 static const struct dev_id id_table[] = {
-    {.compatible = "ti,am4372-i2c", NULL},
-	{.compatible = "ti,omap4-i2c", NULL},
+    {.compatible = "ti,edma3-tptc", NULL},
     {NULL, NULL}
 };
 
 static struct drvmgr_drv_ops dma_driver_ops = {
-	.init = { dma_probe, }
+	.init = {
+		edma_probe,
+	},
 };
 		
-PLATFORM_DRIVER(i2c_bus) = {
+PLATFORM_DRIVER(gpio_bus) = {
 	.drv = {
 		.drv_id   = DRIVER_PLATFORM_ID,
-		.name     = "i2c",
+		.name     = "dma",
 		.bus_type = DRVMGR_BUS_TYPE_PLATFORM,
-		.ops      = &i2c_driver_ops
+		.ops      = &dma_driver_ops
 	},
 	.ids = id_table
 };

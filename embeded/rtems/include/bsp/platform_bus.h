@@ -29,6 +29,8 @@
 #include <rtems/sysinit.h>
 #include <drvmgr/drvmgr.h>
 
+#include "component/compiler.h"
+
 #ifdef __cplusplus
 extern "C"{
 #endif
