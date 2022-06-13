@@ -209,7 +209,7 @@ struct dma_operations {
     int (*dma_get_status)(struct drvmgr_dev *dev, uint32_t channel,
 				struct dma_status *status);
     int (*dma_memcpy)(struct drvmgr_dev *dev, int channel, 
-                dma_addr_t src, dma_addr_t dst, size_t size, unsigned tx_flags);
+                dma_addr_t src, dma_addr_t dst, size_t size);
     bool (*dma_chan_filter)(struct drvmgr_dev *dev, int channel, 
                 void *filter_param);
 };
@@ -372,12 +372,12 @@ static inline int dma_get_status(struct drvmgr_dev *dev, uint32_t channel,
  * @retval Negative errno code if failure.
  */
 static inline int dma_memcpy(struct drvmgr_dev *dev, uint32_t channel,
-	dma_addr_t src, dma_addr_t dst, size_t size, unsigned int flags) {
+	dma_addr_t src, dma_addr_t dst, size_t size) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
 	const struct dma_operations *ops = dmad_get_operations(dev);
 	if (ops->dma_memcpy)
-		return ops->dma_memcpy(dev, channel, src, dst, size, flags);
+		return ops->dma_memcpy(dev, channel, src, dst, size);
 	return -ENOSYS;
 }
 

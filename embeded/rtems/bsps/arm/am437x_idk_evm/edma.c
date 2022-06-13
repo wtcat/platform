@@ -39,6 +39,7 @@
 
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 
+#define SZ_64K (64 * 1024ul)
 
 #define EDMA_CTLR_CHAN(ctlr, chan)	(((ctlr) << 16) | (chan))
 #define EDMA_CTLR(i)			((i) >> 16)
@@ -187,7 +188,6 @@ struct edma_pset {
 };
 
 struct edma_desc {
-	struct virt_dma_desc		vdesc;
 	struct list_head		node;
 	enum dma_transfer_direction	direction;
 	int				cyclic;
@@ -243,7 +243,6 @@ struct edma_chan {
 	bool				hw_triggered;
 	int				slot[EDMA_MAX_SLOTS];
 	int				missed;
-	struct dma_slave_config		cfg;
 };
 
 struct edma_cc {
@@ -315,6 +314,43 @@ static const struct edmacc_param dummy_paramset = {
 	.link_bcntrld = 0xffff,
 	.ccnt = 1,
 };
+static struct edma_desc_resource edma_desres;
+
+
+static void edma_desc_initialize(void) {
+	struct edma_desc_resource *pres = &edma_desres;
+	for (int i = 0; i < RTEMS_ARRAY_SIZE(pres->buffer); i++) {
+		*(struct edma_desc **)&pres->buffer[i] = pres->freelist;
+		pres->freelist = &pres->buffer[i];
+	}
+}
+
+static inline struct edma_desc *edma_desc_allocate(void) {
+	rtems_interrupt_lock_context lock_context;
+	rtems_interrupt_lock_acquire(&edma_desres.lock, &lock_context);
+	struct edma_desc *ptr = edma_desres.freelist;
+	_Assert(ptr != NULL);
+	if (ptr != NULL) 
+		edma_desres.freelist = *(struct edma_desc **)ptr;
+	rtems_interrupt_lock_release(&edma_desres.lock, &lock_context);
+	return ptr;
+}
+
+static inline void edam_desc *edma_desc_free(struct edma_desc *ptr) {
+	if (ptr != NULL) {
+		rtems_interrupt_lock_context lock_context;
+		rtems_interrupt_lock_acquire(&edma_desres.lock, &lock_context);
+		*(struct edma_desc **)ptr = edma_desres.freelist;
+		edma_desres.freelist = ptr;
+		rtems_interrupt_lock_release(&edma_desres.lock, &lock_context);
+	}
+}
+
+static inline edma_cookie_complete(struct edma_desc *ptr) {
+	if (ptr->dma_cb)
+		ptr->dma_cb(ptr->arg);
+	edma_desc_free(ptr);
+}
 
 
 #define EDMA_BINDING_TPCC	1
@@ -965,22 +1001,20 @@ static int edma_config_pset(struct dma_chan *chan, struct edma_pset *epset,
 		}
 		cidx = acnt * bcnt;
 	}
-
 	epset->len = dma_length;
-
-	if (direction == DMA_MEM_TO_DEV) {
+	if (direction == MEMORY_TO_PERIPHERAL) {
 		src_bidx = acnt;
 		src_cidx = cidx;
 		dst_bidx = 0;
 		dst_cidx = 0;
 		epset->addr = src_addr;
-	} else if (direction == DMA_DEV_TO_MEM)  {
+	} else if (direction == PERIPHERAL_TO_MEMORY)  {
 		src_bidx = 0;
 		src_cidx = 0;
 		dst_bidx = acnt;
 		dst_cidx = cidx;
 		epset->addr = dst_addr;
-	} else if (direction == DMA_MEM_TO_MEM)  {
+	} else if (direction == MEMORY_TO_MEMORY)  {
 		src_bidx = acnt;
 		src_cidx = cidx;
 		dst_bidx = acnt;
@@ -1468,7 +1502,7 @@ static void edma_completion_handler(struct edma_chan *echan) {
 		} else if (edesc->processed == edesc->pset_nr) {
 			edesc->residue = 0;
 			edma_stop(echan);
-			vchan_cookie_complete(&edesc->vdesc);
+			edma_cookie_complete(&edesc);
 			echan->edesc = NULL;
 			dev_dbg("Transfer completed on channel %d\n",
 				echan->ch_num);
@@ -1477,10 +1511,10 @@ static void edma_completion_handler(struct edma_chan *echan) {
 				echan->ch_num);
 			edma_pause(echan);
 
-			/* Update statistics for tx_status */
-			edesc->residue -= edesc->sg_len;
-			edesc->residue_stat = edesc->residue;
-			edesc->processed_stat = edesc->processed;
+			// /* Update statistics for tx_status */
+			// edesc->residue -= edesc->sg_len;
+			// edesc->residue_stat = edesc->residue;
+			// edesc->processed_stat = edesc->processed;
 		}
 		edma_execute(echan);
 	}
@@ -1491,17 +1525,13 @@ static void edma_completion_handler(struct edma_chan *echan) {
 /* eDMA interrupt handler */
 static void dma_irq_handler(void *data) {
 	struct edma_cc *ecc = data;
-	int ctlr;
-	uint32_t sh_ier;
-	uint32_t sh_ipr;
-	uint32_t bank;
+	uint32_t sh_ier, sh_ipr, bank;
 
 	ctlr = ecc->id;
 	if (ctlr < 0)
 		return;
 
 	dev_vdbg(ecc->dev, "dma_irq_handler\n");
-
 	sh_ipr = edma_shadow0_read_array(ecc, SH_IPR, 0);
 	if (!sh_ipr) {
 		sh_ipr = edma_shadow0_read_array(ecc, SH_IPR, 1);
@@ -1515,20 +1545,15 @@ static void dma_irq_handler(void *data) {
 	}
 
 	do {
-		uint32_t slot;
-		uint32_t channel;
-
-		slot = __ffs(sh_ipr);
+		uint32_t slot = __ffs(sh_ipr);
 		sh_ipr &= ~(BIT(slot));
-
 		if (sh_ier & BIT(slot)) {
-			channel = (bank << 5) | slot;
+			uint32_t channel = (bank << 5) | slot;
 			/* Clear the corresponding IPR bits */
 			edma_shadow0_write_array(ecc, SH_ICR, bank, BIT(slot));
 			edma_completion_handler(&ecc->slave_chans[channel]);
 		}
 	} while (sh_ipr);
-
 	edma_shadow0_write(ecc, SH_IEVAL, 1);
 }
 
@@ -1962,17 +1987,10 @@ ch_setup:
 		struct edma_chan *echan = &ecc->slave_chans[i];
 		echan->ch_num = EDMA_CTLR_CHAN(ecc->id, i);
 		echan->ecc = ecc;
-		echan->vchan.desc_free = edma_desc_free;
-
-		if (m_ddev && edma_is_memcpy_channel(i, memcpy_channels))
-			vchan_init(&echan->vchan, m_ddev);
-		else
-			vchan_init(&echan->vchan, s_ddev);
-
-		INIT_LIST_HEAD(&echan->node);
-		for (j = 0; j < EDMA_MAX_SLOTS; j++)
+		for (int j = 0; j < EDMA_MAX_SLOTS; j++)
 			echan->slot[j] = -1;
 	}
+	ecc->dmaclass.ops = &edma_operations;
 }
 
 static int edma_setup_from_hw(struct drvmgr_dev *dev, struct edma_soc_info *pdata,
