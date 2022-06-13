@@ -12,6 +12,8 @@
 # define likely(x)	__builtin_expect(!!(x), 1)
 # define unlikely(x)	__builtin_expect(!!(x), 0)
 
+#define smp_read_barrier_depends()
+
 /* Optimization barrier */
 #ifndef barrier
 # define barrier() __memory_barrier()
