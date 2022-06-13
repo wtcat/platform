@@ -141,7 +141,7 @@ static const uint32_t edma_tptcs[][3] = {
 	{0x49900000, nIRQ(113), 5}, //edma_tptc1
 	{0x49a00000, nIRQ(114), 0}, //edma_tptc2
 	{0}
-}
+};
 PLATFORM_RESOURCE(edma, "ti,edma3-tpcc",
   	TRN("REG0", DRVMGR_KT_INT, 0x49000000),
 	TRN("IRQ0", DRVMGR_KT_INT, nIRQ(12)), //edma3_ccint
