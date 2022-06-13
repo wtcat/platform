@@ -121,11 +121,11 @@ int platform_irq_map(struct drvmgr_dev *dev, int index) {
 	if (!dev)
 		return -DRVMGR_EINVAL;
 	priv = dev->businfo;
-	if (index >= (int)priv->nirq)
+	if (IRQF_INDEX(index) >= (int)priv->nirq)
 		return -DRVMGR_EINVAL;
-	if (index >= 0) 
-		return priv->irqs[index];
-	return -index;
+	if (!(index & IRQF_ABS))
+		return priv->irqs[IRQF_INDEX(index)];
+	return IRQF_INDEX(index);
 }
 
 static int platform_bus_unite(struct drvmgr_drv *drv, struct drvmgr_dev *dev) {
@@ -133,24 +133,34 @@ static int platform_bus_unite(struct drvmgr_drv *drv, struct drvmgr_dev *dev) {
 }
 
 static int platform_bus_intr_register(struct drvmgr_dev *dev, int index, 
-	const char *info, drvmgr_isr isr, void *arg) {
+ const char *info, drvmgr_isr isr, void *arg) {
 	rtems_status_code sc;
-	(void) dev;
 	int irq = platform_irq_map(dev, index);
 	if (irq < 0)
 		return DRVMGR_FAIL;
-	sc = rtems_interrupt_handler_install((rtems_vector_number)irq, info, 
-		RTEMS_INTERRUPT_SHARED, isr, arg);
+	if (index & IRQF_THREAD) {
+		sc = rtems_interrupt_server_handler_install(IRQF_NTHREAD(index), 
+			(rtems_vector_number)irq, info, RTEMS_INTERRUPT_SHARED, isr, arg);
+	} else {
+		sc = rtems_interrupt_handler_install((rtems_vector_number)irq, info, 
+			RTEMS_INTERRUPT_SHARED, isr, arg);
+	}
 	return (int)sc;
 }
 
 static int platform_bus_intr_unregister(struct drvmgr_dev *dev, int index, 
-	drvmgr_isr isr, void *arg) {
-	(void) dev;
+ drvmgr_isr isr, void *arg) {
+	rtems_status_code sc;
 	int irq = platform_irq_map(dev, index);
 	if (irq < 0)
 		return DRVMGR_FAIL;
-	return rtems_interrupt_handler_remove((rtems_vector_number)irq, isr, arg);
+	if (index & IRQF_THREAD) {
+		sc = rtems_interrupt_server_handler_remove(IRQF_NTHREAD(index), 
+			(rtems_vector_number)irq, isr, arg);
+	} else {
+		sc = rtems_interrupt_handler_remove((rtems_vector_number)irq, isr, arg);
+	}
+	return sc;
 }
 	
 static int platform_bus_intr_clear(struct drvmgr_dev *dev, int index) {

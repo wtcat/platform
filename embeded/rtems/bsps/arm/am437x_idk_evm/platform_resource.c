@@ -131,6 +131,27 @@ PLATFORM_RESOURCE(spi1, "ti,am4372-mcspi",
 	TRN("word-length", DRVMGR_KT_INT, 16)
 );
 
+
+/*
+ * EDMA
+ */
+static const int edma_memcpy_channels[] = {58, 59, -1};
+static const uint32_t edma_tptcs[][3] = {
+	{0x49800000, nIRQ(112), 7}, //edma_tptc0
+	{0x49900000, nIRQ(113), 5}, //edma_tptc1
+	{0x49a00000, nIRQ(114), 0}, //edma_tptc2
+	{0}
+}
+PLATFORM_RESOURCE(edma, "ti,edma3-tpcc",
+  	TRN("REG0", DRVMGR_KT_INT, 0x49000000),
+	TRN("IRQ0", DRVMGR_KT_INT, nIRQ(12)), //edma3_ccint
+	TRN("IRQ1", DRVMGR_KT_INT, nIRQ(13)), //edma3_mperr
+	TRN("IRQ2", DRVMGR_KT_INT, nIRQ(14)), //edma3_ccerrint
+	TRN("dma-requests", DRVMGR_KT_INT, 64),
+	TRN("ti,edma-memcpy-channels", DRVMGR_KT_POINTER, edma_memcpy_channels),
+	TRN("ti,tptcs", DRVMGR_KT_POINTER, edma_tptcs)
+);
+
 /*
  * Pin-ctrl
  */
@@ -159,5 +180,6 @@ TEMPLATE_RESOURCES_REGISTER(platform_resources,
 	RN(timer2), RN(timer3), RN(timer4),
 	RN(i2c0), RN(i2c2),
 	RN(tpic2810),
+	RN(edma),
 	NULL
 );

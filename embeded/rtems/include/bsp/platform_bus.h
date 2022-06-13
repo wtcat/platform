@@ -37,6 +37,19 @@ extern "C"{
 
 #define DRVMGR_WARN "DRVMGR_WARNING: " 
 
+/*
+ * System Interupt Flags
+ */
+#define IRQF_INDEX(n)           ((uint32_t)(n) & 0xFFFF)
+#define IRQF_ABS                (0x1u << 16)
+#define IRQF_THREAD             (0x1u << 26)
+#define IRQF_THREADED(n)        ((((uint32_t)(n) & 0x1F) << 27) | IRQF_THREAD)
+#define IRQF_NTHREAD(n)         (((uint32_t)(n) >> 27) & 0x1F)
+#define IRQF_SOFT(svr, irq)     (IRQF_THREADED(svr) | IRQF_INDEX(irq))
+#define IRQF_SOFT_ABS(svr, irq) (IRQ_SOFT(svr, irq) | IRQF_ABS)
+#define IRQF_HARD(irq)           IRQF_INDEX(irq)
+#define IRQF_HARD_ABS(irq)      (IRQF_INDEX(irq) | IRQF_ABS)
+
 
 /* Bus resource class */
 #define RESOURCE_BASE_DECLARE \
@@ -83,6 +96,8 @@ extern "C"{
 enum drvmgr_bus_type {
 	DRVMGR_BUS_TYPE_PLATFORM	= 10,
 #define DRIVER_PLATFORM_ID		DRIVER_ROOTBUS_ID(DRVMGR_BUS_TYPE_PLATFORM)
+	DRVMGR_BUS_TYPE_DMA,
+#define DRIVER_DMA_ID		    DRIVER_ROOTBUS_ID(DRVMGR_BUS_TYPE_DMA)
 	DRVMGR_BUS_TYPE_GPIO,
 #define DRIVER_GPIO_ID		    DRIVER_ROOTBUS_ID(DRVMGR_BUS_TYPE_GPIO)
 	DRVMGR_BUS_TYPE_I2C,
