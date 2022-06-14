@@ -309,7 +309,7 @@ struct edma_soc_info {
 
 	/* List of channels allocated for memcpy, terminated with -1 */
 	int32_t memcpy_channels[4];
-	char (*queue_priority_mapping)[2];
+	int8_t (*queue_priority_mapping)[2];
 //	const s16	(*xbar_chans)[2];
 	const struct dma_slave_map *slave_map;
 	int slavecnt;
@@ -1478,13 +1478,12 @@ static void edma_completion_handler(struct edma_chan *echan) {
 	rtems_interrupt_lock_context flags;
 	struct edma_desc *edesc;
 
-	spin_lock(&echan->vchan.lock, &flags);
-	rtems_interrupt_lock_acquire_isr(&echan->vchan.lock, )
+	rtems_interrupt_lock_acquire_isr(&echan->vchan.lock, &flags);
 	edesc = echan->edesc;
 	if (edesc) {
 		if (edesc->cyclic) {
 			vchan_cyclic_callback(&edesc->vdesc);
-			spin_unlock(&echan->vchan.lock);
+			rtems_interrupt_lock_release_isr(&echan->vchan.lock, &flags);
 			return;
 		} else if (edesc->processed == edesc->pset_nr) {
 			edesc->residue = 0;
@@ -1555,13 +1554,15 @@ static void dma_irq_handler(void *data) {
 
 static void edma_error_handler(struct edma_chan *echan) {
 	struct edma_cc *ecc = echan->ecc;
+	rtems_interrupt_lock_context flags;
+	struct edma_desc *edesc;
 	struct edmacc_param p;
 	int err;
 
 	if (!echan->edesc)
 		return;
 
-	spin_lock(&echan->vchan.lock);
+	rtems_interrupt_lock_acquire_isr(&echan->vchan.lock, &flags);
 	err = edma_read_slot(ecc, echan->slot[0], &p);
 
 	/*
@@ -1590,7 +1591,7 @@ static void edma_error_handler(struct edma_chan *echan) {
 		edma_start(echan);
 		edma_trigger_channel(echan);
 	}
-	spin_unlock(&echan->vchan.lock);
+	rtems_interrupt_lock_release_isr(&echan->vchan.lock, &flags);
 }
 
 static inline bool edma_error_pending(struct edma_cc *ecc) {
@@ -1992,10 +1993,11 @@ ch_setup:
 		echan->ch_num = EDMA_CTLR_CHAN(ecc->id, i);
 		echan->ecc = ecc;
 		echan->vchan.desc_free = edma_desc_free;
-
+#if 0
 		if (m_ddev && edma_is_memcpy_channel(i, memcpy_channels))
 			vchan_init(&echan->vchan, m_ddev);
 		else
+#endif
 			vchan_init(&echan->vchan, s_ddev);
 
 		INIT_LIST_HEAD(&echan->node);

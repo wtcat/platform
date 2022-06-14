@@ -61,23 +61,6 @@ enum dmaengine_tx_result {
 	DMA_TRANS_ABORTED,		/* Op never submitted / aborted */
 };
 
-/**
- * struct dma_tx_state - filled in to report the status of
- * a transfer.
- * @last: last completed DMA cookie
- * @used: last issued DMA cookie (i.e. the one in progress)
- * @residue: the remaining number of bytes left to transmit
- *	on the selected transfer for states DMA_IN_PROGRESS and
- *	DMA_PAUSED if this is implemented in the driver, else 0
- * @in_flight_bytes: amount of data in bytes cached by the DMA.
- */
-struct dma_tx_state {
-	dma_cookie_t last;
-	dma_cookie_t used;
-	uint32_t residue;
-	uint32_t in_flight_bytes;
-};
-
 struct dmaengine_result {
 	enum dmaengine_tx_result result;
 };
@@ -249,6 +232,22 @@ enum dma_slave_buswidth {
 	DMA_SLAVE_BUSWIDTH_64_BYTES = 64,
 };
 
+/**
+ * struct dma_tx_state - filled in to report the status of
+ * a transfer.
+ * @last: last completed DMA cookie
+ * @used: last issued DMA cookie (i.e. the one in progress)
+ * @residue: the remaining number of bytes left to transmit
+ *	on the selected transfer for states DMA_IN_PROGRESS and
+ *	DMA_PAUSED if this is implemented in the driver, else 0
+ * @in_flight_bytes: amount of data in bytes cached by the DMA.
+ */
+struct dma_tx_state {
+	dma_cookie_t last;
+	dma_cookie_t used;
+	uint32_t residue;
+	uint32_t in_flight_bytes;
+};
 
 /**
  * struct dma_slave_map - associates slave device and it's slave channel with
@@ -391,6 +390,7 @@ struct dma_chan {
 	const char *name;
 	struct list_head node;
 	dma_cookie_t cookie;
+	dma_cookie_t completed_cookie;
 	uint16_t refcnt;
 };
 
@@ -693,6 +693,43 @@ static inline void vchan_cyclic_callback(struct virt_dma_desc *vd) {
 }
 
 /**
+ * dma_cookie_complete - complete a descriptor
+ * @tx: descriptor to complete
+ *
+ * Mark this descriptor complete by updating the channels completed
+ * cookie marker.  Zero the descriptors cookie to prevent accidental
+ * repeated completions.
+ *
+ * Note: caller is expected to hold a lock to prevent concurrency.
+ */
+static inline void dma_cookie_complete(struct dma_async_tx_descriptor *tx) {
+	_Assert(tx->cookie >= DMA_MIN_COOKIE);
+	tx->chan->completed_cookie = tx->cookie;
+	tx->cookie = 0;
+}
+
+/**
+ * dma_async_is_complete - test a cookie against chan state
+ * @cookie: transaction identifier to test status of
+ * @last_complete: last know completed transaction
+ * @last_used: last cookie value handed out
+ *
+ * dma_async_is_complete() is used in dma_async_is_tx_complete()
+ * the test logic is separated for lightweight testing of multiple cookies
+ */
+static inline enum dma_status dma_async_is_complete(dma_cookie_t cookie,
+	dma_cookie_t last_complete, dma_cookie_t last_used) {
+	if (last_complete <= last_used) {
+		if ((cookie <= last_complete) || (cookie > last_used))
+			return DMA_COMPLETE;
+	} else {
+		if ((cookie <= last_complete) && (cookie > last_used))
+			return DMA_COMPLETE;
+	}
+	return DMA_IN_PROGRESS;
+}
+			
+/**
  * vchan_cookie_complete - report completion of a descriptor
  * @vd: virtual descriptor to update
  *
@@ -701,7 +738,7 @@ static inline void vchan_cyclic_callback(struct virt_dma_desc *vd) {
 static inline void vchan_cookie_complete(struct virt_dma_desc *vd) {
 	struct virt_dma_chan *vc = to_virt_chan(vd->tx.chan);
 	dev_vdbg("txd %p[%x]: marked complete\n", vd, vd->tx.cookie);
-	vd->tx.cookie = 0;
+	dma_cookie_complete(&vd->tx);
 	vchan_vdesc_fini(vc, vd);
 	dmaengine_desc_notify(&vd->tx);
 }
@@ -841,6 +878,21 @@ static inline int dmaengine_terminate_sync(struct dma_chan *chan) {
 		return ret;
 	dmaengine_synchronize(chan);
 	return 0;
+}
+
+static inline enum dma_status dma_cookie_status(struct dma_chan *chan,
+	dma_cookie_t cookie, struct dma_tx_state *state) {
+	dma_cookie_t used, complete;
+	used = chan->cookie;
+	complete = chan->completed_cookie;
+	barrier();
+	if (state) {
+		state->last = complete;
+		state->used = used;
+		state->residue = 0;
+		state->in_flight_bytes = 0;
+	}
+	return dma_async_is_complete(cookie, complete, used);
 }
 
 static inline bool is_slave_direction(enum dma_transfer_direction direction) {
