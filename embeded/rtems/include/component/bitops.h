@@ -311,19 +311,19 @@ bitmap_empty(unsigned long *addr, int size) {
     atomic_set_long((volatile long *)(a), (long)m)
 
 #define	__set_bit(i, a)							\
-    set_bits(&((volatile long *)(a))[BIT_WORD(i)], BIT_MASK(i))
+    set_bits(BIT_MASK(i), &((volatile long *)(a))[BIT_WORD(i)])
 
 #define	set_bit(i, a)							\
-    set_bits(&((volatile long *)(a))[BIT_WORD(i)], BIT_MASK(i))
+    set_bits(BIT_MASK(i), &((volatile long *)(a))[BIT_WORD(i)])
 
 #define	clear_bits(m, a)						\
     atomic_clear_long((volatile long *)(a), m)
 
 #define	__clear_bit(i, a)						\
-    clear_bits(&((volatile long *)(a))[BIT_WORD(i)], BIT_MASK(i))
+    clear_bits(BIT_MASK(i), &((volatile long *)(a))[BIT_WORD(i)])
 
 #define	clear_bit(i, a)							\
-    clear_bits(&((volatile long *)(a))[BIT_WORD(i)], BIT_MASK(i))
+    clear_bits(BIT_MASK(i), &((volatile long *)(a))[BIT_WORD(i)])
 
 #define	test_bit(i, a)							\
     !!(atomic_load_acq_long(&((volatile long *)(a))[BIT_WORD(i)]) &	\

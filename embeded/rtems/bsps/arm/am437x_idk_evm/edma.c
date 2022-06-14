@@ -26,8 +26,11 @@
 #include <rtems/rtems/intr.h>
 
 #include "component/bitops.h"
+#include "component/minmax.h"
 #include "bsp/platform_bus.h"
 #include "bsp/io.h"
+
+#undef LIST_HEAD
 #include "bsp/vdma.h"
 
 #define dev_dbg(fmt, ...)
@@ -1407,7 +1410,7 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
 			echan->slot[i] =
 				edma_alloc_slot(echan->ecc, EDMA_SLOT_ANY);
 			if (echan->slot[i] < 0) {
-				edma_desc_free((struct virt_dma_desc *));
+				edma_desc_free((struct virt_dma_desc *)edesc);
 				dev_err("%s: Failed to allocate slot\n", __func__);
 				return NULL;
 			}
@@ -1809,7 +1812,7 @@ static uint32_t edma_residue(struct edma_desc *edesc) {
 			dev_dbg("%s: timeout waiting for PaRAM update\n", __func__);
 			break;
 		}
-		cpu_relax();
+		RTEMS_COMPILER_MEMORY_BARRIER();
 	}
 
 	/*
@@ -1902,7 +1905,7 @@ static enum dma_status edma_tx_status(struct dma_chan *chan,
 	return ret;
 }
 
-static bool edma_is_memcpy_channel(int ch_num, s32 *memcpy_channels) {
+static bool edma_is_memcpy_channel(int ch_num, int *memcpy_channels) {
 	if (!memcpy_channels)
 		return false;
 	while (*memcpy_channels != -1) {
@@ -1921,7 +1924,7 @@ static bool edma_is_memcpy_channel(int ch_num, s32 *memcpy_channels) {
 static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode) {
 	struct dma_device *s_ddev = &ecc->dma_slave;
 	struct dma_device *m_ddev = NULL;
-	s32 *memcpy_channels = ecc->info->memcpy_channels;
+	int *memcpy_channels = ecc->info->memcpy_channels;
 	int i, j;
 
 	if (ecc->legacy_mode && !memcpy_channels) {
@@ -2065,7 +2068,7 @@ static int edma_setup_from_hw(struct drvmgr_dev *dev, struct edma_soc_info *pdat
 	queue_priority_map[i][0] = -1;
 	queue_priority_map[i][1] = -1;
 
-	pdata->queue_priority_mapping = queue_priority_map;
+	pdata->queue_priority_mapping = (void *)queue_priority_map;
 	/* Default queue has the lowest priority */
 	pdata->default_queue = i - 1;
 
@@ -2289,7 +2292,7 @@ static struct drvmgr_drv_ops dma_driver_ops = {
 	},
 };
 		
-PLATFORM_DRIVER(gpio_bus) = {
+PLATFORM_DRIVER(edma_bus) = {
 	.drv = {
 		.drv_id   = DRIVER_PLATFORM_ID,
 		.name     = "dma",
