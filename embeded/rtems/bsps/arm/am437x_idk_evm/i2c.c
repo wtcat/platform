@@ -430,7 +430,7 @@ static int i2c_probe(struct drvmgr_dev *dev) {
 	i2c->bus.transfer = am437x_i2c_transfer;
 	i2c->bus.set_clock = am437x_i2c_set_clock;
 	i2c->bus.destroy = am437x_i2c_destroy;
-	ret = i2c_bus_register(&i2c->bus, platform_make_devname(dev->name));
+	ret = i2c_bus_register(&i2c->bus, platform_dev_filename(dev));
 	if (ret)
 		goto _destory;
 	return 0;

@@ -467,8 +467,8 @@ static int ns16550_serial_preprobe(struct drvmgr_dev *dev) {
     dev->priv = platdata;
     platdata->port = devp->base;
     rtems_termios_device_context_initialize(&platdata->base, "UART");
-    sc = rtems_termios_device_install(dev->name, &ns16550_ops, 
-        NULL, &platdata->base);
+    sc = rtems_termios_device_install(platform_dev_filename(dev), 
+        &ns16550_ops, NULL, &platdata->base);
     if (sc != RTEMS_SUCCESSFUL) {
         printk("UART(%s) register failed: %s\n", dev->name, 
             rtems_status_text(sc));
@@ -566,7 +566,7 @@ static int ns16550_serial_post(struct drvmgr_dev *dev) {
     union drvmgr_key_value *prop = devcie_get_property(dev, "stdout");
     if (prop) {
         //console_default_baudrate = prop->i;
-        link(dev->name, CONSOLE_DEVICE_NAME);
+        link(platform_dev_filename(dev), CONSOLE_DEVICE_NAME);
         stdout_path = dev;
         BSP_output_char = ns16550_console_putc;
     }

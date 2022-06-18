@@ -63,18 +63,22 @@ extern "C"{
 #define RN(node) (const struct bus_resource *)(&node)
 #define TRN(rname, type, value) {rname, type, {.ptr = (void *)value}}
 #define __TEMPLATE_RESOURCE(_name, _compatible, _parent, _parent_name, ...) \
+	static const char __dev_filename_##_name[] = { "/dev/"#_name }; \
 	static const struct resoruce_##_name {\
 		RESOURCE_BASE_DECLARE } \
 		_name = { \
 			.compatible = _compatible, \
-			.name = #_name, \
+			.name = &__dev_filename_##_name[5], \
 			.parent_bus = _parent, \
 			.parent_name = _parent_name, \
 			.keys = { __VA_ARGS__, DRVMGR_KEY_EMPTY } \
 		}
 
 #define TEMPLATE_RESOURCE(_name, _compatible, _parent, _parent_name, ...) \
-	__TEMPLATE_RESOURCE(_name, _compatible, _parent, #_parent_name, __VA_ARGS__)
+	static const char __dev_filename_parent_##_name[] = { \
+		"/dev/"#_parent_name }; \
+	__TEMPLATE_RESOURCE(_name, _compatible, _parent, \
+		&__dev_filename_parent_##_name[5], __VA_ARGS__)
 
 #define PLATFORM_RESOURCE(_name, _compatible, ...) \
 	__TEMPLATE_RESOURCE(_name, _compatible, DRVMGR_BUS_TYPE_PLATFORM, \
@@ -129,7 +133,6 @@ struct dev_private {
 	unsigned short irqs[];
 };
 
-const char *platform_make_devname(const char *name);
 const struct bus_resource *const * platform_res_get(void);
 int platform_res_count_get(struct drvmgr_key *keys, 
 	const char *name, size_t len);
@@ -151,6 +154,10 @@ int platform_bus_device_register(struct drvmgr_dev *dev,
 int platform_irq_map(struct drvmgr_dev *dev, int index);
 const struct dev_id *device_match(struct drvmgr_dev *dev, 
 	const struct dev_id *id_table);
+
+static inline const char *platform_dev_filename(struct drvmgr_dev *dev) {
+	return dev->name - 5;
+}
 
 static inline struct dev_private *device_get_private(struct drvmgr_dev *dev) {
 	return (struct dev_private *)(dev + 1);
