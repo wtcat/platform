@@ -30,8 +30,9 @@
 #include <rtems/rtems/intr.h>
 #include <rtems/bspIo.h>
 
-#include "component/list.h"
 #include "bsp/platform_bus.h"
+#undef LIST_HEAD
+#include "component/list.h"
 
 #ifdef __cplusplus
 extern "C"{
@@ -898,62 +899,10 @@ static inline enum dma_status dma_cookie_status(struct dma_chan *chan,
 static inline bool is_slave_direction(enum dma_transfer_direction direction) {
 	return (direction == DMA_MEM_TO_DEV) || (direction == DMA_DEV_TO_MEM);
 }
-
-static inline const struct dma_slave_map *dma_filter_match(
-	struct dma_device *device, const char *name) {
-	if (!device->filter.mapcnt)
-		return NULL;
-	for (int i = 0; i < device->filter.mapcnt; i++) {
-		const struct dma_slave_map *map = &device->filter.map[i];
-		if (!strcmp(map->slave, name))
-			return map;
-	}
-	return NULL;
-}
 							
-static inline struct dma_chan *dma_request_chan(struct drvmgr_dev *dev, 
-	const char *name) {
-	const struct dma_slave_map *map;
-	struct dma_device *dma;
-	if (name == NULL)
-		return NULL;
-	dma = (struct dma_device *)dev->priv;
-	_Assert(dma->filter.fn != NULL);
-	map = dma_filter_match(dma, name);
-	if (map) {
-		struct dma_chan *chan;
-		rtems_mutex_lock(&dma->lock);
-		list_for_each_entry(chan, &dma->channels, node) {
-			if (!dma->filter.fn(chan, map->param)) {
-				dev_vdbg("%s: %s filter said false\n",
-					 __func__, chan->name);
-				continue;
-			}
-			if (!chan->refcnt && dma->device_alloc_chan_resources)
-				dma->device_alloc_chan_resources(chan);
-			chan->refcnt++;
-			rtems_mutex_unlock(&dma->lock);
-			return chan;
-		}
-		rtems_mutex_unlock(&dma->lock);
-	}
-	return NULL;
-}
-
-static inline void dma_release_chan(struct dma_chan *chan) {
-	if (chan == NULL)
-		return;
-	struct dma_device *dma = chan->device;
-	rtems_mutex_lock(&dma->lock);
-	if (chan->refcnt > 0) {
-		chan->refcnt--;
-		if (chan->refcnt == 0) {
-			if (dma->device_free_chan_resources)
-				dma->device_free_chan_resources(chan);
-		}
-	}
-	rtems_mutex_unlock(&dma->lock);
-}
+struct dma_chan *dma_request_chan(struct drvmgr_dev *dev, 
+	const char *name);
+void dma_release_chan(struct dma_chan *chan);
 
 #ifdef __cplusplus
 }

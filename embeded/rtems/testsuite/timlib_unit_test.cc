@@ -4,7 +4,7 @@ extern "C" int flsl(long i);
 #include "gtest/gtest.h"
 #include "bsp/timlib.h"
 
-#define DEV_NAME "/dev/timer2"
+#define DEV_NAME "timer2"
 
 
 class cc_timlib_test : public testing::Test {

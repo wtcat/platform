@@ -67,14 +67,14 @@ extern "C"{
 		RESOURCE_BASE_DECLARE } \
 		_name = { \
 			.compatible = _compatible, \
-			.name = "/dev/"#_name, \
+			.name = #_name, \
 			.parent_bus = _parent, \
 			.parent_name = _parent_name, \
 			.keys = { __VA_ARGS__, DRVMGR_KEY_EMPTY } \
 		}
 
 #define TEMPLATE_RESOURCE(_name, _compatible, _parent, _parent_name, ...) \
-	__TEMPLATE_RESOURCE(_name, _compatible, _parent, "/dev/"#_parent_name, __VA_ARGS__)
+	__TEMPLATE_RESOURCE(_name, _compatible, _parent, #_parent_name, __VA_ARGS__)
 
 #define PLATFORM_RESOURCE(_name, _compatible, ...) \
 	__TEMPLATE_RESOURCE(_name, _compatible, DRVMGR_BUS_TYPE_PLATFORM, \
@@ -129,6 +129,7 @@ struct dev_private {
 	unsigned short irqs[];
 };
 
+const char *platform_make_devname(const char *name);
 const struct bus_resource *const * platform_res_get(void);
 int platform_res_count_get(struct drvmgr_key *keys, 
 	const char *name, size_t len);

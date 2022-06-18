@@ -142,11 +142,19 @@ static const uint32_t edma_tptcs[][3] = {
 	{0x49a00000, nIRQ(114), 0}, //edma_tptc2
 	{0}
 };
-PLATFORM_RESOURCE(edma, "ti,edma3-tpcc",
+static const uint32_t edma_clocks[] = {
+	PER_REG(0x78), //TPCC_CLKCTRL
+	PER_REG(0x80), //TPTC0_CLKCTRL
+	PER_REG(0x88), //TPTC1_CLKCTRL
+	PER_REG(0x90), //TPTC2_CLKCTRL
+	0
+};
+PLATFORM_RESOURCE(edma, "ti,edma3-tptc",
   	TRN("REG0", DRVMGR_KT_INT, 0x49000000),
 	TRN("IRQ0", DRVMGR_KT_INT, nIRQ(12)), //edma3_ccint
 	TRN("IRQ1", DRVMGR_KT_INT, nIRQ(13)), //edma3_mperr
 	TRN("IRQ2", DRVMGR_KT_INT, nIRQ(14)), //edma3_ccerrint
+	TRN("dma-clocks", DRVMGR_KT_POINTER, edma_clocks),
 	TRN("dma-requests", DRVMGR_KT_INT, 64),
 	TRN("ti,edma-memcpy-channels", DRVMGR_KT_POINTER, edma_memcpy_channels),
 	TRN("ti,tptcs", DRVMGR_KT_POINTER, edma_tptcs)

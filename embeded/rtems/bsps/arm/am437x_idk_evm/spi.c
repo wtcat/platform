@@ -376,7 +376,7 @@ static int am437x_spi_probe(struct drvmgr_dev *dev) {
     spi->bus.setup = am437x_spi_setup;
     spi->bus.destroy = am437x_spi_destroy;
     parse_parameters(dev, &spi->bus);
-	ret = spi_bus_register(&spi->bus, dev->name);
+	ret = spi_bus_register(&spi->bus, platform_make_devname(dev->name));
 	if (ret)
 		goto _destory;
 	return 0;

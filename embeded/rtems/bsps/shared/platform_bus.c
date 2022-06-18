@@ -8,6 +8,7 @@
 
 #include <rtems/sysinit.h>
 #include <rtems/bspIo.h>
+#include <rtems/malloc.h>
 
 #include <bsp.h>
 #include <bsp/irq-generic.h>
@@ -18,6 +19,18 @@
 #define RES_NAME_SIZE 32
 
 static const struct bus_resource *const *platform_resources;
+
+const char *platform_make_devname(const char *name) {
+	char *dname;
+	if (name == NULL)
+		return NULL;
+	dname = rtems_calloc(1, 6 + strlen(name));
+	if (dname) {
+		strcpy(dname, "/dev/");
+		strcat(dname, name);
+	}
+	return dname;
+}
 
 const struct bus_resource *const *platform_res_get(void) {
 	return platform_resources;

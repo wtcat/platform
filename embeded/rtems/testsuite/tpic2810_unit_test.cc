@@ -5,12 +5,10 @@ extern "C" int flsl(long i);
 
 extern "C" struct drvmgr_dev *drvmgr_dev_by_name(const char *name);
 
-
-
 TEST(tpic2810, write) {
     struct drvmgr_dev *dev;
     int err;
-    dev = drvmgr_dev_by_name("/dev/tpic2810");
+    dev = drvmgr_dev_by_name("tpic2810");
     ASSERT_TRUE(dev != nullptr);
     ASSERT_TRUE(dev->priv != nullptr);
     int value = 0xFF;

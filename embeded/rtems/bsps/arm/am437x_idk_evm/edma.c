@@ -33,7 +33,7 @@
 #undef LIST_HEAD
 #include "bsp/vdma.h"
 
-#define dev_dbg(fmt, ...)
+#define dev_dbg  dev_err
 #define dev_warn dev_err
 #define dev_err(fmt, ...) printk(fmt, ##__VA_ARGS__)
 
@@ -1710,9 +1710,9 @@ static int edma_alloc_chan_resources(struct dma_chan *chan) {
 	/* Set up channel -> slot mapping for the entry slot */
 	edma_set_chmap(echan, echan->slot[0]);
 	echan->alloced = true;
-	dev_dbg("Got eDMA channel %d for virt channel %d (%s trigger)\n",
-		EDMA_CHAN_SLOT(echan->ch_num), chan->chan_id,
-		echan->hw_triggered ? "HW" : "SW");
+	// dev_dbg("Got eDMA channel %d for virt channel %d (%s trigger)\n",
+	// 	EDMA_CHAN_SLOT(echan->ch_num), chan->chan_id,
+	// 	echan->hw_triggered ? "HW" : "SW");
 	return 0;
 err_slot:
 	edma_free_channel(echan);
@@ -1748,8 +1748,8 @@ static void edma_free_chan_resources(struct dma_chan *chan) {
 
 	echan->tc = NULL;
 	echan->hw_triggered = false;
-	dev_dbg("Free eDMA channel %d for virt channel %d\n",
-		EDMA_CHAN_SLOT(echan->ch_num), chan->chan_id);
+	// dev_dbg("Free eDMA channel %d for virt channel %d\n",
+	// 	EDMA_CHAN_SLOT(echan->ch_num), chan->chan_id);
 }
 
 /* Send pending descriptor to hardware */
@@ -2098,6 +2098,7 @@ static int edma_probe(struct drvmgr_dev *dev) {
 	struct edma_soc_info *info;
 	int8_t (*queue_priority_mapping)[2];
 	const uint32_t (*tptc)[3];
+	const uint32_t *pclk;
 	const int16_t (*reserved)[2];
 	int	i, irq;
 	bool legacy_mode = true;
@@ -2130,7 +2131,16 @@ static int edma_probe(struct drvmgr_dev *dev) {
 	dev->priv = ecc;
 
 	/* Enable EDMA clock */
-	//TODO:--------------------------------------------------------------------------------------
+	rkey = devcie_get_property(dev, "dma-clocks");
+	if (!rkey) {
+		ret = -ENODEV;
+		goto free_ecc;
+	}
+	pclk = (uint32_t *)rkey->ptr;
+	while (*pclk) {
+		writel(0x2, *pclk);
+		pclk++;
+	}
 
 	/* Get eDMA3 configuration from IP */
 	ret = edma_setup_from_hw(dev, info, ecc);
@@ -2259,7 +2269,7 @@ static int edma_probe(struct drvmgr_dev *dev) {
 	ecc->dma_slave.filter.map = info->slave_map;
 	ecc->dma_slave.filter.mapcnt = info->slavecnt;
 	ecc->dma_slave.filter.fn = edma_filter_fn;
-	dev_dbg(dev, "TI EDMA DMA engine driver\n");
+	dev_dbg("TI EDMA DMA engine driver\n");
 	return 0;
 
 err_reg1:
@@ -2301,4 +2311,3 @@ PLATFORM_DRIVER(edma_bus) = {
 	},
 	.ids = id_table
 };
-

@@ -72,6 +72,9 @@
 # endif
 #elif defined (__FreeBSD__)  || defined(__rtems__)
 # define GTEST_OS_FREEBSD 1
+#if defined(__rtems__)
+# define GTEST_OS_RTEMS 1
+#endif
 #elif defined __Fuchsia__
 # define GTEST_OS_FUCHSIA 1
 #elif defined (__linux__)

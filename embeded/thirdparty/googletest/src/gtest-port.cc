@@ -67,6 +67,10 @@
 # include <zircon/syscalls.h>
 #endif  // GTEST_OS_FUCHSIA
 
+#if GTEST_OS_RTEMS
+#include <rtems.h>
+#endif
+
 #include "gtest/gtest-spi.h"
 #include "gtest/gtest-message.h"
 #include "gtest/internal/gtest-internal.h"
@@ -177,6 +181,18 @@ size_t GetThreadCount() {
   } else {
     return 0;
   }
+}
+
+#elif GTEST_OS_RTEMS
+
+size_t GetThreadCount() {
+  size_t ntask = 0;
+  rtems_task_iterate([](rtems_tcb *tcb, void *arg)->bool { 
+    size_t *ptr = (size_t *)arg;
+    ++(*ptr);
+    return true;
+  }, &ntask);
+  return ntask;  
 }
 
 #else
