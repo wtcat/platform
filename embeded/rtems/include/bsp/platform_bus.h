@@ -52,11 +52,14 @@ extern "C"{
 
 
 /* Bus resource class */
-#define RESOURCE_BASE_DECLARE \
+#define DEVICE_RESOURCE_BASE \
 	const char *compatible; \
 	const char *name; \
 	int parent_bus; \
-	const char *parent_name; \
+	const char *parent_name;
+
+#define RESOURCE_BASE_DECLARE \
+	DEVICE_RESOURCE_BASE; \
 	const struct drvmgr_key keys[];
 
 

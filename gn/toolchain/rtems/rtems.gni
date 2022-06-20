@@ -23,6 +23,9 @@ declare_args() {
   use_rtl = false
 
   use_backtrace = false
+
+  #Function trace
+  use_fntrace = false
 }
 
 if (use_backtrace) {

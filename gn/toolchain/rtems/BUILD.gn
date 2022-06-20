@@ -51,6 +51,12 @@ config("rtems_config") {
     ldflags = CC_FLAGS
     asmflags = CC_FLAGS
 
+    if (use_fntrace) {
+      cflags += [
+        "-finstrument-functions",
+        "-mpoke-function-name"
+      ]
+    }
     if (use_backtrace) {
       if (use_backtrace_unwind) {
         cflags += [

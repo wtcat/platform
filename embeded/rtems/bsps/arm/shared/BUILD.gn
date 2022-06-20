@@ -11,4 +11,7 @@ component("shared") {
             sources += ["stacktrace.c"]
         }
     }
+    if (use_fntrace) {
+        defines += ["CONFIGURE_FNTRACE"]
+    }
 }

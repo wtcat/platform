@@ -1,6 +1,8 @@
 # Unit Test
+import("//gn/toolchain/rtems/rtems.gni")
 
 component("testsuite") {
+    defines = []
     include_dirs = [
         "//embeded/thirdparty/googletest/include",
         "//embeded/thirdparty/googletest"
@@ -12,4 +14,7 @@ component("testsuite") {
         "timlib_unit_test.cc",
         "tpic2810_unit_test.cc"
     ]
+    if (use_fntrace) {
+        defines += ["CONFIGURE_FNTRACE"]
+    }
 }

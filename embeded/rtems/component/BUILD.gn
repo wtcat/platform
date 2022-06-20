@@ -1,3 +1,5 @@
+# Copyright(c) 2022 wtcat
+import("//gn/toolchain/rtems/rtems.gni")
 
 component("component") {
     sources = [
@@ -6,4 +8,7 @@ component("component") {
         "workqueue.c",
         "crc.c"
     ]
+    if (use_fntrace) {
+        sources += ["callpath.c"]
+    }
 }

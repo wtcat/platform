@@ -5,6 +5,9 @@
 #include "gtest/gtest.h"
 
 #include "bsp/asm/stacktrace.h"
+#ifdef CONFIGURE_FNTRACE
+#include "component/callpath.h"
+#endif
 
 #define K_MSEC(n)      WQ_MSEC(n)
 #define SLEEP_MS(msec) rtems_task_wake_after(WQ_MSEC(msec))
@@ -17,6 +20,9 @@ static void __attribute__((noinline)) func_a(void) {
     rtems_printer printer;
     rtems_print_printer_printf(&printer);
     stack_backtrace(&printer);
+#ifdef CONFIGURE_FNTRACE
+    callpath_print_current(&printer);
+#endif
 }
 
 static void __attribute__((noinline)) func_b(void) {

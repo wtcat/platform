@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2022 wtcat
+ */
 #include <bsp.h>
 #include <bsp/bootcard.h>
 #include <rtems/bspIo.h>
@@ -9,6 +12,10 @@
 #ifdef CONFIGURE_BACKTRACE
 #include <rtems/printer.h>
 #include "bsp/asm/unwind.h"
+#endif
+
+#ifdef CONFIGURE_FNTRACE
+#include "component/callpath.h"
 #endif
 
 void bsp_fatal_extension(rtems_fatal_source source, bool unused,
@@ -31,10 +38,14 @@ void bsp_fatal_extension(rtems_fatal_source source, bool unused,
     #endif //BSP_VERBOSE_FATAL_EXTENSION
 #if (BSP_PRINT_EXCEPTION_CONTEXT) || BSP_VERBOSE_FATAL_EXTENSION
     if (source == RTEMS_FATAL_SOURCE_EXCEPTION) {
-    #ifdef CONFIGURE_BACKTRACE
         rtems_printer printer;
+    #ifdef CONFIGURE_BACKTRACE
         rtems_print_printer_printk(&printer);
         __stack_backtrace(&printer, (rtems_exception_frame *)code, NULL);
+    #endif
+    #ifdef CONFIGURE_FNTRACE
+        rtems_print_printer_printk(&printer);
+        callpath_print_current(&printer);
     #endif
         rtems_exception_frame_print((const rtems_exception_frame *)code);
     }
