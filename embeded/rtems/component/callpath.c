@@ -5,8 +5,6 @@
 #include <errno.h>
 #include <string.h>
 
-#include "component/callpath.h"
-
 #if defined(__rtems__)
 #include <stdlib.h>
 
@@ -20,6 +18,7 @@
 #include <rtems/bspIo.h>
 #include <rtems/sysinit.h>
 
+#include "component/callpath.h"
 
 #define CALLPATH_LOCKCTX_DECLARE \
 	rtems_interrupt_lock_context lock_context;
@@ -36,12 +35,18 @@ typedef struct _Thread_Control thread_t;
 
 #elif defined(__ZEPHYR__)
 #include <zephyr.h>
+#include <spinlock.h>
 
-#define CALLPATH_LOCKCTX_DECLARE
-#define CALLPATH_LOCK_DECLARE(_name)
-#define CALLPATH_LOCK(_pobj)
-#define CALLPATH_UNLOCK(_pobj)
+#define CALLPATH_LOCKCTX_DECLARE \
+	k_spinlock_key_t __key;
+#define CALLPATH_LOCK_DECLARE(_name) \
+	struct k_spinlock _name
+#define CALLPATH_LOCK(_pobj) \
+	__key = k_spin_lock(&(_pobj)->lock)
+#define CALLPATH_UNLOCK(_pobj) \
+	k_spin_unlock(&(_pobj)->lock, __key);
 #define CALLPATH_PRINT(printer, fmt, ...)
+
 typedef struct k_thread thread_t;
 
 #else
@@ -176,11 +181,44 @@ static void callpath_early_init(void) {
 RTEMS_SYSINIT_ITEM(callpath_early_init, 
 	RTEMS_SYSINIT_USER_EXTENSIONS, RTEMS_SYSINIT_ORDER_MIDDLE);
 
-#else
+#elif defined(__ZEPHYR__)
+static inline struct call_path *thread_get_callpath(const thread_t *thread) {
+	return (struct call_path *)thread->custom_data;
+}
+
+static inline void thread_set_callpath(thread_t *thread, 
+	void *extension) {
+	thread->custom_data = extension;
+}
+
 static inline struct call_path *current_callpath(void) {
+	return thread_get_callpath(k_current_get());
+}
+
+void sys_trace_k_thread_create(thread_t *new_thread) {
+	if (!thread_get_callpath(new_thread)) {
+		struct call_path *path = k_malloc(sizeof(*path));
+		if (path) {
+			callpath_init(path);
+			thread_set_callpath(new_thread, path);
+		}
+	}
+}
+
+void sys_trace_k_thread_sched_abort(thread_t *thread) {
+	struct call_path *path = thread_get_callpath(thread);
+	if (path) {
+		thread_set_callpath(deleted, NULL);
+		free(path);
+	}
+}
+
+#else
+static inline struct call_path *thread_get_callpath(const thread_t *thread) {
 	return NULL;
 }
-static inline struct call_path *thread_get_callpath(const thread_t *thread) {
+
+static inline struct call_path *current_callpath(void) {
 	return NULL;
 }
 #endif /* __rtems__ */
@@ -196,12 +234,20 @@ int callpath_print(void *thread, const callpath_printer_t *printer) {
 	CALLPATH_UNLOCK(path);
 	if (temp_path.magic != CALLPATH_MAGIC)
 		return -EINVAL;
+#if defined(__rtems__)
 	CALLPATH_PRINT(printer, "[*CallPath*]:\n");
+#else
+	CALLPATH_PRINT(printer, "\nCallPath: addr2line -e app.axf -a -f");
+#endif
 	for (unsigned int lvl = 0, i = temp_path.ptr; 
 		i < CALLPATH_MAX_DEEP; i++, lvl++) {
 		uintptr_t addr = temp_path.nodes[i].addr & ~0x1ul;
+#if defined(__rtems__)
 		const char *sym = kernel_symbols(addr);
 		CALLPATH_PRINT(printer, " [%2d] - <0x%lx>@ %s\n", lvl, addr, sym);
+#else
+		CALLPATH_PRINT(printer, " 0x%08x", addr);
+#endif
 	};
 	CALLPATH_PRINT(printer, "\n");
 	return 0;
