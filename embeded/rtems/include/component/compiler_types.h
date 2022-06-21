@@ -173,8 +173,8 @@
 #ifndef __must_check
 #define __must_check		__attribute__((warn_unused_result))
 #endif
-#ifndef notrace
-#define notrace			__attribute__((no_instrument_function))
+#ifndef __notrace
+#define __notrace			__attribute__((no_instrument_function))
 #endif
 
 /*

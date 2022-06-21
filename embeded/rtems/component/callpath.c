@@ -88,7 +88,8 @@ static int callpath_pop(struct call_path *path, uintptr_t addr) {
 	if (path == NULL)
 		return -EINVAL;
 	CALLPATH_LOCK(path);
-	if (path->nodes[path->ptr].addr == addr) {
+	if (path->ptr < CALLPATH_MAX_DEEP && 
+		path->nodes[path->ptr].addr == addr) {
 		path->ptr++;
 		CALLPATH_UNLOCK(path);
 		return 0;
