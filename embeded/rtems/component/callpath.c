@@ -14,6 +14,7 @@
 #include <rtems/score/thread.h>
 #include <rtems/score/percpu.h>
 #include <rtems/score/statesimpl.h>
+#include <rtems/score/sysstate.h>
 #include <rtems.h>
 #include <rtems/malloc.h>
 #include <rtems/bspIo.h>
@@ -212,14 +213,18 @@ int callpath_print_current(const callpath_printer_t *printer) {
 
 void __cyg_profile_func_enter(void *this_fn, void *call_site) {
     (void) call_site;
-	struct call_path *path = current_callpath();
-	callpath_push(path, (uintptr_t)this_fn);
+	if (_System_state_Is_up(_System_state_Get())) {
+		struct call_path *path = current_callpath();
+		callpath_push(path, (uintptr_t)this_fn);
+	}
 }
 
 void __cyg_profile_func_exit(void *this_fn, void *call_site) {
     (void) call_site;
-	struct call_path *path = current_callpath();
-	callpath_pop(path, (uintptr_t)this_fn);
+	if (_System_state_Is_up(_System_state_Get())) {
+		struct call_path *path = current_callpath();
+		callpath_pop(path, (uintptr_t)this_fn);
+	}
 } 
 
 // -finstrument-functions
