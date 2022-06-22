@@ -19,6 +19,7 @@
 #include <rtems/sysinit.h>
 
 #include "component/callpath.h"
+#include "component/compiler.h"
 
 #define CALLPATH_LOCKCTX_DECLARE \
 	rtems_interrupt_lock_context lock_context;
@@ -67,7 +68,7 @@ struct call_path {
 	struct call_node nodes[CALLPATH_MAX_DEEP];
 };
 
-static int callpath_push(struct call_path *path, uintptr_t addr) {
+static int __notrace callpath_push(struct call_path *path, uintptr_t addr) {
     CALLPATH_LOCKCTX_DECLARE
 	if (path == NULL)
 		return -EINVAL;
@@ -83,7 +84,7 @@ static int callpath_push(struct call_path *path, uintptr_t addr) {
 	return -EINVAL;
 }
 
-static int callpath_pop(struct call_path *path, uintptr_t addr) {
+static int __notrace callpath_pop(struct call_path *path, uintptr_t addr) {
     CALLPATH_LOCKCTX_DECLARE
 	if (path == NULL)
 		return -EINVAL;
@@ -100,7 +101,7 @@ static int callpath_pop(struct call_path *path, uintptr_t addr) {
 	return -EINVAL;
 }
 
-static int callpath_init(struct call_path *path) {
+static int __notrace callpath_init(struct call_path *path) {
 	if (path == NULL)
 		return -EINVAL;
 	memset(path, 0, sizeof(path));
@@ -109,7 +110,7 @@ static int callpath_init(struct call_path *path) {
 	return 0;
 }
 
-static const char *kernel_symbols(unsigned long addr) {
+static const char *__notrace kernel_symbols(unsigned long addr) {
 #define SYMBOL_MAGIC 0xFF000000ul
 	unsigned long *ptr= (unsigned long *)(addr - 4);
 	if ((*ptr & SYMBOL_MAGIC) == SYMBOL_MAGIC) {
@@ -122,24 +123,24 @@ static const char *kernel_symbols(unsigned long addr) {
 #if defined(__rtems__)
 static size_t callpath_extension_index;
 
-static inline struct call_path *thread_get_callpath(const thread_t *thread) {
+static inline struct call_path *__notrace thread_get_callpath(const thread_t *thread) {
 	return thread->extensions[callpath_extension_index];
 }
 
-static inline void thread_set_callpath(thread_t *thread, 
+static inline void __notrace thread_set_callpath(thread_t *thread, 
 	void *extension) {
 	thread->extensions[callpath_extension_index] = extension;
 }
 
-static inline thread_t *thread_get_current(void) {
+static inline thread_t *__notrace thread_get_current(void) {
 	return _Thread_Get_executing();
 }
 
-static inline struct call_path *current_callpath(void) {
+static inline struct call_path *__notrace current_callpath(void) {
 	return thread_get_callpath(thread_get_current());
 }
 
-static bool callpath_extension_thread_create(Thread_Control *executing,
+static bool __notrace callpath_extension_thread_create(Thread_Control *executing,
 	Thread_Control *created) {
 	(void)executing;
 	struct call_path *path;
@@ -154,7 +155,7 @@ static bool callpath_extension_thread_create(Thread_Control *executing,
 	return false;
 }
 
-static void callpath_extension_thread_delete(Thread_Control *executing,
+static void __notrace callpath_extension_thread_delete(Thread_Control *executing,
 	Thread_Control *deleted) {
 	struct call_path *path = thread_get_callpath(deleted);
 	if (path) {
@@ -169,7 +170,7 @@ static const rtems_extensions_table callpath_extensions = {
 	.thread_delete = callpath_extension_thread_delete
 };
 
-static void callpath_early_init(void) {
+static void __notrace callpath_early_init(void) {
 	rtems_status_code sc;
 	rtems_id ext_id;
 	sc = rtems_extension_create(rtems_build_name('c','a','l','l'),
@@ -183,20 +184,20 @@ RTEMS_SYSINIT_ITEM(callpath_early_init,
 	RTEMS_SYSINIT_USER_EXTENSIONS, RTEMS_SYSINIT_ORDER_MIDDLE);
 
 #elif defined(__ZEPHYR__)
-static inline struct call_path *thread_get_callpath(const thread_t *thread) {
+static inline struct call_path *__notrace thread_get_callpath(const thread_t *thread) {
 	return (struct call_path *)thread->custom_data;
 }
 
-static inline void thread_set_callpath(thread_t *thread, 
+static inline void __notrace thread_set_callpath(thread_t *thread, 
 	void *extension) {
 	thread->custom_data = extension;
 }
 
-static inline struct call_path *current_callpath(void) {
+static inline struct call_path *__notrace current_callpath(void) {
 	return thread_get_callpath(k_current_get());
 }
 
-void sys_trace_k_thread_create(thread_t *new_thread) {
+void __notrace sys_trace_k_thread_create(thread_t *new_thread) {
 	if (!thread_get_callpath(new_thread)) {
 		struct call_path *path = k_malloc(sizeof(*path));
 		if (path) {
@@ -206,7 +207,7 @@ void sys_trace_k_thread_create(thread_t *new_thread) {
 	}
 }
 
-void sys_trace_k_thread_sched_abort(thread_t *thread) {
+void __notrace sys_trace_k_thread_sched_abort(thread_t *thread) {
 	struct call_path *path = thread_get_callpath(thread);
 	if (path) {
 		thread_set_callpath(deleted, NULL);
@@ -215,17 +216,17 @@ void sys_trace_k_thread_sched_abort(thread_t *thread) {
 }
 
 #else
-static inline struct call_path *thread_get_callpath(const thread_t *thread) {
+static inline struct call_path *__notrace thread_get_callpath(const thread_t *thread) {
 	return NULL;
 }
 
-static inline struct call_path *current_callpath(void) {
+static inline struct call_path *__notrace current_callpath(void) {
 	return NULL;
 }
 #endif /* __rtems__ */
 
 
-int callpath_print(void *thread, const callpath_printer_t *printer) {
+int __notrace callpath_print(void *thread, const callpath_printer_t *printer) {
     CALLPATH_LOCKCTX_DECLARE
 	if (!thread || !printer)
 		return -EINVAL;
@@ -254,12 +255,13 @@ int callpath_print(void *thread, const callpath_printer_t *printer) {
 	return 0;
 }
 
-int callpath_print_current(const callpath_printer_t *printer) {
+int __notrace callpath_print_current(const callpath_printer_t *printer) {
 	return callpath_print(current_callpath(), printer);
 }
 
 void __cyg_profile_func_enter(void *this_fn, void *call_site) {
     (void) call_site;
+	// printk("Enter--> %p\n", __builtin_return_address(0));
 	if (_System_state_Is_up(_System_state_Get())) {
 		struct call_path *path = current_callpath();
 		callpath_push(path, (uintptr_t)this_fn);
@@ -268,6 +270,7 @@ void __cyg_profile_func_enter(void *this_fn, void *call_site) {
 
 void __cyg_profile_func_exit(void *this_fn, void *call_site) {
     (void) call_site;
+	// printk("Exit--> %p\n", __builtin_return_address(0));
 	if (_System_state_Is_up(_System_state_Get())) {
 		struct call_path *path = current_callpath();
 		callpath_pop(path, (uintptr_t)this_fn);

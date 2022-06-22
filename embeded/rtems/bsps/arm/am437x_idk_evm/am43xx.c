@@ -33,6 +33,18 @@ arm_cp15_start_section_config _am43xx_mmu_configs[] = {
   }
 };
 
+
+static void __notrace console_early_putc(char ch) {
+    void *port = (void *)0x44e09000; //ttyS0
+    do {
+        uint32_t status = readb_relaxed(port + (5 << 2));
+        if (status & 0x20) {
+            writeb_relaxed(ch, port + (0 << 2));
+            break;
+        }
+    } while (true);
+}
+
 /*
  * Overwrite bsp default mmu configuration
  */
@@ -55,6 +67,7 @@ BSP_START_TEXT_SECTION void __notrace setup_mmu_and_cache(void) {
 }
 
 BSP_START_TEXT_SECTION __notrace void bsp_start_hook_0(void) {
+    BSP_output_char = console_early_putc;
     arm_a9mpcore_start_hook_0();
 }
 
@@ -64,6 +77,7 @@ BSP_START_TEXT_SECTION __notrace void bsp_start_hook_1(void) {
     setup_mmu_and_cache();
     rtems_cache_enable_data();
     bsp_start_clear_bss();
+    BSP_output_char = console_early_putc;
 }
 
 void __notrace bsp_start(void) {
