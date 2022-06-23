@@ -259,7 +259,7 @@ int __notrace callpath_print_current(const callpath_printer_t *printer) {
 	return callpath_print(current_callpath(), printer);
 }
 
-void __cyg_profile_func_enter(void *this_fn, void *call_site) {
+void __notrace __cyg_profile_func_enter(void *this_fn, void *call_site) {
     (void) call_site;
 	// printk("Enter--> %p\n", __builtin_return_address(0));
 	if (_System_state_Is_up(_System_state_Get())) {
@@ -268,7 +268,7 @@ void __cyg_profile_func_enter(void *this_fn, void *call_site) {
 	}
 }
 
-void __cyg_profile_func_exit(void *this_fn, void *call_site) {
+void __notrace __cyg_profile_func_exit(void *this_fn, void *call_site) {
     (void) call_site;
 	// printk("Exit--> %p\n", __builtin_return_address(0));
 	if (_System_state_Is_up(_System_state_Get())) {
