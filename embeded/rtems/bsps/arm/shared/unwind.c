@@ -23,6 +23,7 @@
 #include <rtems/printer.h>
 #include <rtems/bspIo.h>
 
+#include "component/compiler.h"
 #include "bsp/asm/unwind.h"
 
 
@@ -76,7 +77,7 @@ extern const unwind_index_t __exidx_end[];
 #define thread_saved_pc(tsk) \
 	(unsigned long)(tsk)->Registers.register_lr
 
-static inline unsigned long current_stack_pointer(void) {
+static inline unsigned long __notrace current_stack_pointer(void) {
 	unsigned long stkptr;
 	__asm__ volatile ("mov %[stkptr], sp\n"
 		: [stkptr] "=r" (stkptr)
@@ -84,24 +85,24 @@ static inline unsigned long current_stack_pointer(void) {
 	return stkptr;
 }
 
-static unsigned long thread_stack_end(struct _Thread_Control *tsk) {
+static unsigned long __notrace thread_stack_end(struct _Thread_Control *tsk) {
 	Stack_Control *stk = &tsk->Start.Initial_stack;
 	return (unsigned long)stk->area + stk->size;
 }
 
 /* Dummy functions to avoid linker complaints */
 //void __aeabi_unwind_cpp_pr0(void) {}
-void __aeabi_unwind_cpp_pr1(void) {}
-void __aeabi_unwind_cpp_pr2(void) {}
+void __notrace __aeabi_unwind_cpp_pr1(void) {}
+void __notrace __aeabi_unwind_cpp_pr2(void) {}
 
-static bool kernel_text_address(unsigned long addr) {
+static __notrace bool kernel_text_address(unsigned long addr) {
 	if (addr >= (unsigned long)bsp_section_text_begin &&
 		addr <= (unsigned long)bsp_section_text_end)
 		return true;
 	return false;
 }
 
-static const char *kernel_symbols(unsigned long addr) {
+static const char *__notrace kernel_symbols(unsigned long addr) {
 #define SYMBOL_MAGIC 0xFF000000ul
 	unsigned long *ptr= (unsigned long *)(addr - 4);
 	if ((*ptr & SYMBOL_MAGIC) == SYMBOL_MAGIC) {
@@ -112,7 +113,7 @@ static const char *kernel_symbols(unsigned long addr) {
 }
 
 static const struct unwind_index *
-unwind_search_index(const unwind_index_t *start, 
+__notrace unwind_search_index(const unwind_index_t *start, 
 	const unwind_index_t *end, uint32_t ip) {
 	const struct unwind_index *middle;
 
@@ -127,7 +128,7 @@ unwind_search_index(const unwind_index_t *start,
 	return start;
 }
 
-static int unwind_get_next_byte(unwind_control_block_t *ucb) {
+static int __notrace unwind_get_next_byte(unwind_control_block_t *ucb) {
 	int instruction;
 
 	/* Are there more instructions */
@@ -147,7 +148,7 @@ static int unwind_get_next_byte(unwind_control_block_t *ucb) {
 	return instruction;
 }
 
-static int unwind_control_block_init(unwind_control_block_t *ucb, 
+static int __notrace unwind_control_block_init(unwind_control_block_t *ucb, 
 	const uint32_t *instructions, const backtrace_frame_t *frame) {
 	/* Initialize control block */
 	memset(ucb, 0, sizeof(unwind_control_block_t));
@@ -174,7 +175,7 @@ static int unwind_control_block_init(unwind_control_block_t *ucb,
 	return 0;
 }
 
-static int unwind_execute_instruction(unwind_control_block_t *ucb) {
+static int __notrace unwind_execute_instruction(unwind_control_block_t *ucb) {
 	int instruction;
 	uint32_t mask;
 	uint32_t reg;
@@ -272,7 +273,7 @@ static int unwind_execute_instruction(unwind_control_block_t *ucb) {
 	return instruction != -1;
 }
 
-static int unwind_frame(backtrace_frame_t *frame) {
+static int __notrace unwind_frame(backtrace_frame_t *frame) {
 	unwind_control_block_t ucb;
 	const unwind_index_t *index;
 	const uint32_t *instructions;
@@ -335,11 +336,11 @@ static int unwind_frame(backtrace_frame_t *frame) {
 	return 1;
 }
 
-static void backtrace_info(rtems_printer *printer) {
+static void __notrace backtrace_info(rtems_printer *printer) {
 	rtems_printf(printer, "\n[Backtrace Dump] =>\n");
 }
 
-static void dump_stack(rtems_printer *printer, unsigned long sp, 
+static void __notrace dump_stack(rtems_printer *printer, unsigned long sp, 
 	struct _Thread_Control *tsk) {
 	unsigned long top = sp + 0x100;
 	if (tsk) {
@@ -353,13 +354,13 @@ static void dump_stack(rtems_printer *printer, unsigned long sp,
 	}
 }
 
-static void dump_backtrace(rtems_printer *printer, unsigned long pc,
+static void __notrace dump_backtrace(rtems_printer *printer, unsigned long pc,
 	unsigned long fnaddr, int level) {
 	const char *sym = kernel_symbols(fnaddr);
 	rtems_printf(printer, " [%2d] - <0x%lx>@ %s\n", level, pc, sym);
 }
 
-const char *unwind_kernel_symbols(unsigned long pc) {
+const char *__notrace unwind_kernel_symbols(unsigned long pc) {
 	const unwind_index_t *index = unwind_search_index(__exidx_start, 
 		__exidx_end, pc);
 	if (index)
@@ -367,7 +368,7 @@ const char *unwind_kernel_symbols(unsigned long pc) {
 	return "Unknown"; 
 }
 
-void __stack_backtrace(rtems_printer *printer, CPU_Exception_frame *regs,
+void __notrace __stack_backtrace(rtems_printer *printer, CPU_Exception_frame *regs,
 	struct _Thread_Control *tsk) {
 	const unwind_index_t *index;
 	backtrace_frame_t frame;
@@ -407,7 +408,7 @@ void __stack_backtrace(rtems_printer *printer, CPU_Exception_frame *regs,
 		dump_backtrace(printer, frame.pc, prel31_to_addr(&index->addr_offset), level);
 		level++;
 	} while (unwind_frame(&frame));
-	if (regs)
-		dump_stack(printer, regs->register_sp, tsk);
+	// if (regs)
+	// 	dump_stack(printer, regs->register_sp, tsk);
 }
 
