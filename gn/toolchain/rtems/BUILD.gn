@@ -55,7 +55,7 @@ config("rtems_config") {
       cflags += [
         "-finstrument-functions",
         "-mpoke-function-name",
-        "-finstrument-functions-exclude-file-list=rtems/score,rtems/rtems,bsp,libcpu"
+        "-finstrument-functions-exclude-file-list=rtems/score,rtems/rtems,rtems,bsp,libcpu"
       ]
     }
     if (use_backtrace) {

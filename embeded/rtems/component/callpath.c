@@ -9,6 +9,7 @@
 #include <stdlib.h>
 
 #include <rtems/score/objectimpl.h>
+#include <rtems/score/threadimpl.h>
 #include <rtems/score/thread.h>
 #include <rtems/score/percpu.h>
 #include <rtems/score/statesimpl.h>
@@ -75,8 +76,8 @@ static int __notrace callpath_push(struct call_path *path, uintptr_t addr) {
     CALLPATH_LOCK(path);
 	unsigned int ptr = path->ptr;
 	if (ptr > 0) {
-		path->nodes[ptr].addr = addr;
-		path->ptr = ptr - 1;
+		path->nodes[--ptr].addr = addr;
+		path->ptr = ptr;
 		CALLPATH_UNLOCK(path);
 		return 0;
 	}
@@ -178,10 +179,11 @@ static void __notrace callpath_early_init(void) {
 	if (sc != RTEMS_SUCCESSFUL)
 		rtems_panic("cannot create extension");
 	callpath_extension_index = rtems_object_id_get_index(ext_id);
+
 }
 
 RTEMS_SYSINIT_ITEM(callpath_early_init, 
-	RTEMS_SYSINIT_USER_EXTENSIONS, RTEMS_SYSINIT_ORDER_MIDDLE);
+	RTEMS_SYSINIT_ROOT_FILESYSTEM, RTEMS_SYSINIT_ORDER_MIDDLE);
 
 #elif defined(__ZEPHYR__)
 static inline struct call_path *__notrace thread_get_callpath(const thread_t *thread) {
@@ -225,7 +227,6 @@ static inline struct call_path *__notrace current_callpath(void) {
 }
 #endif /* __rtems__ */
 
-
 int __notrace callpath_print(void *thread, const callpath_printer_t *printer) {
     CALLPATH_LOCKCTX_DECLARE
 	if (!thread || !printer)
@@ -237,7 +238,7 @@ int __notrace callpath_print(void *thread, const callpath_printer_t *printer) {
 	if (temp_path.magic != CALLPATH_MAGIC)
 		return -EINVAL;
 #if defined(__rtems__)
-	CALLPATH_PRINT(printer, "[*CallPath*]:\n");
+	CALLPATH_PRINT(printer, "[*CallPath()%d*]:\n", temp_path.ptr);
 #else
 	CALLPATH_PRINT(printer, "\nCallPath: addr2line -e app.axf -a -f");
 #endif
@@ -250,18 +251,17 @@ int __notrace callpath_print(void *thread, const callpath_printer_t *printer) {
 #else
 		CALLPATH_PRINT(printer, " 0x%08x", addr);
 #endif
-	};
+	}
 	CALLPATH_PRINT(printer, "\n");
 	return 0;
 }
 
 int __notrace callpath_print_current(const callpath_printer_t *printer) {
-	return callpath_print(current_callpath(), printer);
+	return callpath_print(thread_get_current(), printer);
 }
 
 void __notrace __cyg_profile_func_enter(void *this_fn, void *call_site) {
     (void) call_site;
-	// printk("Enter--> %p\n", __builtin_return_address(0));
 	if (_System_state_Is_up(_System_state_Get())) {
 		struct call_path *path = current_callpath();
 		callpath_push(path, (uintptr_t)this_fn);
@@ -270,11 +270,9 @@ void __notrace __cyg_profile_func_enter(void *this_fn, void *call_site) {
 
 void __notrace __cyg_profile_func_exit(void *this_fn, void *call_site) {
     (void) call_site;
-	// printk("Exit--> %p\n", __builtin_return_address(0));
 	if (_System_state_Is_up(_System_state_Get())) {
 		struct call_path *path = current_callpath();
 		callpath_pop(path, (uintptr_t)this_fn);
 	}
 } 
 
-// -finstrument-functions
