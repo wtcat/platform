@@ -11,4 +11,7 @@ component("component") {
     if (use_fntrace) {
         sources += ["callpath.c"]
     }
+    if (use_fnstack_check) {
+        sources += ["compiler_stack_protect.c"]
+    }
 }

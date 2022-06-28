@@ -26,6 +26,9 @@ declare_args() {
 
   #Function trace
   use_fntrace = false
+
+  #Function call stack check
+  use_fnstack_check = false
 }
 
 if (use_backtrace) {

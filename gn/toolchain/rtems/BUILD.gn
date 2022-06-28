@@ -70,4 +70,7 @@ config("rtems_config") {
         ]
       }
     }
+    if (use_fnstack_check) {
+      cflags += ["-fstack-protector-all"]
+    }
 }
