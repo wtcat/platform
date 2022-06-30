@@ -6,7 +6,8 @@ component("component") {
         "xmodem.c",
         "timer_ii.c",
         "workqueue.c",
-        "crc.c"
+        "crc.c",
+        "ring_buffer.c"
     ]
     if (use_fntrace) {
         sources += ["callpath.c"]
