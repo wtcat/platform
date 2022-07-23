@@ -168,8 +168,8 @@ WR4(struct ti_sdhci_softc *sc, bus_size_t off, uint32_t val)
 static uint8_t
 ti_sdhci_read_1(device_t dev, struct sdhci_slot *slot, bus_size_t off)
 {
+	(void) slot;
 	struct ti_sdhci_softc *sc = device_get_softc(dev);
-
 	return ((RD4(sc, off & ~3) >> (off & 3) * 8) & 0xff);
 }
 
@@ -222,6 +222,7 @@ ti_sdhci_read_4(device_t dev, struct sdhci_slot *slot, bus_size_t off)
 	struct ti_sdhci_softc *sc = device_get_softc(dev);
 	uint32_t val32;
 
+	(void) slot;
 	val32 = RD4(sc, off);
 
 	/*
@@ -244,8 +245,8 @@ static void
 ti_sdhci_read_multi_4(device_t dev, struct sdhci_slot *slot, bus_size_t off,
     uint32_t *data, bus_size_t count)
 {
+	(void) slot;
 	struct ti_sdhci_softc *sc = device_get_softc(dev);
-
 	bus_read_multi_4(sc->mem_res, off + sc->sdhci_reg_off, data, count);
 }
 
@@ -253,6 +254,7 @@ static void
 ti_sdhci_write_1(device_t dev, struct sdhci_slot *slot, bus_size_t off, 
     uint8_t val)
 {
+	(void) slot;
 	struct ti_sdhci_softc *sc = device_get_softc(dev);
 	uint32_t val32;
 
@@ -332,8 +334,8 @@ static void
 ti_sdhci_write_4(device_t dev, struct sdhci_slot *slot, bus_size_t off, 
     uint32_t val)
 {
+	(void) slot;
 	struct ti_sdhci_softc *sc = device_get_softc(dev);
-
 	WR4(sc, off, val);
 }
 
@@ -341,8 +343,8 @@ static void
 ti_sdhci_write_multi_4(device_t dev, struct sdhci_slot *slot, bus_size_t off,
     uint32_t *data, bus_size_t count)
 {
+	(void) slot;
 	struct ti_sdhci_softc *sc = device_get_softc(dev);
-
 	bus_write_multi_4(sc->mem_res, off + sc->sdhci_reg_off, data, count);
 }
 
@@ -393,6 +395,7 @@ ti_sdhci_update_ios(device_t brdev, device_t reqdev)
 static int
 ti_sdhci_get_ro(device_t brdev, device_t reqdev)
 {
+	(void) reqdev;
 	struct ti_sdhci_softc *sc = device_get_softc(brdev);
 
 	if (sc->disable_readonly)
@@ -405,14 +408,15 @@ static bool
 ti_sdhci_get_card_present(device_t dev, struct sdhci_slot *slot)
 {
 	//struct ti_sdhci_softc *sc = device_get_softc(dev);
-
+	(void) dev;
+	(void) slot;
 	return true; //return (sdhci_fdt_gpio_get_present(sc->gpio));
 }
 
 static int
 ti_sdhci_detach(device_t dev)
 {
-
+	(void) dev;
 	/* sdhci_fdt_gpio_teardown(sc->gpio); */
 
 	return (EBUSY);

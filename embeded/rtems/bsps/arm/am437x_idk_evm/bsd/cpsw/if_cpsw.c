@@ -528,7 +528,7 @@ cpsw_init_slots(struct cpsw_softc *sc)
 	STAILQ_INIT(&sc->avail);
 
 	/* Put the slot descriptors onto the global avail list. */
-	for (i = 0; i < nitems(sc->_slots); i++) {
+	for (i = 0; i < (int)nitems(sc->_slots); i++) {
 		slot = &sc->_slots[i];
 		slot->bd_offset = cpsw_cpdma_bd_offset(i);
 		STAILQ_INSERT_TAIL(&sc->avail, slot, next);
@@ -985,7 +985,7 @@ cpsw_detach(device_t dev)
 	cpsw_intr_detach(sc);
 
 	/* Free dmamaps and mbufs */
-	for (i = 0; i < nitems(sc->_slots); ++i)
+	for (i = 0; i < (int)nitems(sc->_slots); ++i)
 		cpsw_free_slot(sc, &sc->_slots[i]);
 
 	/* Free null padding buffer. */
@@ -1018,7 +1018,7 @@ cpsw_detach(device_t dev)
 static phandle_t
 cpsw_get_node(device_t bus, device_t dev)
 {
-
+	(void) dev;
 	/* Share controller node with port device. */
 	return (ofw_bus_get_node(bus));
 }
@@ -1415,6 +1415,7 @@ cpsw_set_promisc(struct cpswp_softc *sc, int set)
 static void
 cpsw_set_allmulti(struct cpswp_softc *sc, int set)
 {
+	(void) sc;
 	if (set) {
 		printf("All-multicast mode unimplemented\n");
 	}
@@ -2556,7 +2557,7 @@ cpsw_ale_update_vlan_table(struct cpsw_softc *sc, int vlan, int ports,
 		if (free_index < 0 && ALE_TYPE(ale_entry) == 0)
 			free_index = i;
 
-		if (ALE_VLAN(ale_entry) == vlan) {
+		if ((int)ALE_VLAN(ale_entry) == vlan) {
 			matching_index = i;
 			break;
 		}

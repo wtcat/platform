@@ -392,7 +392,7 @@ static int i2c_probe(struct drvmgr_dev *dev) {
 	union drvmgr_key_value *prop;
 	struct i2c_private *i2c;
     struct dev_private *devp;
-	int ret;
+	int ret = -EINVAL;
     i2c = rtems_calloc(1, sizeof(struct i2c_private));
     if (i2c == NULL) 
         return -DRVMGR_NOMEM;

@@ -51,6 +51,13 @@ config("rtems_config") {
     ldflags = CC_FLAGS
     asmflags = CC_FLAGS
 
+    cflags += [
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-Wno-unused-function",
+      "-Wno-missing-field-initializers"
+    ]
     if (use_fntrace) {
       cflags += [
         "-finstrument-functions",

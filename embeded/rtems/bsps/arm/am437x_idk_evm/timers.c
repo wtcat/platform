@@ -121,7 +121,8 @@ static void timer_restart(struct drvmgr_dev *dev) {
 static int timer_set_freq(struct drvmgr_dev *dev, uint32_t tickrate) {
     struct dmtimer_priv *priv = dev->priv;
     uint32_t ldv = TIMER_MAX_COUNT - tickrate;
-    writel_relaxed(ldv, priv->base + DMTIMER_TLDR);   
+    writel_relaxed(ldv, priv->base + DMTIMER_TLDR);  
+    return 0; 
 }
 
 static int timer_get_freq(struct drvmgr_dev *dev, uint32_t *basefreq,
@@ -161,6 +162,7 @@ static uint32_t timer_get_counter(struct drvmgr_dev *dev) {
 }
 
 static uint32_t timer_get_widthmask(struct drvmgr_dev *dev) {
+    (void) dev;
     return TIMER_MAX_COUNT;
 }
 
@@ -193,7 +195,6 @@ static int timer_init(struct drvmgr_dev *dev) {
     union drvmgr_key_value *prop;
     struct dev_private *devp;
     struct dmtimer_priv *priv;
-	int ret;
     priv = rtems_calloc(1, sizeof(struct dmtimer_priv));
     if (priv == NULL) {
         printk("Error***(%s): no more memory\n", __func__);

@@ -88,6 +88,7 @@ void __notrace bsp_start(void) {
 
 uint32_t __notrace bsp_fdt_map_intr(const uint32_t *intr, 
 	size_t icells) {
+    (void) icells;
     return intr[1] + 32;
 }
 
@@ -97,6 +98,7 @@ void __notrace bsp_reset(void) {
     // sync();
     rtems_interrupt_disable(level);
     writel(RST_GLOBAL_WARM_SW, PRM_DEVICE);
+    (void) level;
 }
 
 /* LIBBSD PHY DRIVER */

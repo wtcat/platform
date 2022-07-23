@@ -52,6 +52,7 @@
 
 #if defined(CONFIGURE_SHELL_COMMAND_CLEAR)
 static int shell_main_clear(int argc, char *argv[]) {
+    (void) argv;
     if (argc > 1)
         return -EINVAL;
     SHELL_VT100_CMD(SHELL_VT100_CURSORHOME);
@@ -94,6 +95,7 @@ static struct rtems_shell_cmd_tt rtems_rtl_command = {
 #if defined(CONFIGURE_SHELL_COMMAND_REBOOT)
 static int shell_main_reboot(int argc, char *argv[]) {
     extern void bsp_reset(void);
+    (void) argv;
     if (argc > 1)
         return -EINVAL;
     bsp_reset();

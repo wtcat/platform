@@ -122,14 +122,14 @@ TEMPLATE_RESOURCE(tpic2810, "ti,tpic2810", DRVMGR_BUS_TYPE_I2C, i2c2,
 /*
  * SPI
  */
-PLATFORM_RESOURCE(spi1, "ti,am4372-mcspi",
-  	TRN("REG0", DRVMGR_KT_INT, 0x481a0000),
-	TRN("IRQ0", DRVMGR_KT_INT, nIRQ(125)),
-	TRN("CLKCTRL", DRVMGR_KT_INT, PER_REG(0x508)),
-	TRN("mode", DRVMGR_KT_INT, 0),
-	TRN("speed", DRVMGR_KT_INT, 48000000),
-	TRN("word-length", DRVMGR_KT_INT, 16)
-);
+// PLATFORM_RESOURCE(spi1, "ti,am4372-mcspi",
+//   	TRN("REG0", DRVMGR_KT_INT, 0x481a0000),
+// 	TRN("IRQ0", DRVMGR_KT_INT, nIRQ(125)),
+// 	TRN("CLKCTRL", DRVMGR_KT_INT, PER_REG(0x508)),
+// 	TRN("mode", DRVMGR_KT_INT, 0),
+// 	TRN("speed", DRVMGR_KT_INT, 48000000),
+// 	TRN("word-length", DRVMGR_KT_INT, 16)
+// );
 
 
 /*

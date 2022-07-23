@@ -66,12 +66,14 @@ static int gpio_keys_init(struct drvmgr_dev *dev) {
     ret = drvmgr_interrupt_register(dev, priv->pin, dev->name, 
         gpio_keys_isr, priv);
     if (ret) {
-        printk("Error***(%s): install pin(%d) isr failed: %d\n", __func__, ret);
+        printk("Error***(%s): install pin(%d) isr failed: %d\n", 
+            __func__, priv->pin, ret);
         goto _free;
     }
     ret = gpiod_configure(dev->parent->dev, priv->pin, GPIO_INTR(GPIO_EDGE_BOTH));
     if (ret) {
-        printk("Error***(%s): configure pin(%d) failed: %d\n", __func__, ret);
+        printk("Error***(%s): configure pin(%d) failed: %d\n", 
+            __func__, priv->pin, ret);
         goto _unregister;
     }
     printk("gpio pin-number: %d\n", (int)priv->pin);

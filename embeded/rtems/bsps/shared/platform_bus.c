@@ -164,6 +164,8 @@ static int platform_bus_intr_unregister(struct drvmgr_dev *dev, int index,
 }
 	
 static int platform_bus_intr_clear(struct drvmgr_dev *dev, int index) {
+	(void) dev;
+	(void) index;
 	return DRVMGR_FAIL;
 }
 
@@ -190,11 +192,16 @@ static int platform_bus_intr_set_affinity(struct drvmgr_dev *dev,
 
 static int platform_bus_get_params(struct drvmgr_dev *dev, 
 	struct drvmgr_bus_params *param) {
+	(void) dev;
+	(void) param;
 	return DRVMGR_FAIL;
 }
 	
 static int platform_bus_get_freq(struct drvmgr_dev *dev, int no, 
 	unsigned int *freq) {
+	(void) dev;
+	(void) no;
+	(void) freq;
 	return DRVMGR_FAIL;
 }
 
@@ -205,15 +212,15 @@ int platform_dev_register(struct drvmgr_bus *parent,
 	drvmgr_alloc_dev(&dev, sizeof(struct dev_private) + nr * sizeof(short));
 	struct dev_private *priv = device_get_private(dev);
 	if (platform_reg_resource_get((struct drvmgr_key *)r->keys, 0, &priv->base)) {
-		printk(DRVMGR_WARN "%s not found \"REG(0)\" resource(%s)\n", 
-			r->name?: r->compatible);
+		printk(DRVMGR_WARN "%s not found \"REG(0)\" resource\n", 
+			r->name? r->name: r->compatible);
 		free(dev);
 		return -DRVMGR_ENORES;
 	}
 	for (int i = 0; i < nr; i++) {
 		unsigned int irqno;
 		if (platform_irq_resource_get((struct drvmgr_key *)r->keys, i, &irqno)) {
-			printk(DRVMGR_WARN "%s not found \"IRQ%d\" resource(%s)\n", 
+			printk(DRVMGR_WARN "%s not found \"IRQ%d\" resource\n", 
 				r->name?: r->compatible, i);
 			free(dev);
 			return -DRVMGR_ENORES;

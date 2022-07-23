@@ -188,6 +188,7 @@ size_t GetThreadCount() {
 size_t GetThreadCount() {
   size_t ntask = 0;
   rtems_task_iterate([](rtems_tcb *tcb, void *arg)->bool { 
+    (void) tcb;
     size_t *ptr = (size_t *)arg;
     ++(*ptr);
     return true;

@@ -10,7 +10,8 @@
 const uintptr_t __stack_chk_guard = 0xDEADBEEF;
 
 void __stack_chk_fail(void) {
-    rtems_panic("StackCheckError***: Victim(%p)\n", __builtin_return_address(0));
+    rtems_panic("\nError***: Function(%p) stack has been destroy!\n", 
+        __builtin_return_address(0));
 	__builtin_unreachable();
 }
 

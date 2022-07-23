@@ -218,7 +218,7 @@ static int __notrace unwind_execute_instruction(unwind_control_block_t *ucb) {
 		} else if ((instruction & 0xf0) == 0xa0) {
 			/* pop r4-r[4+nnn] or pop r4-r[4+nnn], r14*/
 			vsp = (uint32_t *)ucb->vrs[13];
-			for (reg = 4; reg <= (instruction & 0x07) + 4; ++reg)
+			for (reg = 4; reg <= (uint32_t)(instruction & 0x07) + 4; ++reg)
 				ucb->vrs[reg] = *vsp++;
 			if (instruction & 0x08)
 				ucb->vrs[14] = *vsp++;
@@ -349,7 +349,7 @@ static void __notrace dump_stack(rtems_printer *printer, unsigned long sp,
 	}
 	rtems_printf(printer, "\n[Stack Dump] =>\n");
 	while (sp < top) {
-		rtems_printf(printer, "0x%x: 0x%x\n", sp, *(uint32_t *)sp);
+		rtems_printf(printer, "0x%08lx: 0x%08lx\n", sp, *(unsigned long *)sp);
 		sp += sizeof(void *);
 	}
 }

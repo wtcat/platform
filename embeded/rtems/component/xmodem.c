@@ -157,6 +157,7 @@ static int xm_putc(int fd, int c) {
 
 static ssize_t xm_read(int fd, void *buffer, size_t size, 
     struct termios *t) {
+    (void) size;
     void *ptr = buffer;
     int len = 0;
     t->c_cc[VTIME] = 0;
@@ -201,12 +202,12 @@ static int xm_receive(struct param_struct *param) {
     int c, len = 0;
     int retry = 64;
     int retrans = MAXRETRANS;
-    struct termios t_old, t_new;
     size_t packet_size;
     int fd;
     int ret = 0;
     int fp = 0;
     int file;
+    uint8_t tvar;
     
     fcache = rtems_malloc(XMODE_FCACHE_SIZE);
     if (fcache == NULL)
@@ -276,9 +277,10 @@ static int xm_receive(struct param_struct *param) {
         trychar = 0;
         packet_size = bufsz + (crc? 1: 0) + 3;
         xbuff[0] = c;
-        if (xm_read(fd, xbuff+1, packet_size, &param->t_new) != packet_size)
+        if (xm_read(fd, xbuff+1, packet_size, &param->t_new) != (ssize_t)packet_size)
             goto reject;
-        if (xbuff[1] == (uint8_t)(~xbuff[2]) && 
+        tvar = ~xbuff[2];
+        if (xbuff[1] == tvar && 
            (xbuff[1] == packetno || xbuff[1] == (uint8_t)packetno-1) &&
             xm_check(&xbuff[3], bufsz, crc)) {
             if (xbuff[1] == packetno) {
@@ -418,7 +420,7 @@ start_trans:
                 packet_size = bufsz + 4 + (crc? 1: 0);
 				for (retry = 0; retry < MAXRETRANS; retry++) {
                     if (xm_write(fd, xbuff, packet_size, &param->t_new) 
-                        != packet_size) {
+                        != (ssize_t)packet_size) {
                         continue;
                     }
                     c = xm_getc(fd);
@@ -466,7 +468,6 @@ start_trans:
 	} 
 _exit:
     xm_input_flush(fd);
-_close:
     XLOG("%s\n", err_code_text[ret]);
     return ret;
 }
@@ -508,10 +509,9 @@ static int shell_main_xm(int argc, char *argv[]) {
     struct param_struct param;
     struct getopt_data getopt_reent;
     const char *fname = NULL;
-    off_t offset = 0;
     int ch;
     int oflag;
-    int ret;
+    int ret = -EINVAL;
 
     if (argc < 2) {
         printf(help_usage);
@@ -566,7 +566,7 @@ static int shell_main_xm(int argc, char *argv[]) {
         ret = fn_exec(&param);
         xm_close_console(&param);
     }
-_close_f:
+
     XLOG_END();
     close(param.file);
     return ret;

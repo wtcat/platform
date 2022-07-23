@@ -20,6 +20,7 @@
 
 void bsp_fatal_extension(rtems_fatal_source source, bool unused,
     rtems_fatal_code code) {
+    (void) unused;
 #if BSP_VERBOSE_FATAL_EXTENSION
     Thread_Control *executing;
     const char* TYPE = "*** FATAL ***";

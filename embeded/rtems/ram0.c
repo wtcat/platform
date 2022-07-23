@@ -16,7 +16,7 @@ static const struct ram_block ramblk_cfg[] = {
 int ramblk_init(void) {
     rtems_status_code sc = RTEMS_NOT_DEFINED;
     char devname[] = {"/dev/ramX"};
-    for (int i = 0; i < RTEMS_ARRAY_SIZE(ramblk_cfg); i++) {
+    for (int i = 0; i < (int)RTEMS_ARRAY_SIZE(ramblk_cfg); i++) {
         uint32_t blksz = ramblk_cfg[i].blksz;
         uint32_t blkcnt = ramblk_cfg[i].capacity / blksz;
         devname[8] = i + '0';
