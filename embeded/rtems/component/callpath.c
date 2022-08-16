@@ -105,7 +105,7 @@ static int __notrace callpath_pop(struct call_path *path, uintptr_t addr) {
 static int __notrace callpath_init(struct call_path *path) {
 	if (path == NULL)
 		return -EINVAL;
-	memset(path, 0, sizeof(path));
+	memset(path, 0, sizeof(*path));
 	path->magic = CALLPATH_MAGIC;
 	path->ptr = CALLPATH_MAX_DEEP;
 	return 0;
@@ -247,7 +247,7 @@ int __notrace callpath_print(void *thread, const callpath_printer_t *printer) {
 		uintptr_t addr = temp_path.nodes[i].addr & ~0x1ul;
 #if defined(__rtems__)
 		const char *sym = kernel_symbols(addr);
-		CALLPATH_PRINT(printer, " [%2d] - <0x%lx>@ %s\n", lvl, addr, sym);
+		CALLPATH_PRINT(printer, " [%2d] - <0x%x>@ %s\n", lvl, addr, sym);
 #else
 		CALLPATH_PRINT(printer, " 0x%08x", addr);
 #endif

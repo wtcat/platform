@@ -44,7 +44,7 @@ static void test_timer_isr(void *arg) {
 
 TEST_F(cc_timlib_test, open_close) {
     struct drvmgr_dev *dev;
-    struct timlib_priv *t;
+    // struct timlib_priv *t;
     dev = timlib_open(DEV_NAME);
     ASSERT_TRUE(dev != nullptr);
     ASSERT_TRUE(t_->state == 1);

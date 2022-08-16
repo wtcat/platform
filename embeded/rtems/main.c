@@ -38,6 +38,8 @@ static rtems_binary_semaphore bsd_completed_sem =
 static rtems_status_code 
 media_listener(rtems_media_event event, rtems_media_state state, 
     const char *src, const char *dest, void *arg) {
+    (void) src;
+    (void) arg;
     if (event == RTEMS_MEDIA_EVENT_MOUNT) {
       if (state == RTEMS_MEDIA_STATE_SUCCESS) 
         symlink(dest, "/home");
@@ -107,6 +109,7 @@ int RTEMS_WEAK app_main(void) {
 }
 
 static rtems_task Init(rtems_task_argument arg) {
+  (void) arg;
   int err = ramblk_init();
   if (err) 
     SYS_ERROR("Create ramdisk failed: %d\n", err);

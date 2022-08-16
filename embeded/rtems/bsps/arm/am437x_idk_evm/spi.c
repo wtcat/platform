@@ -216,6 +216,8 @@ static void am437x_spi_done(struct spi_private *priv) {
 
 static int am437x_spi_configure(struct spi_private *priv,
     uint32_t speed_hz, uint32_t mode, uint8_t cs) {
+    (void) mode;
+    (void) cs;
     uint32_t div = priv->bus.max_speed_hz / speed_hz;
     if (div && (div & (div - 1)) == 0) {
         uint32_t rv = readl_relaxed(priv->base + AM335X_SPI_CH0CONF);
@@ -341,7 +343,7 @@ static int am437x_spi_probe(struct drvmgr_dev *dev) {
 	union drvmgr_key_value *prop;
 	struct spi_private *spi;
     struct dev_private *devp;
-	int ret;
+	int ret = -EINVAL;
     spi = rtems_calloc(1, sizeof(struct spi_private));
     if (spi == NULL) 
         return -DRVMGR_NOMEM;

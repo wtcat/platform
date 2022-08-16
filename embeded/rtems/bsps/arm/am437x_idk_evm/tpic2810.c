@@ -43,10 +43,8 @@ static const struct gpio_operations tpic2810_gpio_ops = {
 };
 
 static int tpic2810_probe(struct drvmgr_dev *dev) {
-    union drvmgr_key_value *prop;
     struct dev_private *devp;
     struct tpic2810_priv *priv;
-	int ret;
     priv = rtems_calloc(1, sizeof(struct tpic2810_priv));
     if (priv == NULL) {
         printk("Error***(%s): no more memory\n", __func__);
@@ -60,9 +58,6 @@ static int tpic2810_probe(struct drvmgr_dev *dev) {
     priv->ops = &tpic2810_gpio_ops;
     priv->ov = 0;
 	return 0;
-_free:
-    free(priv);
-    return 0;
 }
 
 static const struct dev_id id_table[] = {

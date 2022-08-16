@@ -77,7 +77,7 @@ static void print_buffer(const rtems_printer *printer, const char *addr,
 	if (linelen < 1)
 		linelen = DEFAULT_LINE_LENGTH_BYTES / width;
 
-	if (disp_addr == -1)
+	if (disp_addr == (unsigned long)-1)
 		disp_addr = (unsigned long)addr;
 
 	while (count) {

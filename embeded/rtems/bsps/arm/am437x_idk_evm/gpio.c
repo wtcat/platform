@@ -208,6 +208,7 @@ static int gpio_bus_getport(struct drvmgr_dev *dev, uint32_t mask,
 }
 
 static void gpio_bus_default_isr(void *arg) {
+	(void) arg;
 	printk("Please install GPIO ISR\n");
 }
 
@@ -217,6 +218,7 @@ static int gpio_bus_unite(struct drvmgr_drv *drv, struct drvmgr_dev *dev) {
 
 static int gpio_bus_intr_register(struct drvmgr_dev *dev, int index, 
 	const char *info, drvmgr_isr isr, void *arg) {
+	(void) info;
 	struct gpio_priv *platdata = dev->parent->dev->priv;
 	if (index >= GPIO_PAD_PINS)
 		return -DRVMGR_EINVAL;
@@ -231,6 +233,8 @@ static int gpio_bus_intr_register(struct drvmgr_dev *dev, int index,
 
 static int gpio_bus_intr_unregister(struct drvmgr_dev *dev, int index, 
 	drvmgr_isr isr, void *arg) {
+	(void) isr;
+	(void) arg;
 	struct gpio_priv *platdata = dev->parent->dev->priv;
 	if (index >= GPIO_PAD_PINS)
 		return -DRVMGR_EINVAL;

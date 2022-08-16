@@ -262,6 +262,8 @@ static bool ns16550_open(struct rtems_termios_tty *tty,
     rtems_termios_device_context *base,
     struct termios *term,
     rtems_libio_open_close_args_t *args) {
+    (void) term;
+    (void) args;
     struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
         struct ns16550_priv, base);
     platdata->tty = tty;
@@ -274,6 +276,8 @@ static bool ns16550_open(struct rtems_termios_tty *tty,
 static void ns16550_close(struct rtems_termios_tty *tty,
     rtems_termios_device_context *base,
     rtems_libio_open_close_args_t *args) {
+    (void) args;
+    (void) tty;
     struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
         struct ns16550_priv, base);
     writeb(NS16550_DISABLE_ALL_INTR, 
@@ -285,7 +289,6 @@ static void ns16550_putc_poll(rtems_termios_device_context *base,
     struct ns16550_priv *platdata = RTEMS_CONTAINER_OF(base, 
         struct ns16550_priv, base);
     rtems_interrupt_lock_context ctx;
-    uint32_t status;
     uint8_t mask = readb(platdata->port + NS16550_INTERRUPT_ENABLE);
     do {
         rtems_termios_device_lock_acquire(base, &ctx);

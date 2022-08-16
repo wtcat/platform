@@ -336,7 +336,7 @@ static const struct edmacc_param dummy_paramset = {
 static void edma_desc_initialize(void) {
 	struct edma_descpool *p = &desc_pool;
 	rtems_mutex_init(&p->lock, "edma-desc");
-	for (int i = 0; i < RTEMS_ARRAY_SIZE(p->descs); i++) {
+	for (int i = 0; i < (int)RTEMS_ARRAY_SIZE(p->descs); i++) {
 		*(struct edma_desc **)&p->descs[i] = p->freelist;
 		p->freelist = &p->descs[i];
 	}
@@ -533,7 +533,7 @@ static int edma_alloc_slot(struct edma_cc *ecc, int slot) {
 	if (slot >= 0) {
 		slot = EDMA_CHAN_SLOT(slot);
 		/* Requesting entry paRAM slot for a HW triggered channel. */
-		if (ecc->chmap_exist && slot < ecc->num_channels)
+		if (ecc->chmap_exist && slot < (int)ecc->num_channels)
 			slot = EDMA_SLOT_ANY;
 	}
 
@@ -545,14 +545,14 @@ static int edma_alloc_slot(struct edma_cc *ecc, int slot) {
 		for (;;) {
 			slot = find_next_zero_bit(ecc->slot_inuse,
 						  ecc->num_slots, slot);
-			if (slot == ecc->num_slots)
+			if (slot == (int)ecc->num_slots)
 				return -ENOMEM;
-			if (!test_and_set_bit(slot, ecc->slot_inuse))
+			if (!test_and_set_bit(slot, (long *)ecc->slot_inuse))
 				break;
 		}
-	} else if (slot >= ecc->num_slots) {
+	} else if (slot >= (int)ecc->num_slots) {
 		return -EINVAL;
-	} else if (test_and_set_bit(slot, ecc->slot_inuse)) {
+	} else if (test_and_set_bit(slot, (long *)ecc->slot_inuse)) {
 		return -EBUSY;
 	}
 
@@ -715,7 +715,7 @@ static void edma_assign_channel_eventq(struct edma_chan *echan,
 	/* default to low priority queue */
 	if (eventq_no == EVENTQ_DEFAULT)
 		eventq_no = ecc->default_queue;
-	if (eventq_no >= ecc->num_tc)
+	if ((unsigned int)eventq_no >= ecc->num_tc)
 		return;
 
 	eventq_no &= 7;
@@ -982,7 +982,7 @@ static int edma_config_pset(struct dma_chan *chan, struct edma_pset *epset,
 		absync = true;
 		bcnt = burst;
 		ccnt = dma_length / (acnt * bcnt);
-		if (ccnt > (SZ_64K - 1)) {
+		if (ccnt > (int)(SZ_64K - 1)) {
 			dev_err("Exceeded max SG segment size\n");
 			return -EINVAL;
 		}
@@ -1041,6 +1041,7 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
 	struct dma_chan *chan, struct scatterlist *sgl,
 	unsigned int sg_len, enum dma_transfer_direction direction,
 	unsigned long tx_flags, void *context) {
+	(void) context;
 	struct edma_chan *echan = to_edma_chan(chan);
 	struct edma_desc *edesc;
 	enum dma_slave_buswidth dev_width;
@@ -1055,11 +1056,11 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
 		return NULL;
 
 	if (direction == DMA_DEV_TO_MEM) {
-		src_addr = echan->cfg.src_addr;
+		
 		dev_width = echan->cfg.src_addr_width;
 		burst = echan->cfg.src_maxburst;
 	} else if (direction == DMA_MEM_TO_DEV) {
-		dst_addr = echan->cfg.dst_addr;
+		
 		dev_width = echan->cfg.dst_addr_width;
 		burst = echan->cfg.dst_maxburst;
 	} else {
@@ -1093,10 +1094,13 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
 			}
 		}
 
-		if (direction == DMA_DEV_TO_MEM)
+		if (direction == DMA_DEV_TO_MEM) {
 			dst_addr = sgl[i].dma_address;
-		else
+			src_addr = echan->cfg.src_addr;
+		} else {
+			dst_addr = echan->cfg.dst_addr;
 			src_addr = sgl[i].dma_address;
+		}
 		/* Configure PaRAM sets for each SG */
 		ret = edma_config_pset(chan, &edesc->pset[i], src_addr,
 			dst_addr, burst, dev_width, sgl->length, direction); 
@@ -1145,7 +1149,7 @@ static struct dma_async_tx_descriptor *edma_prep_dma_memcpy(
 	int ret, nslots;
 	struct edma_desc *edesc;
 	struct edma_chan *echan = to_edma_chan(chan);
-	unsigned int width, pset_len, array_size;
+	unsigned int width, pset_len;
 
 	if (unlikely(!echan || !len))
 		return NULL;
@@ -1154,17 +1158,17 @@ static struct dma_async_tx_descriptor *edma_prep_dma_memcpy(
 		return NULL;
 
 	/* Align the array size (acnt block) with the transfer properties */
-	switch (__builtin_ctzl((src | dest | len))) {
-	case 0:
-		array_size = SZ_32K - 1;
-		break;
-	case 1:
-		array_size = SZ_32K - 2;
-		break;
-	default:
-		array_size = SZ_32K - 4;
-		break;
-	}
+	// switch (__builtin_ctzl((src | dest | len))) {
+	// case 0:
+	// 	array_size = SZ_32K - 1;
+	// 	break;
+	// case 1:
+	// 	array_size = SZ_32K - 2;
+	// 	break;
+	// default:
+	// 	array_size = SZ_32K - 4;
+	// 	break;
+	// }
 
 	/* if (len < SZ_64K) */ {
 		/*
@@ -1296,7 +1300,7 @@ edma_prep_dma_interleaved(struct dma_chan *chan,
 		return NULL;
 	}
 
-	if (src_bidx > SZ_64K || dst_bidx > SZ_64K)
+	if (src_bidx > (int)SZ_64K || dst_bidx > (int)SZ_64K)
 		return NULL;
 
 	edesc = edma_desc_allocate(&echan->vchan);
@@ -1558,7 +1562,6 @@ static void dma_irq_handler(void *data) {
 static void edma_error_handler(struct edma_chan *echan) {
 	struct edma_cc *ecc = echan->ecc;
 	rtems_interrupt_lock_context flags;
-	struct edma_desc *edesc;
 	struct edmacc_param p;
 	int err;
 
@@ -1722,7 +1725,7 @@ err_slot:
 /* Free channel resources */
 static void edma_free_chan_resources(struct dma_chan *chan) {
 	struct edma_chan *echan = to_edma_chan(chan);
-	struct drvmgr_dev *dev = echan->ecc->dev;
+	// struct drvmgr_dev *dev = echan->ecc->dev;
 	int i;
 
 	/* Terminate transfers */
@@ -1860,7 +1863,7 @@ static uint32_t edma_residue(struct edma_desc *edesc) {
 static enum dma_status edma_tx_status(struct dma_chan *chan,
 	dma_cookie_t cookie, struct dma_tx_state *txstate) {
 	struct edma_chan *echan = to_edma_chan(chan);
-	struct dma_tx_state txstate_tmp;
+	// struct dma_tx_state txstate_tmp;
 	enum dma_status ret;
 	rtems_interrupt_lock_context flags;
 
@@ -1922,8 +1925,9 @@ static bool edma_is_memcpy_channel(int ch_num, int *memcpy_channels) {
 				 BIT(DMA_SLAVE_BUSWIDTH_4_BYTES))
 
 static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode) {
+	(void) legacy_mode;
 	struct dma_device *s_ddev = &ecc->dma_slave;
-	struct dma_device *m_ddev = NULL;
+	// struct dma_device *m_ddev = NULL;
 	int *memcpy_channels = ecc->info->memcpy_channels;
 	int i, j;
 
@@ -1990,8 +1994,8 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode) {
 	}
 #endif
 
-ch_setup:
-	for (i = 0; i < ecc->num_channels; i++) {
+// ch_setup:
+	for (i = 0; i < (int)ecc->num_channels; i++) {
 		struct edma_chan *echan = &ecc->slave_chans[i];
 		echan->ch_num = EDMA_CTLR_CHAN(ecc->id, i);
 		echan->ecc = ecc;
@@ -2011,6 +2015,7 @@ ch_setup:
 
 static int edma_setup_from_hw(struct drvmgr_dev *dev, struct edma_soc_info *pdata,
 	struct edma_cc *ecc) {
+	(void) dev;
 	int i;
 	uint32_t value, cccfg;
 	char (*queue_priority_map)[2];
@@ -2061,7 +2066,7 @@ static int edma_setup_from_hw(struct drvmgr_dev *dev, struct edma_soc_info *pdat
 	if (!queue_priority_map)
 		return -ENOMEM;
 
-	for (i = 0; i < ecc->num_tc; i++) {
+	for (i = 0; i < (int)ecc->num_tc; i++) {
 		queue_priority_map[i][0] = i;
 		queue_priority_map[i][1] = i;
 	}
@@ -2076,6 +2081,8 @@ static int edma_setup_from_hw(struct drvmgr_dev *dev, struct edma_soc_info *pdat
 }
 
 static bool edma_filter_fn(struct dma_chan *chan, void *param) {
+	(void) chan;
+	(void) param;
 	bool match = false;
 #if 0
 	if (chan->drvmgr_dev->dev->driver == &edma_driver.driver) {
@@ -2099,8 +2106,8 @@ static int edma_probe(struct drvmgr_dev *dev) {
 	int8_t (*queue_priority_mapping)[2];
 	const uint32_t (*tptc)[3];
 	const uint32_t *pclk;
-	const int16_t (*reserved)[2];
-	int	i, irq;
+	// const int16_t (*reserved)[2];
+	// int	i, irq;
 	bool legacy_mode = true;
 	int ret;
 
@@ -2180,7 +2187,7 @@ static int edma_probe(struct drvmgr_dev *dev) {
 		}
 	}
 #endif
-	for (i = 0; i < ecc->num_slots; i++) {
+	for (int i = 0; i < (int)ecc->num_slots; i++) {
 		/* Reset only unused - not reserved - paRAM slots */
 		if (!test_bit(i, ecc->slot_inuse))
 			edma_write_slot(ecc, i, &dummy_paramset);
@@ -2210,13 +2217,13 @@ static int edma_probe(struct drvmgr_dev *dev) {
 	queue_priority_mapping = info->queue_priority_mapping;
 	if (!ecc->legacy_mode) {
 		int lowest_priority = 0;
-		unsigned int array_max;
+		// unsigned int array_max;
 		ecc->tc_list = rtems_calloc(ecc->num_tc, sizeof(*ecc->tc_list));
 		if (!ecc->tc_list) {
 			ret = -ENOMEM;
 			goto err_reg1;
 		}
-		for (i = 0; i < ecc->num_tc; i++) {
+		for (int i = 0; i < (int)ecc->num_tc; i++) {
 			if (!tptc[i][0])
 				break;
 			ecc->tc_list[i].node = tptc[i];
@@ -2243,7 +2250,7 @@ static int edma_probe(struct drvmgr_dev *dev) {
 	}
 
 	/* Event queue priority mapping */
-	for (i = 0; queue_priority_mapping[i][0] != -1; i++)
+	for (int i = 0; queue_priority_mapping[i][0] != -1; i++)
 		edma_assign_priority_to_queue(ecc, queue_priority_mapping[i][0],
 					      queue_priority_mapping[i][1]);
 	edma_write_array2(ecc, EDMA_DRAE, 0, 0, 0x0);
@@ -2254,7 +2261,7 @@ static int edma_probe(struct drvmgr_dev *dev) {
 	/* Init the dma drvmgr_dev and channels */
 	edma_dma_init(ecc, legacy_mode);
 
-	for (i = 0; i < ecc->num_channels; i++) {
+	for (int i = 0; i < (int)ecc->num_channels; i++) {
 		/* Do not touch reserved channels */
 		if (!test_bit(i, ecc->channels_mask))
 			continue;
@@ -2277,10 +2284,10 @@ err_reg1:
 free_channels_mask:
 	if (ecc->channels_mask)
 		free(ecc->channels_mask);
-free_slot_inuse:
+// free_slot_inuse:
 	if (ecc->slot_inuse)
 		free(ecc->slot_inuse);
-free_slave_chans:
+// free_slave_chans:
 	if (ecc->slave_chans)
 		free(ecc->slave_chans);
 free_ecc:

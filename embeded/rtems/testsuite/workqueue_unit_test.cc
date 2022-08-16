@@ -38,6 +38,7 @@ static void __attribute__((noinline)) func_c(void) {
 }
 
 static void test_task_1(struct work_struct *work) {
+    (void) work;
     test_phase = 3;
     printf("<%s> start\n", __func__);
     SLEEP_MS(2000);
@@ -46,6 +47,7 @@ static void test_task_1(struct work_struct *work) {
 }
 
 static void test_task_2(struct work_struct *work) {
+    (void) work;
     printf("\n**************<%s> start\n", __func__);
     func_c();
     printf("****************<%s> end\n\n", __func__);
