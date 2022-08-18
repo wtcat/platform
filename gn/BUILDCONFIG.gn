@@ -115,3 +115,52 @@ template("component") {
     }
   }
 }
+
+# ==============================================================================
+# RTEMS application module
+# ==============================================================================
+template("rtems_rap") {
+    src_target = target_name
+    dst_target = "${target_name}_action"
+    source_set（target_name) {
+        forward_variables_from(invoker, "*", ["configs"])
+        if (defined(invoker.configs)) {
+            configs += invoker.configs
+        }
+    }
+    if (defined(invoker.libs)) {
+        LIBS = invoker.libs
+    } else {
+        LIBS = []
+    }
+    if (defined(invoker.lib_dirs)) {
+        LIBPATH = invoker.lib_dirs
+    } else {
+        LIBPATH = []
+    }
+    if (defined(invoker.output_format)) {
+        FORMAT = invoker.output_format
+    } else {
+        FORMAT = "rap"
+    }
+    if (defined(invoker.kernel)) {
+        KERNEL = invoker.kernel
+    } else {
+        KERNEL = "rtems"
+    }
+    input_path = rebase_path("${target_out_dir}")
+    action(dst_target) {
+        script = "//gn/utils/rap.py"
+        sources = ["$root_out_dir/${KERNEL}.elf"]
+        outputs = ["$root_out_dir/${target_name}.rap"]
+        args = [
+            "--base", rebase_path("${root_out_dir}/${KERNEL}.elf"),
+            "--input", "${input_path}",
+            "--output-format", "${FORMAT}",
+            "--output", rebase_path("${root_out_dir}/${target_name}.rap"),
+            "--libpath", "${LIBPATH}",
+            "--libs", "${LIBS}"
+        ]
+        deps = [":${src_target}"]
+    }
+}

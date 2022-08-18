@@ -4,7 +4,25 @@ import argparse
 import os
 import subprocess
 import sys
- 
+
+def find_files(path):
+    result_list = []
+    for root, ds, fs in os.walk(path):
+        for f in fs:
+            result_list.append(os.path.join(root, f))
+    return result_list
+
+def files_filter(path, *k):
+    flist = find_files(path)
+    filtered = []
+    for f in flist:
+        fext = os.path.splitext(f)
+        for ext in k:
+            if ext == fext[1]:
+                filtered.append(f)
+                break
+    return filtered
+
 def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--base',
@@ -27,13 +45,18 @@ def main():
                       metavar='FILE')        
   args = parser.parse_args()
 
-  command_string = 'rtems-ld --base {base} {input} --format {format}  --output {output} {libpath} {libs}'
+  # Find input object files
+  input_files = files_filter(args.input, '.c')
+  files_str = ''
+  for file in input_files:
+    files_str = file + ' '
+
+  # Construct command 
+  command_string = 'rtems-ld --base {base} {input} --format {format}  --output {output}'
   command = command_string.format(base   = args.base, 
-                                  input  = args.input,
+                                  input  = files_str,
                                   format = args.format, 
-                                  output = args.output, 
-                                  libpath = args.libpath,
-                                  libs = args.libs)
+                                  output = args.output)
   print("########", command)
   return subprocess.call(command, shell=True)
  
