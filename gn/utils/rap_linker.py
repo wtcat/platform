@@ -46,18 +46,32 @@ def main():
   args = parser.parse_args()
 
   # Find input object files
-  input_files = files_filter(args.input, '.c')
-  files_str = ''
+  input_files = files_filter(args.input, '.o')
+  files_str = ' '
   for file in input_files:
-    files_str = file + ' '
+    files_str = files_str + file + ' '
+
+  # Convert libs
+  if args.libs != '*':
+    dep_libs = ' -l' + args.libs
+  else:
+    dep_libs = ' '
+
+  # Convert libpath
+  if args.libpath != '*':
+    dep_path = ' -L' + args.libpath
+  else:
+    dep_path = ' '
 
   # Construct command 
-  command_string = 'rtems-ld --base {base} {input} --format {format}  --output {output}'
+  command_string = 'rtems-ld --base {base} {input} --out-format {format}  --output {output} {libs} {libpath}'
   command = command_string.format(base   = args.base, 
                                   input  = files_str,
                                   format = args.format, 
-                                  output = args.output)
-  print("########", command)
+                                  output = args.output,
+                                  libs   = dep_libs,
+                                  libpath = dep_path)
+  print('LinkCommand: ', command)
   return subprocess.call(command, shell=True)
  
 if __name__ == "__main__":
