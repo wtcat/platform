@@ -71,7 +71,7 @@ def main():
                                   output = args.output,
                                   libs   = dep_libs,
                                   libpath = dep_path)
-  print('LinkCommand: ', command)
+  # print('LinkCommand: ', command)
   return subprocess.call(command, shell=True)
  
 if __name__ == "__main__":

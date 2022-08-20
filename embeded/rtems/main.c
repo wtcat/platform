@@ -63,7 +63,7 @@ static int media_service_setup(void) {
 }
 #endif
 
-static int sysfile_create(const char *pathname, int mode,
+static int fsys_create(const char *pathname, int mode,
     const char *content) {
     if (access(pathname, F_OK) < 0) {
         return IMFS_make_linearfile(pathname, mode, 
@@ -74,18 +74,18 @@ static int sysfile_create(const char *pathname, int mode,
 
 static void environment_load(void) {
 #ifdef CONFIGURE_SCRIPT_CONTENT
-    if (!sysfile_create("/etc/start.joel", 0777, 
+    if (!fsys_create("/etc/start.joel", 0777, 
       CONFIGURE_SCRIPT_CONTENT)) {
         char *script[] = {"/etc/start.joel"};
       rtems_shell_script_file(0, script);
     }
 #endif
 #ifdef CONFIGURE_ETC_RC_CONF_CONTENT
-    sysfile_create("/etc/rc.conf", 0666, 
+    fsys_create("/etc/rc.conf", 0666, 
       CONFIGURE_ETC_RC_CONF_CONTENT);
 #endif
 #ifdef CONFIGURE_LIB_CONTENT
-    sysfile_create("/etc/libdl.conf", 0666, 
+    fsys_create("/etc/libdl.conf", 0666, 
       CONFIGURE_LIB_CONTENT);
 #endif
 }

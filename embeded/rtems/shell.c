@@ -9,7 +9,6 @@
 #include <rtems/shell.h>
 #include <rtems/imfs.h>
 #include <rtems/console.h>
-#include <rtems/rtl/rap-shell.h>
 
 #include <bsp/irq-info.h>
 
@@ -71,6 +70,8 @@ static rtems_shell_cmd_t shell_clear_command = {
 #endif /* CONFIGURE_SHELL_COMMAND_CLEAR */
 
 #if defined(CONFIGURE_SHELL_COMMAND_RAP)
+#include <rtems/rtl/rap-shell.h>
+
 static struct rtems_shell_cmd_tt rtems_rap_command = {
   .name     = "rap",
   .usage   = "Runtime load",
@@ -82,6 +83,8 @@ static struct rtems_shell_cmd_tt rtems_rap_command = {
 #endif /* CONFIGURE_SHELL_COMMAND_RAP */
 
 #if defined(CONFIGURE_SHELL_COMMAND_RTL)
+#include <rtems/rtl/rtl-shell.h>
+
 static struct rtems_shell_cmd_tt rtems_rtl_command = {
   .name     = "rtl",
   .usage   = "Runtime Linker",

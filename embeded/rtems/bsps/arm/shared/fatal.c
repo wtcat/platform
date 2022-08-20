@@ -38,11 +38,17 @@ void bsp_fatal_extension(rtems_fatal_source source, bool unused,
     #endif
     #endif //BSP_VERBOSE_FATAL_EXTENSION
 #if (BSP_PRINT_EXCEPTION_CONTEXT) || BSP_VERBOSE_FATAL_EXTENSION
-    if (source == RTEMS_FATAL_SOURCE_EXCEPTION) {
+    if (source == RTEMS_FATAL_SOURCE_EXCEPTION ||
+        source == INTERNAL_ERROR_CORE ) {
+    #if defined(CONFIGURE_BACKTRACE) || defined(CONFIGURE_FNTRACE)
         rtems_printer printer;
+    #endif
     #ifdef CONFIGURE_BACKTRACE
         rtems_print_printer_printk(&printer);
-        __stack_backtrace(&printer, (rtems_exception_frame *)code, NULL);
+        if (source == RTEMS_FATAL_SOURCE_EXCEPTION)
+            __stack_backtrace(&printer, (rtems_exception_frame *)code, NULL);
+        else
+            __stack_backtrace(&printer, NULL, NULL);
     #endif
     #ifdef CONFIGURE_FNTRACE
         rtems_print_printer_printk(&printer);
