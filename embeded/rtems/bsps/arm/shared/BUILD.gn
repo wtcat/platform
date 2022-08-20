@@ -1,17 +1,15 @@
 import("//gn/toolchain/rtems/rtems.gni")
 
 component("shared") {
-    defines = []
     sources = ["fatal.c"]
     if (use_backtrace) {
-        defines += ["CONFIGURE_BACKTRACE"]
         if (use_backtrace_unwind) {
             sources += ["unwind.c"]
         } else {
             sources += ["stacktrace.c"]
         }
     }
-    if (use_fntrace) {
-        defines += ["CONFIGURE_FNTRACE"]
-    }
+    configs = [
+        "//gn/config:backtrace"
+    ]
 }

@@ -23,7 +23,7 @@ executable("rtems") {
   sources = [
     "main.c",
     "shell.c",
-    "shell_mem.c",
+    "shell_misc.c",
     "ram0.c"
   ]
   deps = [
@@ -32,10 +32,12 @@ executable("rtems") {
     "component",
     "bsps/${target_cpu}/${target_board}:board"
   ]
+  configs += [
+    "//gn/config:backtrace"
+  ]
   if (use_testsuite) {
     deps += ["testsuite"]
   }
-
   if (use_libbsd) {
     defines += [
       "RTEMS_BSD_CONFIG_INIT",

@@ -357,7 +357,7 @@ static void __notrace dump_stack(rtems_printer *printer, unsigned long sp,
 static void __notrace dump_backtrace(rtems_printer *printer, unsigned long pc,
 	unsigned long fnaddr, int level) {
 	const char *sym = kernel_symbols(fnaddr);
-	rtems_printf(printer, " [%2d] - <0x%lx>@ %s\n", level, pc, sym);
+	rtems_printf(printer, " [%2d] - <%s + 0x%lx>@ 0x%lx\n", level, sym, pc - fnaddr, pc);
 }
 
 const char *__notrace unwind_kernel_symbols(unsigned long pc) {
@@ -370,12 +370,14 @@ const char *__notrace unwind_kernel_symbols(unsigned long pc) {
 
 void __notrace __stack_backtrace(rtems_printer *printer, CPU_Exception_frame *regs,
 	struct _Thread_Control *tsk) {
+	struct _Thread_Control *curr_thread;
 	const unwind_index_t *index;
 	backtrace_frame_t frame;
 	int level = 0;
 	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
+	curr_thread = _Thread_Get_executing();
 	if (tsk == NULL)
-		tsk = _Thread_Executing;
+		tsk = curr_thread;
 	if (regs) {
 		frame.fp = (unsigned long)regs->register_r11;
 		frame.sp = (unsigned long)regs->register_sp;
@@ -384,7 +386,7 @@ void __notrace __stack_backtrace(rtems_printer *printer, CPU_Exception_frame *re
 		/* PC might be corrupted, use LR in that case. */
 		if (!kernel_text_address((unsigned long)regs->register_pc))
 			frame.pc = (unsigned long)regs->register_lr;
-	} else if (tsk == _Thread_Executing) {
+	} else if (tsk == curr_thread) {
 		frame.fp = (unsigned long)__builtin_frame_address(0);
 		frame.sp = current_stack_pointer();
 		frame.lr = (unsigned long)__builtin_return_address(0);

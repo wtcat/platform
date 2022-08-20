@@ -1,0 +1,13 @@
+# Unit Test
+
+
+rtems_rap("test") {
+    # output_format = "elf"
+    kernel = "rtems"
+    defines = []
+    sources = [
+        "test_1.c"
+    ]
+    libs = ["m"]
+    
+}
