@@ -1,3 +1,6 @@
+# 
+# Copyright 2022 wtcat
+#
 import("//gn/toolchain/rtems/rtems.gni")
 import("//gn/common.gni")
 import("//gn/utils/objcopy.gni")
@@ -7,7 +10,10 @@ toolchain_prefix = "${target_cpu}-rtems${target_version}-"
 
 # Top-level project target
 group("all") {
-  deps = [":rtems"]
+  deps = [
+    ":rtems",
+    "//gn/utils:custom"
+  ]
   if (use_bin) {
     deps += [":binary"]
   }
@@ -108,27 +114,3 @@ action("postprocess") {
   deps = [":rtems"]
 }
 
-# Custom commands
-generated_file("custom") {
-  outputs = ["$root_build_dir/cmd/build.ninja"]
-  data_keys = ["content"]
-  deps = [
-    ":sysinit"
-  ]
-}
-
-group("sysinit") {
-  root_path = rebase_path("$root_out_dir")
-  metadata = {
-    content = []
-    content += [ 
-      "rule sysinit_cmd",
-      " command = rtems-exeinfo -I \$in",
-      " pool = console",
-      " description = Dump rtems sysinit section"
-    ]
-    content += [ 
-      "build sysinit: sysinit_cmd ${root_path}/rtems.elf"
-    ]
-  }
-}

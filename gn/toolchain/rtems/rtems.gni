@@ -49,5 +49,4 @@ if (use_libbsd) {
 declare_args() {
   target_board = ""
   target_version = 5
-  rtems_package_path = ""
 }

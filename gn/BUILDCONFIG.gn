@@ -119,7 +119,7 @@ template("component") {
 # ==============================================================================
 # RTEMS application module
 # ==============================================================================
-template("rtems_rap") {
+template("rtems_app") {
     if (defined(invoker.libs)) {
         LIBS = string_join(" -l", invoker.libs)
     } else {

@@ -1,0 +1,51 @@
+# 
+# Copyright 2022 wtcat
+#
+import("//gn/toolchain/rtems/rtems.gni")
+
+# Custom commands
+generated_file("custom") {
+  outputs = ["$root_build_dir/cmd/build.ninja"]
+  data_keys = ["content"]
+  deps = [
+    ":sysinit",
+    ":dtb"
+  ]
+}
+
+# System initialize 
+group("sysinit") {
+  root_path = rebase_path("$root_out_dir")
+  metadata = {
+    content = []
+    content += [ 
+      "rule sysinit_cmd",
+      " command = rtems-exeinfo -I \$in",
+      " description = Dump rtems sysinit section"
+    ]
+    content += [ 
+      "build sysinit: sysinit_cmd ${root_path}/rtems.elf"
+    ]
+  }
+}
+
+# Device tree
+group("dtb") {
+  if (use_devicetree) {
+    out_dir = rebase_path(root_out_dir)
+    dts_path = rebase_path("//embeded/rtems/bsps/${target_cpu}/dts")
+    inc_path = rebase_path("//embeded/rtems/include")
+    dtc_flags = "-i ${dts_path} -i ${inc_path}"
+    cpp_flags = "-I ${dts_path} -I ${inc_path} -nostdinc -undef -D__DTS__"
+    metadata = {
+      content = [ 
+        "rule dtb_cmd",
+        " command = cpp ${cpp_flags} -x assembler-with-cpp -o ${out_dir}/${target_board}.dts.tmp ${dts_path}/${target_board}.dts && dtc ${dtc_flags} -I dts -O dtb -o ${out_dir}/${target_board}.dtb ${out_dir}/${target_board}.dts.tmp",
+        " description = Generate device tree binary"
+      ]
+      content += [ 
+        "build dtb: dtb_cmd"
+      ]
+    }
+  }
+}
