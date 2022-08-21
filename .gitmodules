@@ -4,6 +4,3 @@
 [submodule "rtems-libbsd"]
 	path = rtems-libbsd
 	url = git://git.rtems.org/rtems-libbsd.git
-[submodule "embeded/ODrive"]
-	path = embeded/ODrive
-	url = https://github.com/odriverobotics/ODrive
