@@ -12,3 +12,6 @@ For example(AM437X):
 
 3> Generate compile_commands.json
     ninja -C out -t compdb cxx cc > compile_commands.json
+
+4> Generate device tree
+    ninja -C out/cmd dtb
