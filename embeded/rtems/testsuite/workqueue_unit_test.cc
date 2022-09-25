@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <rtems/sysinit.h>
 
-#include "component/workqueue.h"
+#include "base/workqueue.h"
 #include "gtest/gtest.h"
 
 #include "bsp/asm/stacktrace.h"
 #ifdef CONFIGURE_FNTRACE
-#include "component/callpath.h"
+#include "base/callpath.h"
 #endif
 
 #define K_MSEC(n)      WQ_MSEC(n)

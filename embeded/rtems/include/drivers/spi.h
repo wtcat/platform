@@ -2,12 +2,13 @@
  * CopyRight(c) 2022 wtcat
  */
 
-#ifndef BSP_SPID_H_
-#define BSP_SPID_H_
+#ifndef DRIVER_SPI_H_
+#define DRIVER_SPI_H_
 
 #include <rtems/thread.h>
 #include <dev/spi/spi.h>
-#include "bsp/platform_bus.h"
+
+#include "drivers/platform_bus.h"
 
 #ifdef __cplusplus
 extern "C"{
@@ -18,9 +19,9 @@ static inline ssize_t spi_master_transfer(struct drvmgr_dev *dev,
     spi_bus *bus = (spi_bus *)dev->priv;
     int err;
     rtems_recursive_mutex_lock(&bus->mutex);
-    err = bus->transfer(bus, &msgs, n);
+    err = bus->transfer(bus, msgs, n);
     rtems_recursive_mutex_unlock(&bus->mutex);
-    return err == 0? msg.len: -err;  
+    return err == 0? msgs->len: -err;  
 }
 
 static inline ssize_t spi_master_write(struct drvmgr_dev *dev, 
@@ -44,4 +45,4 @@ static inline ssize_t spi_master_read(struct drvmgr_dev *dev,
 #ifdef __cplusplus
 }
 #endif
-#endif /* BSP_SPID_H_ */
+#endif /* DRIVER_SPI_H_ */

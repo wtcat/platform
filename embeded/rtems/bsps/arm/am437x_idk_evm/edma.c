@@ -25,10 +25,10 @@
 #include <rtems/bspIo.h>
 #include <rtems/rtems/intr.h>
 
-#include "component/bitops.h"
-#include "component/minmax.h"
-#include "bsp/platform_bus.h"
-#include "bsp/io.h"
+#include "drivers/platform_bus.h"
+#include "drivers/mio.h"
+#include "base/bitops.h"
+#include "base/minmax.h"
 
 #undef LIST_HEAD
 #include "bsp/vdma.h"

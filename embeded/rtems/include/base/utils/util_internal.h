@@ -12,10 +12,10 @@
  * Repetitive or obscure helper macros needed by sys/util.h.
  */
 
-#ifndef COMPONENT_UTIL_INTERNAL_H_
-#define COMPONENT_UTIL_INTERNAL_H_
+#ifndef BASE_UTIL_INTERNAL_H_
+#define BASE_UTIL_INTERNAL_H_
 
-#include "component/util_loops.h"
+#include "base/utils/util_loops.h"
 
 /* IS_ENABLED() helpers */
 
@@ -143,4 +143,4 @@
 #define MACRO_MC_14(m, a, ...) UTIL_CAT(m(a), MACRO_MC_13(m, __VA_ARGS__,))
 #define MACRO_MC_15(m, a, ...) UTIL_CAT(m(a), MACRO_MC_14(m, __VA_ARGS__,))
 
-#endif /* COMPONENT_UTIL_INTERNAL_H_ */
+#endif /* BASE_UTIL_INTERNAL_H_ */

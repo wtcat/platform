@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-#ifndef COMPONENT_MINMAX_H_
-#define COMPONENT_MINMAX_H_
+#ifndef BASE_MINMAX_H_
+#define BASE_MINMAX_H_
 
 #define __is_constexpr(x) __builtin_constant_p(x)
 
@@ -144,4 +144,4 @@
 #define swap(a, b) \
 	do { typeof(a) __tmp = (a); (a) = (b); (b) = __tmp; } while (0)
 
-#endif	/* COMPONENT_MINMAX_H_ */
+#endif	/* BASE_MINMAX_H_ */

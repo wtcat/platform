@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-#ifndef COMPONENT_COMPILER_H_
-#define COMPONENT_COMPILER_H_
+#ifndef BASE_COMPILER_H_
+#define BASE_COMPILER_H_
 
-#include "component/compiler_types.h"
+#include "base/toolchain/compiler_types.h"
 
 #ifndef ASM
 
@@ -235,4 +235,4 @@ static inline void *offset_to_ptr(const int *off)
 	compiletime_assert(__native_word(t),				\
 		"Need native word sized stores/loads for atomicity.")
 
-#endif /* COMPONENT_COMPILER_H_ */
+#endif /* BASE_COMPILER_H_ */

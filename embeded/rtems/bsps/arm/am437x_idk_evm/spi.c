@@ -4,8 +4,8 @@
 #include <rtems/bspIo.h>
 #include <dev/spi/spi.h>
 
-#include "bsp/platform_bus.h"
-#include "bsp/io.h"
+#include "drivers/platform_bus.h"
+#include "drivers/mio.h"
 
 struct spi_private {
     spi_bus bus;

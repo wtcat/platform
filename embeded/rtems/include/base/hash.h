@@ -9,8 +9,8 @@
 #ifndef COMPONENT_HASH_H_
 #define COMPONENT_HASH_H_
 
-#include "component/compiler.h"
-#include "component/bitops.h"
+#include "base/compiler.h"
+#include "base/bitops.h"
 
 #ifdef __cplusplus
 extern "C"{

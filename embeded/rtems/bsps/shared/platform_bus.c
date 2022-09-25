@@ -8,12 +8,10 @@
 
 #include <rtems/sysinit.h>
 #include <rtems/bspIo.h>
-
 #include <bsp.h>
 #include <bsp/irq-generic.h>
-#include <bsp/platform_bus.h>
 
-#include <drvmgr/drvmgr.h>
+#include "drivers/platform_bus.h"
 
 #define RES_NAME_SIZE 32
 

@@ -1,4 +1,7 @@
-#include "bsp/platform_bus.h"
+/*
+ * Copyright 2021-2022 wtcat
+ */
+#include "drivers/platform_bus.h"
 #include "bsp/board/pinctrl.h"
 
 /* Control Module */

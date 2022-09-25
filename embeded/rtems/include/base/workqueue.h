@@ -7,7 +7,7 @@
 #include <rtems.h>
 #include <rtems/scheduler.h>
 
-#include "component/timer_ii.h"
+#include "base/timer_ii.h"
 
 #ifdef __cplusplus
 extern "C"{

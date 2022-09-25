@@ -4,3 +4,7 @@
 [submodule "rtems-libbsd"]
 	path = rtems-libbsd
 	url = git://git.rtems.org/rtems-libbsd.git
+[submodule "embeded/thirdparty/lvgl"]
+	path = embeded/thirdparty/lvgl
+	url = https://github.com/lvgl/lvgl
+	branch = master

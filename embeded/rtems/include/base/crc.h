@@ -11,8 +11,8 @@
  * @brief CRC computation function
  */
 
-#ifndef COMPONENT_CRC_H_
-#define COMPONENT_CRC_H_
+#ifndef BASE_CRC_H_
+#define BASE_CRC_H_
 
 #include <sys/types.h>
 #include <stdbool.h>

@@ -104,7 +104,7 @@ static void libbsd_setup(void) {
 #endif/* __rtems_libbsd__ */
 }
 
-int RTEMS_WEAK app_main(void) {
+int RTEMS_WEAK rtems_main(void) {
   return 0;
 }
 
@@ -126,7 +126,7 @@ static rtems_task Init(rtems_task_argument arg) {
 #ifdef CONFIGURE_GDBSERVER
   rtems_debugger_register_tcp_remote();
 #endif
-  app_main();
+  rtems_main();
   rtems_task_exit();
 }
 

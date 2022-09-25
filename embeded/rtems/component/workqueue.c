@@ -10,8 +10,8 @@
 #include <rtems/score/assert.h>
 #include <rtems/sysinit.h>
 
-#include "component/atomic.h"
-#include "component/workqueue.h"
+#include "base/atomic.h"
+#include "base/workqueue.h"
 #include "bsp/board/sysconf.h"
 
 struct helper_work_struct {

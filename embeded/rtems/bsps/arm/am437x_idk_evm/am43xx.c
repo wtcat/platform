@@ -10,8 +10,9 @@
 #include <bsp/arm-cp15-start.h>
 #include <bsp/arm-a9mpcore-start.h>
 
-#include "bsp/io.h"
-#include "component/compiler.h"
+#include "base/compiler.h"
+#include "drivers/mio.h"
+
 
 #define PRM_DEVICE 0x44DF4000
 

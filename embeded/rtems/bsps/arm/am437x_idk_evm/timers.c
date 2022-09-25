@@ -1,9 +1,9 @@
 #include <rtems/bspIo.h>
 #include <rtems/malloc.h>
 
-#include "bsp/platform_bus.h"
+#include "drivers/platform_bus.h"
 #include "bsp/timlib.h"
-#include "bsp/io.h"
+#include "drivers/mio.h"
 
 struct dmtimer_priv {
     struct timlib_priv timer;

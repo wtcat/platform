@@ -200,7 +200,7 @@ struct dma_context {
 
 /* DMA operations */
 struct dma_operations {
-    int (*configure)(struct drvmgr_dev *dev, uint32_t channel,
+    int (*dma_configure)(struct drvmgr_dev *dev, uint32_t channel,
 			    struct dma_config *config); 
     int (*dma_reload)(struct drvmgr_dev *dev, uint32_t channel,
                 dma_addr_t src, dma_addr_t dst, size_t size);
@@ -244,7 +244,7 @@ static inline int dma_configure(struct drvmgr_dev *dev, uint32_t channel,
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
 	const struct dma_operations *ops = dmad_get_operations(dev);
-	return ops->configure(dev, channel, config);
+	return ops->dma_configure(dev, channel, config);
 }
 
 /**
@@ -265,8 +265,8 @@ static inline int dma_reload(struct drvmgr_dev *dev, uint32_t channel,
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
 	const struct dma_operations *ops = dmad_get_operations(dev);
-	if (ops->reload)
-		return ops->reload(dev, channel, src, dst, size);
+	if (ops->dma_reload)
+		return ops->dma_reload(dev, channel, src, dst, size);
 	return -ENOSYS;
 }
 
@@ -288,7 +288,7 @@ static inline int dma_start(struct drvmgr_dev *dev, uint32_t channel) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
 	const struct dma_operations *ops = dmad_get_operations(dev);
-	return ops->start(dev, channel);
+	return ops->dma_start(dev, channel);
 }
 
 /**
@@ -308,7 +308,7 @@ static inline int dma_stop(struct drvmgr_dev *dev, uint32_t channel) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
 	const struct dma_operations *ops = dmad_get_operations(dev);
-	return ops->stop(dev, channel);
+	return ops->dma_stop(dev, channel);
 }
 
 /**
@@ -328,8 +328,8 @@ static inline int dma_chan_filter(struct drvmgr_dev *dev,
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
     const struct dma_operations *ops = dmad_get_operations(dev);
-	if (ops->chan_filter) 
-		return ops->chan_filter(dev, channel, filter_param);
+	if (ops->dma_chan_filter) 
+		return ops->dma_chan_filter(dev, channel, filter_param);
 	return -ENOSYS;
 }
 
@@ -352,8 +352,8 @@ static inline int dma_get_status(struct drvmgr_dev *dev, uint32_t channel,
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
     const struct dma_operations *ops = dmad_get_operations(dev);
-	if (ops->get_status) 
-		return ops->get_status(dev, channel, stat);
+	if (ops->dma_get_status) 
+		return ops->dma_get_status(dev, channel, stat);
 	return -ENOSYS;
 }
 
@@ -406,8 +406,8 @@ static inline int dma_request_channel(struct drvmgr_dev *dev,
 	for (i = 0; i < dma_ctx->dma_channels; i++) {
 		if (!atomic_test_and_set_bit(dma_ctx->atomic, i)) {
 			channel = i;
-			if (ops->chan_filter &&
-			    !ops->chan_filter(dev, channel, filter_param)) {
+			if (ops->dma_chan_filter &&
+			    !ops->dma_chan_filter(dev, channel, filter_param)) {
 				atomic_clear_bit(dma_ctx->atomic, channel);
 				continue;
 			}

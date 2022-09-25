@@ -6,9 +6,10 @@
 #include <rtems/irq-extension.h>
 
 #include <bsp.h>
-#include "bsp/platform_bus.h"
-#include "bsp/io.h"
-#include "bsp/gpiod.h"
+
+#include "drivers/mio.h"
+#include "drivers/gpio.h"
+#include "drivers/platform_bus.h"
 
 #define GPIO_PAD_PINS 32
 struct gpio_entry {
@@ -17,7 +18,6 @@ struct gpio_entry {
 };
 
 struct gpio_priv {
-	const struct gpio_operations *ops;
 	struct gpio_entry enties[GPIO_PAD_PINS];
 	rtems_interrupt_lock lock;
 	struct drvmgr_dev *dev;
@@ -331,9 +331,9 @@ static int gpio_bus_init(struct drvmgr_dev *dev) {
     devp = device_get_private(dev);
 	gpio_entry_init(platdata->enties);
 	rtems_interrupt_lock_initialize(&platdata->lock, dev->name);
+	devp->devops = &gpio_ops;
     platdata->base = devp->base;
 	platdata->dev = dev;
-	platdata->ops = &gpio_ops;
 	dev->priv = platdata;
     ret = drvmgr_interrupt_register(dev, 0, dev->name, 
 		gpio_bus_isr, platdata);

@@ -19,8 +19,8 @@
 #include <rtems/bspIo.h>
 #include <rtems/sysinit.h>
 
-#include "component/callpath.h"
-#include "component/compiler.h"
+#include "base/callpath.h"
+#include "base/compiler.h"
 
 #define CALLPATH_LOCKCTX_DECLARE \
 	rtems_interrupt_lock_context lock_context;

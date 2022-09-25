@@ -3,11 +3,12 @@
 
 #include <rtems/bspIo.h>
 #include <rtems/malloc.h>
-
 #include <bsp.h>
-#include "bsp/gpiod.h"
-#include "bsp/platform_bus.h"
-#include "component/workqueue.h"
+
+#include "base/workqueue.h"
+#include "drivers/gpio.h"
+#include "drivers/platform_bus.h"
+
 
 #define GPIO_DEBOUNCE_TIME WQ_MSEC(10)
 
@@ -60,7 +61,7 @@ static int gpio_keys_init(struct drvmgr_dev *dev) {
     }
     priv->code = (uint16_t)prop->i;
     priv->pin = (uint16_t)devp->base;
-    priv->parent = dev->parent->dev;
+    priv->parent = device_get_parent(dev);
 	dev->priv = priv;
     delayed_work_init(&priv->work, gpio_keys_work);
     ret = drvmgr_interrupt_register(dev, priv->pin, dev->name, 
@@ -70,14 +71,12 @@ static int gpio_keys_init(struct drvmgr_dev *dev) {
             __func__, priv->pin, ret);
         goto _free;
     }
-    ret = gpiod_configure(dev->parent->dev, priv->pin, GPIO_INTR(GPIO_EDGE_BOTH));
+    ret = gpiod_configure(priv->parent, priv->pin, GPIO_INTR(GPIO_EDGE_BOTH));
     if (ret) {
         printk("Error***(%s): configure pin(%d) failed: %d\n", 
             __func__, priv->pin, ret);
         goto _unregister;
     }
-    printk("gpio pin-number: %d\n", (int)priv->pin);
-    //gpiod_dump(dev->parent->dev);
 	return 0;
 _unregister:
     drvmgr_interrupt_unregister(dev, priv->pin, gpio_keys_isr, priv);

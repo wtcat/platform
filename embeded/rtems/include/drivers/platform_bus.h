@@ -23,13 +23,13 @@
  *
  */
 
-#ifndef DRVMGR_PLATFORM_BUS_H_
-#define DRVMGR_PLATFORM_BUS_H_
+#ifndef DRIVER_PLATFORM_BUS_H_
+#define DRIVER_PLATFORM_BUS_H_
 
 #include <rtems/sysinit.h>
 #include <drvmgr/drvmgr.h>
 
-#include "component/compiler.h"
+#include "base/compiler.h"
 
 #ifdef __cplusplus
 extern "C"{
@@ -130,6 +130,7 @@ struct bus_resource {
 };
 
 struct dev_private {
+	const void *devops;  /* Device operations */
 	const struct bus_resource *res;
 	unsigned int base;
 	unsigned short nirq;
@@ -164,6 +165,14 @@ static inline const char *platform_dev_filename(struct drvmgr_dev *dev) {
 
 static inline struct dev_private *device_get_private(struct drvmgr_dev *dev) {
 	return (struct dev_private *)(dev + 1);
+}
+
+static inline struct drvmgr_dev *device_get_parent(struct drvmgr_dev *dev) {
+	return dev->parent->dev;
+}
+
+static inline const void *device_get_operations(struct drvmgr_dev *dev) {
+	return *(void **)(dev + 1);
 }
 
 static inline int platform_irq_count_get(struct drvmgr_key *keys) {
@@ -232,5 +241,5 @@ devcie_get_property(struct drvmgr_dev *dev, const char *prop) {
 #ifdef __cplusplus
 }
 #endif
-#endif /* DRVMGR_PLATFORM_BUS_H_ */
+#endif /* DRIVER_PLATFORM_BUS_H_ */
 

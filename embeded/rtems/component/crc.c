@@ -7,7 +7,7 @@
  * Copyright (c) 2018 Workaround GmbH.
  * SPDX-License-Identifier: Apache-2.0
  */
-#include "component/crc.h"
+#include "base/crc.h"
 
 static const uint8_t crc8_ccitt_small_table[16] = {
 	0x00, 0x07, 0x0e, 0x09, 0x1c, 0x1b, 0x12, 0x15,

@@ -1,6 +1,10 @@
-#ifndef BSP_GPIOD_H_
-#define BSP_GPIOD_H_
+/*
+ * Copyright wtcat 2022
+ */
+#ifndef DRIVER_GPIOD_H_
+#define DRIVER_GPIOD_H_
 
+#include "drivers/platform_bus.h"
 #include <drvmgr/drvmgr.h>
 
 #ifdef __cplusplus
@@ -30,15 +34,16 @@ struct gpio_operations {
     int (*get_port)(struct drvmgr_dev *dev, uint32_t mask, uint32_t *value);
 	int (*set_pin)(struct drvmgr_dev *dev, int pin, int val);
 	int (*get_pin)(struct drvmgr_dev *dev, int pin);
+    int (*toggle_pin)(struct drvmgr_dev *dev, int pin);
 };
 
-#define GET_GPIOD_OPS(dev) (const struct gpio_operations *)(*(void **)(dev)->priv)
+#define gpiod_get_ops(_dev) (const struct gpio_operations *)device_get_operations(_dev)
 
 static inline int gpiod_configure(struct drvmgr_dev *dev, int pin, 
 	unsigned int mode) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
-    const struct gpio_operations *ops = GET_GPIOD_OPS(dev);
+    const struct gpio_operations *ops = gpiod_get_ops(dev);
     return ops->configure(dev, pin, mode);
 }
 
@@ -46,7 +51,7 @@ static inline int gpiod_write(struct drvmgr_dev *dev, uint32_t mask,
     uint32_t val) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
-    const struct gpio_operations *ops = GET_GPIOD_OPS(dev);
+    const struct gpio_operations *ops = gpiod_get_ops(dev);
     return ops->set_port(dev, mask, val);
 }
 
@@ -54,7 +59,7 @@ static inline int gpiod_read(struct drvmgr_dev *dev, uint32_t mask,
     uint32_t *val) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
-    const struct gpio_operations *ops = GET_GPIOD_OPS(dev);
+    const struct gpio_operations *ops = gpiod_get_ops(dev);
     return ops->get_port(dev, mask, val);
 }
 
@@ -62,18 +67,25 @@ static inline int gpiod_setpin(struct drvmgr_dev *dev, int pin,
 	int val) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
-    const struct gpio_operations *ops = GET_GPIOD_OPS(dev);
+    const struct gpio_operations *ops = gpiod_get_ops(dev);
     return ops->set_pin(dev, pin, val);
 }
 
 static inline int gpiod_getpin(struct drvmgr_dev *dev, int pin) {
     _Assert(dev != NULL);
     _Assert(dev->priv != NULL);
-    const struct gpio_operations *ops = GET_GPIOD_OPS(dev);
+    const struct gpio_operations *ops = gpiod_get_ops(dev);
     return ops->get_pin(dev, pin);
+}
+
+static inline int gpiod_toggle(struct drvmgr_dev *dev, int pin) {
+    _Assert(dev != NULL);
+    _Assert(dev->priv != NULL);
+    const struct gpio_operations *ops = gpiod_get_ops(dev);
+    return ops->toggle_pin(dev, pin);
 }
 
 #ifdef __cplusplus
 }
 #endif
-#endif /* BSP_GPIOD_H_ */
+#endif /* DRIVER_GPIOD_H_ */

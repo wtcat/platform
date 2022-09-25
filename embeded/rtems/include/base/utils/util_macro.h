@@ -14,8 +14,8 @@
  * should be include instead <sys/util_internal.h>
  */
 
-#ifndef COMPONENT_UTIL_MACROS_H_
-#define COMPONENT_UTIL_MACROS_H_
+#ifndef BASE_UTIL_MACROS_H_
+#define BASE_UTIL_MACROS_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,8 +31,8 @@ extern "C" {
  * below (APIs like IS_ENABLED(), COND_CODE_1(), etc.) are hidden away
  * in this file.
  */
-#include "component/util_internal.h"
-#include "component/bitops.h"
+#include "base/utils/util_internal.h"
+#include "base/bitops.h"
 
 #ifndef BIT
 #if defined(ASM)
@@ -629,4 +629,4 @@ extern "C" {
 }
 #endif
 
-#endif /* COMPONENT_UTIL_MACROS_H_ */
+#endif /* BASE_UTIL_MACROS_H_ */

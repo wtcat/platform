@@ -8,8 +8,8 @@
 
 #include <string.h>
 
-#include "component/minmax.h"
-#include "component/ring_buffer.h"
+#include "base/minmax.h"
+#include "base/ring_buffer.h"
 
 #ifndef ARG_UNUSED
 #define ARG_UNUSED(n) (void)n

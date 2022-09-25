@@ -6,12 +6,12 @@
 /*
  * Copyright (C) 2022 wtcat
  */
-#ifndef COMPONENT_HASHTABLE_H_
-#define COMPONENT_HASHTABLE_H_
+#ifndef BASE_HASHTABLE_H_
+#define BASE_HASHTABLE_H_
 
-#include "component/list.h"
-#include "component/hash.h"
-#include "component/ilog2.h"
+#include "base/list.h"
+#include "base/hash.h"
+#include "base/ilog2.h"
 
 #ifdef __cplusplus
 extern "C"{
@@ -165,4 +165,4 @@ static inline void hash_del_rcu(struct hlist_node *node)
 #ifdef __cplusplus
 }
 #endif
-#endif /* COMPONENT_HASHTABLE_H_ */
+#endif /* BASE_HASHTABLE_H_ */

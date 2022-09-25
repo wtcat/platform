@@ -8,8 +8,8 @@
 
 #include <dev/i2c/i2c.h>
 
-#include "bsp/platform_bus.h"
-#include "bsp/io.h"
+#include "drivers/platform_bus.h"
+#include "drivers/mio.h"
 
 
 //#define DEBUG_ON

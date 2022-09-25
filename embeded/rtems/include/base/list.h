@@ -2,11 +2,11 @@
 /*
  * Copyright (c) 2022 wtcat
  */
-#ifndef COMPONENT_LIST_H_
-#define COMPONENT_LIST_H_
+#ifndef BASE_LIST_H_
+#define BASE_LIST_H_
 
 #include <rtems/score/basedefs.h>
-#include "component/compiler.h"
+#include "base/compiler.h"
 
 #ifdef __cplusplus
 extern "C"{
@@ -818,4 +818,4 @@ static inline void hlist_move_list(struct hlist_head *old,
 #ifdef __cplusplus
 }
 #endif
-#endif /* COMPONENT_LIST_H_ */
+#endif /* BASE_LIST_H_ */

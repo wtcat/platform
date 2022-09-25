@@ -39,7 +39,7 @@
 #include <sys/param.h>
 #include <sys/errno.h>
 
-#include "component/atomic.h"
+#include "base/atomic.h"
 
 #ifdef __cplusplus
 extern "C"{

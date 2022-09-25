@@ -2,11 +2,11 @@
  * CopyRight(c) 2022 wtcat
  */
 
-#ifndef BSP_I2CD_H_
-#define BSP_I2CD_H_
+#ifndef DRIVER_I2C_H_
+#define DRIVER_I2C_H_
 
 #include <dev/i2c/i2c.h>
-#include "bsp/platform_bus.h"
+#include "drivers/platform_bus.h"
 
 #ifdef __cplusplus
 extern "C"{
@@ -60,4 +60,4 @@ static inline ssize_t i2c_master_read(struct drvmgr_dev *dev, void *buffer,
 #ifdef __cplusplus
 }
 #endif
-#endif /* BSP_I2CD_H_ */
+#endif /* DRIVER_I2C_H_ */

@@ -7,14 +7,14 @@
  */
 /** @file */
 
-#ifndef COMPONENT_RING_BUFFER_H_
-#define COMPONENT_RING_BUFFER_H_
+#ifndef BASE_RING_BUFFER_H_
+#define BASE_RING_BUFFER_H_
 
 #include <stdint.h>
 #include <errno.h>
 #include <rtems/score/assert.h>
 
-#include "component/compiler.h"
+#include "base/compiler.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -483,4 +483,4 @@ int ring_buf_item_get(struct ring_buf *buf, uint16_t *type, uint8_t *value,
 }
 #endif
 
-#endif /* COMPONENT_RING_BUFFER_H_ */
+#endif /* BASE_RING_BUFFER_H_ */

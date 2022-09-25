@@ -15,7 +15,7 @@
 #endif
 
 #ifdef CONFIGURE_FNTRACE
-#include "component/callpath.h"
+#include "base/callpath.h"
 #endif
 
 void bsp_fatal_extension(rtems_fatal_source source, bool unused,

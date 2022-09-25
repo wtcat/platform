@@ -34,15 +34,18 @@ executable("rtems") {
   ]
   deps = [
     ":preprocess",
-    "bsps/shared",
-    "component",
-    "bsps/${target_cpu}/${target_board}:board"
+    "//embeded/rtems/bsps/shared",
+    "//embeded/rtems/component",
+    "//embeded/rtems/bsps/${target_cpu}/${target_board}:board"
   ]
   configs += [
     "//gn/config:backtrace"
   ]
+  if (use_gui) {
+    deps +=["//embeded/rtems/component/lvgl"]
+  }
   if (use_testsuite) {
-    deps += ["testsuite"]
+    deps += ["//embeded/rtems/testsuite"]
   }
   if (use_libbsd) {
     defines += [

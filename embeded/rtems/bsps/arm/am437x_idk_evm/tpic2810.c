@@ -3,9 +3,9 @@
 #include <rtems/malloc.h>
 #include <rtems/bspIo.h>
 
-#include "bsp/platform_bus.h"
-#include "bsp/gpiod.h"
-#include "bsp/i2cd.h"
+#include "drivers/platform_bus.h"
+#include "drivers/gpio.h"
+#include "drivers/i2c.h"
 
 #define TPIC2810_WS_COMMAND 0x44
 

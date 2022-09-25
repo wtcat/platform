@@ -5,10 +5,10 @@
  * Written by David Howells (dhowells@redhat.com)
  */
 
-#ifndef COMPONENT_LOG2_H_
-#define COMPONENT_LOG2_H_
+#ifndef BASE_LOG2_H_
+#define BASE_LOG2_H_
 
-#include "component/bitops.h"
+#include "base/bitops.h"
 
 #ifdef __cplusplus
 extern "C"{
@@ -261,4 +261,4 @@ int __bits_per(unsigned long n)
 #ifdef __cplusplus
 }
 #endif
-#endif /* COMPONENT_LOG2_H_ */
+#endif /* BASE_LOG2_H_ */

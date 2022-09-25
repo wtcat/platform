@@ -23,7 +23,7 @@
 #include <rtems/printer.h>
 #include <rtems/bspIo.h>
 
-#include "component/compiler.h"
+#include "base/compiler.h"
 #include "bsp/asm/unwind.h"
 
 

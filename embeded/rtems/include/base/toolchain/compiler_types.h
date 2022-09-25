@@ -9,10 +9,10 @@
 
 /* Compiler specific macros. */
 #if defined(__clang__)
-#include "component/compiler-clang.h"
+#include "base/toolchain/compiler-clang.h"
 #elif defined(__GNUC__)
 /* The above compilers also define __GNUC__, so order is important here. */
-#include "component/compiler-gcc.h"
+#include "base/toolchain/compiler-gcc.h"
 #else
 #error "Unknown compiler"
 #endif

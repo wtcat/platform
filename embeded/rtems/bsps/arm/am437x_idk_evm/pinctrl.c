@@ -1,7 +1,7 @@
 #include <rtems/bspIo.h>
 
-#include "bsp/platform_bus.h"
-#include "bsp/io.h"
+#include "drivers/platform_bus.h"
+#include "drivers/mio.h"
 
 #include "bsp/board/pinctrl.h"
 

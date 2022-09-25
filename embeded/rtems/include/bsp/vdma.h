@@ -30,9 +30,9 @@
 #include <rtems/rtems/intr.h>
 #include <rtems/bspIo.h>
 
-#include "bsp/platform_bus.h"
+#include "drivers/platform_bus.h"
 #undef LIST_HEAD
-#include "component/list.h"
+#include "base/list.h"
 
 #ifdef __cplusplus
 extern "C"{

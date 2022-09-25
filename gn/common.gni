@@ -7,6 +7,9 @@ declare_args() {
   #Generate uboot image
   use_uboot = false
 
+  #Enable LVGL graphic libary
+  use_gui = false
+
   #Enable unit testcase
   use_testsuite = false
 }
