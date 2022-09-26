@@ -1,0 +1,18 @@
+# Make rootfs for rtems
+action("preprocess") {
+  rootfs_path = rebase_path("//embeded/rootfs")
+  outpath = rebase_path("${root_out_dir}")
+  script = "//gn/utils/shell.py"
+  outputs = ["${root_out_dir}/rootfs.c"]
+  args = [
+    "tar -cf ${outpath}/rootfs.tar --exclude BUILD.gn ${rootfs_path}/*",
+    "rtems-bin2c -N __rootfs_image -A 4 -C ${outpath}/rootfs.tar ${outpath}/rootfs"
+  ]
+}
+
+component("rootfs") {
+    sources = [
+        "${root_out_dir}/rootfs.c"
+    ]
+    public_deps = [":preprocess"]
+}

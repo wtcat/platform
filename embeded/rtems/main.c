@@ -1,6 +1,7 @@
 /*
  * CopyRight(c) 2022 wtcat
  */
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -10,6 +11,7 @@
 #include <rtems/shell.h>
 #include <rtems/bspIo.h>
 #include <rtems/media.h>
+#include <rtems/untar.h>
 #ifdef CONFIGURE_GDBSERVER
 #include <rtems/rtems-debugger-remote-tcp.h>
 #endif
@@ -63,33 +65,6 @@ static int media_service_setup(void) {
 }
 #endif
 
-static int fsys_create(const char *pathname, int mode,
-    const char *content) {
-    if (access(pathname, F_OK) < 0) {
-        return IMFS_make_linearfile(pathname, mode, 
-            content, strlen(content));
-    }
-    return 0;
-}
-
-static void environment_load(void) {
-#ifdef CONFIGURE_SCRIPT_CONTENT
-    if (!fsys_create("/etc/start.joel", 0777, 
-      CONFIGURE_SCRIPT_CONTENT)) {
-        char *script[] = {"/etc/start.joel"};
-      rtems_shell_script_file(0, script);
-    }
-#endif
-#ifdef CONFIGURE_ETC_RC_CONF_CONTENT
-    fsys_create("/etc/rc.conf", 0666, 
-      CONFIGURE_ETC_RC_CONF_CONTENT);
-#endif
-#ifdef CONFIGURE_LIB_CONTENT
-    fsys_create("/etc/libdl.conf", 0666, 
-      CONFIGURE_LIB_CONTENT);
-#endif
-}
-
 static void libbsd_setup(void) {
 #if defined(__rtems_libbsd__)
   rtems_task_priority prio;
@@ -104,13 +79,25 @@ static void libbsd_setup(void) {
 #endif/* __rtems_libbsd__ */
 }
 
+static int make_rootfs(void) {
+extern const unsigned char __rootfs_image[];
+extern const size_t __rootfs_image_size;
+  return Untar_FromMemory((char*)__rootfs_image, __rootfs_image_size);
+}
+
 int RTEMS_WEAK rtems_main(void) {
   return 0;
 }
 
 static rtems_task Init(rtems_task_argument arg) {
   (void) arg;
-  int err = ramblk_init();
+  int err = make_rootfs();
+  if (err) {
+    SYS_ERROR("Make rootfs error(%d)\n", err);
+    exit(-1);
+  }
+
+  err = ramblk_init();
   if (err) 
     SYS_ERROR("Create ramdisk failed: %d\n", err);
   err = shell_init(NULL);
@@ -121,7 +108,7 @@ static rtems_task Init(rtems_task_argument arg) {
   if (err)
     SYS_ERROR("Media service start failed: %d\n", err);
 #endif
-  environment_load();
+  // environment_load();
   libbsd_setup();
 #ifdef CONFIGURE_GDBSERVER
   rtems_debugger_register_tcp_remote();
