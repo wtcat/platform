@@ -122,10 +122,6 @@ static void shell_commands_register(void) {
 #ifdef CONFIGURE_SHELL_COMMAND_XMODEM
     SHELL_COMMAND_ADD(xmodem);
 #endif
-#if defined(CONFIGURE_SHELL_COMMAND_DISK)
-    extern rtems_shell_cmd_t shell_fdisk_command;
-    rtems_shell_add_cmd_struct(&shell_fdisk_command);
-#endif
 #if defined(CONFIGURE_SHELL_COMMAND_CLEAR)
     rtems_shell_add_cmd_struct(&shell_clear_command);
 #endif

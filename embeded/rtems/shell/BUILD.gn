@@ -1,8 +1,9 @@
 
 component("shell") {
     sources = [
+        "shell.c",
         "shell_disk.c",
         "shell_mem.c",
-        "shell.c"
+        "shell_backtrace.c"
     ]
 }

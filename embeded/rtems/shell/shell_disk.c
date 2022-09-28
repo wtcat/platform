@@ -2,6 +2,7 @@
  * Copyright 2022 wtcat
  */
 #include "bsp/board/shellconf.h"
+#include "rtems/rtems/status.h"
 
 #ifdef CONFIGURE_SHELL_COMMAND_DISK
 #include <unistd.h>
@@ -14,7 +15,9 @@
 #include <getopt.h>
 
 #include <rtems/blkdev.h>
-#include <rtems/shell.h>
+#include <rtems/ramdisk.h>
+
+#include "shell/shell_utils.h"
 
 static void fdisk_usage(void) {
 	static const char usage[] = {
@@ -85,10 +88,74 @@ static int shell_cmd_fdisk(int argc, char **argv) {
 	return 0;
 }
 
-rtems_shell_cmd_t shell_fdisk_command = {
-    "fdisk",
-    "Disk partition tool",
-    "file",
-    shell_cmd_fdisk
+static void ramdisk_usage(void) {
+	static const char usage[] = {
+		"Create ramdisk\n"
+		"mkrd -d <dev> -s <blksize> -n <blks>\n" 
+		"Options:\n"
+		" -d device name\n"
+		" -s block size\n"
+		" -n block numbers\n"
+	};
+	puts(usage);
+}
+static int shell_cmd_ramdisk(int argc, char **argv) {
+	struct getopt_data getopt_reent;
+	char *devname = NULL;
+	unsigned long blksz = 0, nblks = 0;
+	rtems_status_code sc;
+	int ch;
+
+	memset(&getopt_reent, 0, sizeof(getopt_data));
+	while ((ch = getopt_r(argc, argv, "d:s:n:", &getopt_reent)) != -1) {
+		switch (ch) {
+		case 'd':
+			devname = getopt_reent.optarg;
+			break;
+		case 's':
+			blksz = strtoul(getopt_reent.optarg, NULL, 10);
+			break;
+		case 'n':
+			nblks = strtoul(getopt_reent.optarg, NULL, 10);
+			break;
+		default:
+			ramdisk_usage();
+			return -EINVAL;
+		}
+	}
+	if (!devname || blksz == 0 || nblks == 0) {
+		fprintf(stderr, "Invalid format or paramters\n");
+		return -EINVAL;
+	}
+	if (strncmp("/dev/", devname, 5)) {
+		fprintf(stderr, "Invalid device name(%s)\n", devname);
+		return -EINVAL;
+	}
+	sc = ramdisk_register(blksz, nblks, false, devname);
+	if (sc != RTEMS_SUCCESSFUL) {
+		fprintf(stderr, "Create ramdisk(%s) failed(%s)\n", 
+			devname, rtems_status_text(sc));
+		return -rtems_status_code_to_errno(sc);
+	}
+	printf("Created ramdisk: %s size(0x%lx)\n", devname, blksz*nblks);
+	return 0;
+}
+
+SHELL_CMDS_DEFINE(disk_cmds) {
+	{
+		.name = "fdisk",
+		.usage = "Disk partition tool",
+		.topic = "file",
+		.command = shell_cmd_fdisk
+	},
+	{
+		.name = "mkrdk",
+		.usage = "Create a ramdisk",
+		.topic = "file",
+		.command = shell_cmd_ramdisk
+	},
+	SHELL_CMD_TERMINAL
 };
+
 #endif /* CONFIGURE_SHELL_COMMAND_DISK */
+

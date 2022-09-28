@@ -19,7 +19,8 @@
 
 #include <rtems/shell.h>
 #include <rtems/printer.h>
-#include <rtems/sysinit.h>
+
+#include "shell/shell_utils.h"
 
 struct printer_ctx {
 	rtems_printer printer;
@@ -222,103 +223,43 @@ static int shell_cmd_mwb(int argc, char **argv) {
 	return ret;
 }
 
-
-static rtems_shell_cmd_t shell_mdw_command = {
-    "mdw",
-    "display memory by word: mdw address [,count]",
-    "misc",
-    shell_cmd_mdw
+SHELL_CMDS_DEFINE(mem_cmds) {
+	{
+		.name = "mdw",
+		.usage = "display memory by word: mdw address [,count]",
+		.topic = "misc",
+		.command = shell_cmd_mdw
+	},
+	{
+		.name = "mdh",
+		.usage = "display memory by half-word: mdh address [,count]",
+		.topic = "misc",
+		.command = shell_cmd_mdh
+	},
+	{
+		.name = "mdb",
+		.usage = "display memory by byte: mdb address [,count]",
+		.topic = "misc",
+		.command = shell_cmd_mdb
+	},
+	{
+		.name = "mww",
+		.usage = "memory write (fill) by word: mww address value [,count]",
+		.topic = "misc",
+		.command = shell_cmd_mww
+	},
+	{
+		.name = "mwh",
+		.usage = "memory write (fill) by half-word: mwh address value [,count]",
+		.topic = "misc",
+		.command = shell_cmd_mwh
+	},
+	{
+		.name = "mwb",
+		.usage = "memory write (fill) by byte: mwb address value [,count]",
+		.topic = "misc",
+		.command = shell_cmd_mwb
+	},
+	SHELL_CMD_TERMINAL
 };
-
-static rtems_shell_cmd_t shell_mdh_command = {
-    "mdh",
-    "display memory by half-word: mdh address [,count]",
-    "misc",
-    shell_cmd_mdh
-};
-
-static rtems_shell_cmd_t shell_mdb_command = {
-    "mdb",
-    "display memory by byte: mdb address [,count]",
-    "misc",
-    shell_cmd_mdb
-};
-
-static rtems_shell_cmd_t shell_mww_command = {
-    "mww",
-    "memory write (fill) by word: mww address value [,count]",
-    "misc",
-    shell_cmd_mww
-};
-
-static rtems_shell_cmd_t shell_mwh_command = {
-    "mwh",
-    "memory write (fill) by half-word: mwh address value [,count]",
-    "misc",
-    shell_cmd_mwh
-};
-
-static rtems_shell_cmd_t shell_mwb_command = {
-    "mwb",
-    "memory write (fill) by byte: mwb address value [,count]",
-    "misc",
-    shell_cmd_mwb
-};
-#endif /* CONFIGURE_SHELL_COMMANDS_MEM */
-
-#if defined(CONFIGURE_SHELL_COMMANDS_BT) && \
-	defined(CONFIGURE_BACKTRACE)
-#include <rtems/score/threadimpl.h>
-#include <rtems/printer.h>
-#include "bsp/asm/unwind.h"
-
-static int shell_cmd_backtrace(int argc, char **argv) {
-	if (argc <= 2) {
-		rtems_printer printer;
-		rtems_print_printer_printf(&printer);
-		if (argc == 1) {
-			__stack_backtrace(&printer, NULL, NULL);
-			return 0;
-		} else {
-			ISR_lock_Context lock_context;
-			Thread_Control *the_thread;
-			rtems_id id = (rtems_id)strtoul(argv[1], NULL, 16);
-			the_thread = _Thread_Get(id, &lock_context);
-			_ISR_lock_ISR_enable(&lock_context);
-			if (the_thread) {
-				__stack_backtrace(&printer, NULL, the_thread);
-				return 0;
-			} else {
-				printf("Error: Invalid object id!\n");
-			}
-		}
-	}
-	return -EINVAL;
-}
-
-static rtems_shell_cmd_t shell_bt_command = {
-    "bt",
-    "bt [object ID]",
-    "misc",
-    shell_cmd_backtrace
-};
-#endif //CONFIGURE_SHELL_COMMANDS_BT && CONFIGURE_BACKTRACE
-
-static void shell_cmds_register(void) {
-#ifdef CONFIGURE_SHELL_COMMANDS_MEM
-	rtems_shell_add_cmd_struct(&shell_mdw_command);
-	rtems_shell_add_cmd_struct(&shell_mdh_command);
-	rtems_shell_add_cmd_struct(&shell_mdb_command);
-	rtems_shell_add_cmd_struct(&shell_mww_command);
-	rtems_shell_add_cmd_struct(&shell_mwh_command);
-	rtems_shell_add_cmd_struct(&shell_mwb_command);
 #endif //CONFIGURE_SHELL_COMMANDS_MEM
-#if defined(CONFIGURE_SHELL_COMMANDS_BT) && \
-	defined(CONFIGURE_BACKTRACE)
-	rtems_shell_add_cmd_struct(&shell_bt_command);
-#endif //CONFIGURE_SHELL_COMMANDS_BT && CONFIGURE_BACKTRACE
-}
-
-RTEMS_SYSINIT_ITEM(shell_cmds_register, 
-	RTEMS_SYSINIT_STD_FILE_DESCRIPTORS + 10, 
-	RTEMS_SYSINIT_ORDER_MIDDLE);
