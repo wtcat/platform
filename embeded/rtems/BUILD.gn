@@ -28,8 +28,6 @@ executable("rtems") {
   defines = []
   sources = [
     "main.c",
-    "shell.c",
-    "shell_misc.c",
     "ram0.c"
   ]
   deps = [
@@ -37,6 +35,7 @@ executable("rtems") {
     "//embeded/rootfs",
     "//embeded/rtems/bsps/shared",
     "//embeded/rtems/component",
+    "//embeded/rtems/shell",
     "//embeded/rtems/bsps/${target_cpu}/${target_board}:board"
   ]
   configs += [

@@ -1,0 +1,8 @@
+
+component("shell") {
+    sources = [
+        "shell_disk.c",
+        "shell_mem.c",
+        "shell.c"
+    ]
+}
