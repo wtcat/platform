@@ -203,8 +203,10 @@ static void shell_commands_register(void) {
 
 int shell_init(rtems_shell_login_check_t login_check) {
 #if defined(CONFIGURE_SHELL_COMMANDS_INIT)
+    char *stcript[] = {"/etc/start.rs"};
     rtems_status_code sc;
     shell_commands_register();
+    rtems_shell_script_file(1, stcript);
     sc = rtems_shell_init("root", SHELL_STACKSZ, SHELL_PRIO,
         CONSOLE_DEVICE_NAME, false, false, login_check);
     return rtems_status_code_to_errno(sc);

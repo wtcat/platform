@@ -37,13 +37,12 @@ static int shell_cmd_backtrace(int argc, char **argv) {
 	return -EINVAL;
 }
 
-SHELL_CMDS_DEFINE(backtrace_cmds) {
+SHELL_CMDS_DEFINE(backtrace_cmds,
 	{
 		.name = "bt",
 		.usage = "bt [object ID]",
 		.topic = "misc",
 		.command = shell_cmd_backtrace
-	},
-    SHELL_CMD_TERMINAL
-};
+	}
+);
 #endif //CONFIGURE_SHELL_COMMANDS_BT && CONFIGURE_BACKTRACE

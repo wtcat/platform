@@ -2,7 +2,6 @@
  * Copyright 2022 wtcat
  */
 #include "bsp/board/shellconf.h"
-#include "rtems/rtems/status.h"
 
 #ifdef CONFIGURE_SHELL_COMMAND_DISK
 #include <unistd.h>
@@ -19,17 +18,25 @@
 
 #include "shell/shell_utils.h"
 
-static void fdisk_usage(void) {
-	static const char usage[] = {
-		"fdisk -d <dev> -p <log_dev> -s <start_blk> -n <blks>\n" 
-		"Options:\n"
-		" -d physical device\n"
-		" -p logic device\n"
-		" -s start media block\n"
-		" -n block numbers\n"
-	};
-	puts(usage);
-}
+
+static const char disk_usage[] = {
+	"fdisk -d <dev> -p <log_dev> -s <start_blk> -n <blks>\n" 
+	"options:\n"
+	"  @ create logic-disk from phsical disk\n"
+	"  -d physical device\n"
+	"  -p logic device\n"
+	"  -s start media block\n"
+	"  -n block numbers\n"
+};
+
+static const char ramdisk_usage[] = {
+	"mkrd -d <dev> -s <blksize> -n <blks>\n" 
+	"options:\n"
+	"  @ create ramdisk\n"
+	"  -d device name\n"
+	"  -s block size\n"
+	"  -n block numbers\n"
+};
 
 static int shell_cmd_fdisk(int argc, char **argv) {
 	struct getopt_data getopt_reent;
@@ -56,14 +63,12 @@ static int shell_cmd_fdisk(int argc, char **argv) {
 			nblks = strtoul(getopt_reent.optarg, NULL, 10);
 			break;
 		default:
-			fdisk_usage();
-			return -EINVAL;
+			goto _inv_err;
 		}
 	}
 	if (!parent || !partition || 
 		start == (unsigned long)-1 || nblks == 0) {
-		fprintf(stderr, "Invalid format\n");
-		return -EINVAL;
+		goto _inv_err;
 	}
 	if (strncmp("/dev/", parent, 5) || 
 		strncmp("/dev/", partition, 5)) {
@@ -83,22 +88,14 @@ static int shell_cmd_fdisk(int argc, char **argv) {
 	}
 	rtems_disk_fd_get_media_block_size(fd, &media_blksz);
 	close(fd);
-	printf("Created paritition: %s[%lu, %lu] -> %s(BlockSize: %d)\n", parent, start, 
+	printf("created paritition: %s[%lu, %lu] -> %s(BlockSize: %d)\n", parent, start, 
 		start+nblks, partition, media_blksz);
 	return 0;
+_inv_err:
+	fprintf(stderr, "Invalid format\n");
+	return -EINVAL;
 }
 
-static void ramdisk_usage(void) {
-	static const char usage[] = {
-		"Create ramdisk\n"
-		"mkrd -d <dev> -s <blksize> -n <blks>\n" 
-		"Options:\n"
-		" -d device name\n"
-		" -s block size\n"
-		" -n block numbers\n"
-	};
-	puts(usage);
-}
 static int shell_cmd_ramdisk(int argc, char **argv) {
 	struct getopt_data getopt_reent;
 	char *devname = NULL;
@@ -119,7 +116,7 @@ static int shell_cmd_ramdisk(int argc, char **argv) {
 			nblks = strtoul(getopt_reent.optarg, NULL, 10);
 			break;
 		default:
-			ramdisk_usage();
+			puts("Invalid format or paramters\n");
 			return -EINVAL;
 		}
 	}
@@ -137,25 +134,23 @@ static int shell_cmd_ramdisk(int argc, char **argv) {
 			devname, rtems_status_text(sc));
 		return -rtems_status_code_to_errno(sc);
 	}
-	printf("Created ramdisk: %s size(0x%lx)\n", devname, blksz*nblks);
+	printf("created ramdisk: %s size(0x%lx)\n", devname, blksz*nblks);
 	return 0;
 }
 
-SHELL_CMDS_DEFINE(disk_cmds) {
+SHELL_CMDS_DEFINE(disk_cmds,
 	{
 		.name = "fdisk",
-		.usage = "Disk partition tool",
-		.topic = "file",
+		.usage = disk_usage,
+		.topic = "files",
 		.command = shell_cmd_fdisk
 	},
 	{
-		.name = "mkrdk",
-		.usage = "Create a ramdisk",
-		.topic = "file",
+		.name = "mkrd",
+		.usage = ramdisk_usage,
+		.topic = "files",
 		.command = shell_cmd_ramdisk
-	},
-	SHELL_CMD_TERMINAL
-};
+	}
+);
 
 #endif /* CONFIGURE_SHELL_COMMAND_DISK */
-

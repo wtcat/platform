@@ -26,10 +26,7 @@ group("all") {
 executable("rtems") {
   libs = []
   defines = []
-  sources = [
-    "main.c",
-    "ram0.c"
-  ]
+  sources = [ "main.c" ]
   deps = [
     ":preprocess",
     "//embeded/rootfs",

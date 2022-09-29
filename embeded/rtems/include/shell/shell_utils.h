@@ -11,18 +11,15 @@
 extern "C"{
 #endif
 
-#define SHELL_CMD_TERMINAL {NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 0}
-#define SHELL_CMDS_DEFINE(_name) \
-    static rtems_shell_cmd_t cmds_##_name[]; \
+#define SHELL_CMDS_DEFINE(_name, ...) \
 	static void _shell_cmds_register_##_name(void) { \
-		rtems_shell_cmd_t *cmd = cmds_##_name; \
-		while (cmd->command) \
-			rtems_shell_add_cmd_struct(cmd++); \
+		static rtems_shell_cmd_t _cmds_##_name[] = { __VA_ARGS__ }; \
+		for (unsigned int _i = 0; _i < RTEMS_ARRAY_SIZE(_cmds_##_name); _i++) \
+			rtems_shell_add_cmd_struct(&_cmds_##_name[_i]); \
 	} \
 	RTEMS_SYSINIT_ITEM(_shell_cmds_register_##_name, \
 		RTEMS_SYSINIT_STD_FILE_DESCRIPTORS, \
-		RTEMS_SYSINIT_ORDER_LAST); \
-    static rtems_shell_cmd_t cmds_##_name[] = 
+		RTEMS_SYSINIT_ORDER_LAST)
 
 
 #ifdef __cplusplus

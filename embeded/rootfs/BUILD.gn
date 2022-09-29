@@ -5,7 +5,7 @@ action("preprocess") {
   script = "//gn/utils/shell.py"
   outputs = ["${root_out_dir}/rootfs.c"]
   args = [
-    "tar -cf ${outpath}/rootfs.tar --exclude BUILD.gn ${rootfs_path}/*",
+    "tar -cf ${outpath}/rootfs.tar -C ${rootfs_path} --exclude BUILD.gn .",
     "rtems-bin2c -N __rootfs_image -A 4 -C ${outpath}/rootfs.tar ${outpath}/rootfs"
   ]
 }

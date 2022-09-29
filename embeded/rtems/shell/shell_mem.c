@@ -223,7 +223,7 @@ static int shell_cmd_mwb(int argc, char **argv) {
 	return ret;
 }
 
-SHELL_CMDS_DEFINE(mem_cmds) {
+SHELL_CMDS_DEFINE(mem_cmds,
 	{
 		.name = "mdw",
 		.usage = "display memory by word: mdw address [,count]",
@@ -260,6 +260,5 @@ SHELL_CMDS_DEFINE(mem_cmds) {
 		.topic = "misc",
 		.command = shell_cmd_mwb
 	},
-	SHELL_CMD_TERMINAL
-};
+);
 #endif //CONFIGURE_SHELL_COMMANDS_MEM

@@ -1,6 +1,7 @@
 /*
  * CopyRight(c) 2022 wtcat
  */
+#include "rtems/printer.h"
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -83,6 +84,7 @@ static int make_rootfs(void) {
 extern const unsigned char __rootfs_image[];
 extern const size_t __rootfs_image_size;
   return Untar_FromMemory((char*)__rootfs_image, __rootfs_image_size);
+ // return Untar_FromMemory((char*)__rootfs_image, __rootfs_image_size);
 }
 
 int RTEMS_WEAK rtems_main(void) {
@@ -92,17 +94,11 @@ int RTEMS_WEAK rtems_main(void) {
 static rtems_task Init(rtems_task_argument arg) {
   (void) arg;
   int err = make_rootfs();
-  if (err) {
-    SYS_ERROR("Make rootfs error(%d)\n", err);
-    exit(-1);
-  }
-
-  err = ramblk_init();
   if (err) 
-    SYS_ERROR("Create ramdisk failed: %d\n", err);
+    rtems_panic("Make rootfs error(%d)\n", err);
   err = shell_init(NULL);
   if (err) 
-    SYS_ERROR("Shell initialize failed: %d\n", err);
+    rtems_panic("Shell initialize failed: %d\n", err);
 #ifdef CONFIGURE_MEDIA_SERVICE
   err = media_service_setup();
   if (err)
