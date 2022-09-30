@@ -2,23 +2,15 @@
  * CopyRight(c) 2022 wtcat
  */
 #include <rtems.h>
-#include <rtems/thread.h>
-#include <rtems/shell.h>
-#include <rtems/media.h>
 #include <rtems/untar.h>
-
 #if defined (__rtems_libbsd__)
 #include <rtems/bsd/bsd.h>
-#include <machine/rtems-bsd-config.h>
 #ifdef CONFIGURE_GDBSERVER
 #include <rtems/rtems-debugger-remote-tcp.h>
 #endif
 #endif
 
-#include <bsp/stackalloc.h>
 #include "bsp/board/sysconf.h"
-#include "bsp/init.h"
-
 #include "shell/shell_utils.h"
 
 
@@ -65,9 +57,11 @@ static rtems_task Init(rtems_task_argument arg) {
 
 #if defined (__rtems_libbsd__) && \
     defined(CONFIGURE_FDT)
+#include <machine/rtems-bsd-config.h>
 RTEMS_BSD_DEFINE_NEXUS_DEVICE(ofwbus, 0, 0, NULL);
 SYSINIT_DRIVER_REFERENCE(simplebus, ofwbus);
 #endif
 
 #define CONFIGURE_INIT
+#include <bsp/stackalloc.h>
 #include <rtems/confdefs.h>
