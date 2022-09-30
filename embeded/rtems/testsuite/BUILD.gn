@@ -3,18 +3,14 @@ import("//gn/toolchain/rtems/rtems.gni")
 
 component("testsuite") {
     defines = []
-    include_dirs = [
-        "//embeded/thirdparty/googletest/include",
-        "//embeded/thirdparty/googletest"
-    ]
+    configs = []
     sources = [
-        "//embeded/thirdparty/googletest/src/gtest-all.cc",
-        "test_main.cc",
-        "workqueue_unit_test.cc",
-        "timlib_unit_test.cc",
-        "tpic2810_unit_test.cc"
+        # "workqueue_unit_test.cc",
+        # "timlib_unit_test.cc",
+        # "tpic2810_unit_test.cc"
     ]
     if (use_fntrace) {
         defines += ["CONFIGURE_FNTRACE"]
     }
+    configs += ["//embeded/thirdparty/googletest:gtest_config"]
 }

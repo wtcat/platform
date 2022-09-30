@@ -4,3 +4,6 @@
 mkdir /temp
 mkrd -d /dev/ram -s 512 -n 2048
 mount -t imfs /dev/ram /temp
+
+#Starting media server
+media -p 110 -s 4096

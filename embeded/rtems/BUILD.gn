@@ -42,7 +42,10 @@ executable("rtems") {
     deps +=["//embeded/rtems/component/lvgl"]
   }
   if (use_testsuite) {
-    deps += ["//embeded/rtems/testsuite"]
+    deps += [
+      "//embeded/thirdparty/googletest",
+      "//embeded/rtems/testsuite"
+    ]
   }
   if (use_libbsd) {
     defines += [
