@@ -1,9 +1,17 @@
+import("//gn/toolchain/rtems/rtems.gni")
 
 component("shell") {
     sources = [
         "shell.c",
+        "shell_backtrace.c",
         "shell_disk.c",
         "shell_mem.c",
-        "shell_backtrace.c"
+        "shell_misc.c"
     ]
+    if (use_libbsd) {
+        sources += ["shell_bsd.c"]
+    }
+    if (use_rtl) {
+        sources += ["shell_dl.c"]
+    }
 }

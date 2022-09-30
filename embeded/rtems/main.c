@@ -1,35 +1,30 @@
 /*
  * CopyRight(c) 2022 wtcat
  */
-#include "rtems/printer.h"
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-
 #include <rtems.h>
 #include <rtems/thread.h>
-#include <rtems/imfs.h>
 #include <rtems/shell.h>
 #include <rtems/bspIo.h>
 #include <rtems/media.h>
 #include <rtems/untar.h>
+
+#if defined (__rtems_libbsd__)
+#include <rtems/bsd/bsd.h>
+#include <machine/rtems-bsd-config.h>
 #ifdef CONFIGURE_GDBSERVER
 #include <rtems/rtems-debugger-remote-tcp.h>
+#endif
 #endif
 
 #include <bsp/stackalloc.h>
 #include "bsp/board/sysconf.h"
 #include "bsp/init.h"
 
-#if defined (__rtems_libbsd__)
-#include <rtems/bsd/bsd.h>
-#include <machine/rtems-bsd-config.h>
-#endif
+#include "shell/shell_utils.h"
+
 
 #define TIMEOUT_MS(ms) RTEMS_MILLISECONDS_TO_TICKS(ms)
-#define SYS_ERROR(fmt, ...) \
-  rtems_panic("System Error***: "fmt"(%s:%d)", ##__VA_ARGS__, \
-    __func__, __LINE__)
+#define kerror(fmt, ...) rtems_panic("<*Kernel Panic*>: "fmt, ##__VA_ARGS__) 
 
 #ifdef CONFIGURE_MEDIA_SERVICE
 
@@ -66,25 +61,12 @@ static int media_service_setup(void) {
 }
 #endif
 
-static void libbsd_setup(void) {
-#if defined(__rtems_libbsd__)
-  rtems_task_priority prio;
-  rtems_task_set_priority(RTEMS_SELF, 110, &prio);
-  (void) prio;
-  if (rtems_bsd_initialize())
-    rtems_panic("LIBBSD initialize failed\n");
-#ifdef CONFIGURE_MEDIA_SERVICE
-  rtems_binary_semaphore_wait(&bsd_completed_sem);
-#endif
-  rtems_bsd_run_etc_rc_conf(TIMEOUT_MS(5000), true);
-#endif/* __rtems_libbsd__ */
-}
-
-static int make_rootfs(void) {
+static void make_rootfs(void) {
 extern const unsigned char __rootfs_image[];
 extern const size_t __rootfs_image_size;
-  return Untar_FromMemory((char*)__rootfs_image, __rootfs_image_size);
- // return Untar_FromMemory((char*)__rootfs_image, __rootfs_image_size);
+  int err = Untar_FromMemory((char*)__rootfs_image, __rootfs_image_size);
+  if (err)
+    kerror("make rootfs failed(%d)\n", err);
 }
 
 int RTEMS_WEAK rtems_main(void) {
@@ -93,22 +75,25 @@ int RTEMS_WEAK rtems_main(void) {
 
 static rtems_task Init(rtems_task_argument arg) {
   (void) arg;
-  int err = make_rootfs();
-  if (err) 
-    rtems_panic("Make rootfs error(%d)\n", err);
-  err = shell_init(NULL);
-  if (err) 
-    rtems_panic("Shell initialize failed: %d\n", err);
+  make_rootfs();
+  if (shell_run_script("/etc/start.rs"))
+    kerror("Run /etc/start.rs failed");
+
 #ifdef CONFIGURE_MEDIA_SERVICE
   err = media_service_setup();
   if (err)
     SYS_ERROR("Media service start failed: %d\n", err);
 #endif
-  // environment_load();
-  libbsd_setup();
+
+#ifdef __rtems_libbsd__
+  if (rtems_bsd_initialize())
+    rtems_panic("LIBBSD initialize failed\n");
+  rtems_bsd_run_etc_rc_conf(TIMEOUT_MS(5000), true);
 #ifdef CONFIGURE_GDBSERVER
   rtems_debugger_register_tcp_remote();
 #endif
+#endif
+  shell_run_script("/etc/post.rs");
   rtems_main();
   rtems_task_exit();
 }
