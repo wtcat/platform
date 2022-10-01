@@ -4828,6 +4828,7 @@
 /*
  * libbsd configure options
  */
+#define CONFIGURE_FDT 1
 #define RTEMS_BSD_CONFIG_DOMAIN_PAGE_MBUFS_SIZE (8 * 1024 * 1024ul)
 #define RTEMS_BSD_CONFIG_NET_PF_UNIX
 // #define RTEMS_BSD_CONFIG_NET_IP_MROUTE
