@@ -31,7 +31,7 @@ static int shell_cmd_media(int argc, char **argv) {
 	int ch;
 
 	memset(&getopt_reent, 0, sizeof(getopt_data));
-	while ((ch = getopt_r(argc, argv, "p:s::", &getopt_reent)) != -1) {
+	while ((ch = getopt_r(argc, argv, "p:s:", &getopt_reent)) != -1) {
 		switch (ch) {
 		case 'p':
 			prio = strtoul(getopt_reent.optarg, NULL, 10);
@@ -68,3 +68,4 @@ SHELL_CMDS_DEFINE(media_cmds,
 		.command = shell_cmd_media
 	}
 );
+#endif /* CONFIGURE_SHELL_COMMAND_DISK */

@@ -5,6 +5,7 @@
 #include <rtems/untar.h>
 #if defined (__rtems_libbsd__)
 #include <rtems/bsd/bsd.h>
+#include <machine/rtems-bsd-rc-conf.h>
 #ifdef CONFIGURE_GDBSERVER
 #include <rtems/rtems-debugger-remote-tcp.h>
 #endif
@@ -15,28 +16,30 @@
 
 
 #define MS(ms) RTEMS_MILLISECONDS_TO_TICKS(ms)
-#define kerr(fmt, ...) rtems_panic("<*Kernel Panic*>: "fmt, ##__VA_ARGS__) 
+#define kerror(fmt, ...) rtems_panic("<*Kernel Panic*>: "fmt, ##__VA_ARGS__) 
+
+void RTEMS_WEAK _shell_init(void) {
+}
 
 int RTEMS_WEAK rtems_main(void) {
   return 0;
 }
 
-static void make_rootfs(void) {
+static void rootfs_init(void) {
   extern const unsigned char __rootfs_image[];
   extern const size_t __rootfs_image_size;
   int err = Untar_FromMemory((char*)__rootfs_image, __rootfs_image_size);
   if (err)
-    kerr("make rootfs failed(%d)\n", err);
+    kerror("make rootfs failed(%d)\n", err);
 }
 
 static rtems_task Init(rtems_task_argument arg) {
   (void) arg;
-  /* */
-  make_rootfs();
+  rootfs_init();
 
   /* system startup script */
   if (shell_run_script("/etc/start.rs"))
-    kerr("run /etc/start.rs failed\n");
+    kerror("run /etc/start.rs failed\n");
 
 #if defined(__rtems_libbsd__)
   /* Setup run environment for freebsd */
@@ -50,7 +53,7 @@ static rtems_task Init(rtems_task_argument arg) {
   rtems_debugger_register_tcp_remote();
 #endif
 #endif /* __rtems_libbsd__ */
-  shell_run_script("/etc/post.rs");
+  _shell_init();
   rtems_main();
   rtems_task_exit();
 }
