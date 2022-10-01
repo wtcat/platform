@@ -32,12 +32,14 @@ executable("rtems") {
     "//embeded/rootfs",
     "//embeded/rtems/bsps/shared",
     "//embeded/rtems/component",
-    "//embeded/rtems/shell",
     "//embeded/rtems/bsps/${target_cpu}/${target_board}:board"
   ]
   configs += [
     "//gn/config:backtrace"
   ]
+  if (use_shell) {
+    deps += ["//embeded/rtems/shell"]
+  }
   if (use_gui) {
     deps +=["//embeded/rtems/component/lvgl"]
   }
@@ -65,6 +67,9 @@ executable("rtems") {
   if (use_gdbserver) {
     defines += ["CONFIGURE_GDBSERVER"]
     libs += ["debugger"]
+  }
+  if (use_devicetree) {
+    defines +=["CONFIGURE_FDT"]
   }
 }
 

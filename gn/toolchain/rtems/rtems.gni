@@ -20,8 +20,13 @@ declare_args() {
   #Media service
   use_media = false
 
+  #Enable dynamic loader
   use_rtl = false
 
+  #Enable shell
+  use_shell = true
+
+  #Enable backtrace
   use_backtrace = false
 
   #Function trace

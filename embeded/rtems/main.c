@@ -37,7 +37,7 @@ static rtems_task Init(rtems_task_argument arg) {
   (void) arg;
   rootfs_init();
 
-  /* system startup script */
+  /* Run startup script */
   if (shell_run_script("/etc/start.rs"))
     kerror("run /etc/start.rs failed\n");
 
