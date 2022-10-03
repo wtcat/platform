@@ -3,6 +3,7 @@
  */
 #include "configs/rtems_confdefs.h"
 
+#ifdef CONFIGURE_SHELL_COMMAND_XYZMODEM
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -90,3 +91,4 @@ SHELL_CMDS_DEFINE(xyzmodem_cmds,
 		.command = shell_cmd_xyzmodem
 	}
 );
+#endif /* CONFIGURE_SHELL_COMMAND_XYZMODEM */

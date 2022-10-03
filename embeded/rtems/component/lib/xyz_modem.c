@@ -122,8 +122,8 @@ static ssize_t CYGACC_COMM_IF_READ_TIMEOUT(void *buffer, size_t size)
     int fd = xyz.__chan;
     void *ptr = buffer;
     int len = (int)size;
-    xyz.t_new.c_cc[VTIME] = 0;
-    tcsetattr(fd, TCSANOW, &xyz.t_new);
+    // xyz.t_new.c_cc[VTIME] = 0;
+    // tcsetattr(fd, TCSANOW, &xyz.t_new);
     while (len > 0) {
         int ret = read(fd, ptr, (size_t)len);
         if (ret <= 0)
@@ -131,8 +131,8 @@ static ssize_t CYGACC_COMM_IF_READ_TIMEOUT(void *buffer, size_t size)
         len -= ret;
         ptr += ret;
     }
-    xyz.t_new.c_cc[VTIME] = xyzModem_CHAR_TIMEOUT;
-    tcsetattr(fd, TCSANOW, &xyz.t_new);
+    // xyz.t_new.c_cc[VTIME] = xyzModem_CHAR_TIMEOUT;
+    // tcsetattr(fd, TCSANOW, &xyz.t_new);
     return (int)size - len;
 }
 
