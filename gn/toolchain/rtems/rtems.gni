@@ -5,12 +5,6 @@ declare_args() {
   #Libbsd
   use_libbsd = false
 
-  #Debugger
-  use_gdbserver = false
-
-  #Bsp stack allocator
-  use_stack_allocator = true
-
   #Enable sysinit_verbose
   use_verbose = false
   
@@ -48,6 +42,8 @@ if (use_libbsd) {
   declare_args() {
     use_bsdnet_ftpd = true
     use_bsdnet_telnet = true
+    #Debugger
+    use_gdbserver = false
   }
 }
 

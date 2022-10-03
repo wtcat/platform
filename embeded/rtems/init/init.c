@@ -1,19 +1,18 @@
 /*
  * CopyRight(c) 2022 wtcat
  */
+#include "configs/rtems_confdefs.h"
+
 #include <rtems.h>
 #include <rtems/untar.h>
-#if defined (__rtems_libbsd__)
+#ifdef __rtems_libbsd__
 #include <rtems/bsd/bsd.h>
 #include <machine/rtems-bsd-rc-conf.h>
 #ifdef CONFIGURE_GDBSERVER
 #include <rtems/rtems-debugger-remote-tcp.h>
 #endif
-#endif
-
-#include "bsp/board/sysconf.h"
+#endif /* __rtems_libbsd__ */
 #include "shell/shell_utils.h"
-
 
 #define MS(ms) RTEMS_MILLISECONDS_TO_TICKS(ms)
 #define kerror(fmt, ...) rtems_panic("<*Kernel Panic*>: "fmt, ##__VA_ARGS__) 

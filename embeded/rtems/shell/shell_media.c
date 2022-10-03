@@ -1,7 +1,7 @@
 /*
  * Copyright 2022 wtcat
  */
-#include "bsp/board/shellconf.h"
+#include "configs/rtems_confdefs.h"
 
 #ifdef CONFIGURE_SHELL_COMMAND_DISK
 #include <stdio.h>

@@ -23,7 +23,7 @@
 #include <stdint.h>
 
 #include "base/byteorder.h"
-#include "bsp/asm/barriers.h"
+#include "asm/barriers.h"
 
 #ifdef __cplusplus
 extern "C"{

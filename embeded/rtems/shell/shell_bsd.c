@@ -1,7 +1,7 @@
 /*
  * Copyright 2022 wtcat
  */
-#include "bsp/board/sysconf.h"
+#include "configs/rtems_confdefs.h"
 #include "shell/shell_utils.h"
 
 #define BSD_SHELL_COMMAND_DECLARE(key) \

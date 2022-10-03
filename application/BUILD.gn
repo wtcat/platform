@@ -1,0 +1,4 @@
+
+component("application") {
+    sources = ["main.c"]
+}

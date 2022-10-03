@@ -2,7 +2,7 @@
  * Copyright 2021-2022 wtcat
  */
 #include "drivers/platform_bus.h"
-#include "bsp/board/pinctrl.h"
+#include "pinctrl.h"
 
 /* Control Module */
 #define CTRL_MODULE 		0x44E10000

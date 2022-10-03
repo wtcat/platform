@@ -2,7 +2,7 @@
  * Copyright 2022 wtcat
  */
 
-#include "bsp/board/shellconf.h"
+#include "configs/rtems_confdefs.h"
 
 #if defined(CONFIGURE_SHELL_COMMANDS_BT) && \
 	defined(CONFIGURE_BACKTRACE)

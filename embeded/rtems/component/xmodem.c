@@ -1,4 +1,7 @@
-#include "bsp/board/sysconf.h"
+/*
+ * Copyright 2022 wtcat
+ */
+#include "configs/rtems_confdefs.h"
 #ifdef CONFIGURE_SHELL_COMMAND_XMODEM
 #include <unistd.h>
 #include <fcntl.h>

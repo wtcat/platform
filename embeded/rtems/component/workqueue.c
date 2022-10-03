@@ -1,6 +1,8 @@
 /*
  * CopyRight 2022 wtcat
  */
+#include "configs/rtems_confdefs.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -12,7 +14,6 @@
 
 #include "base/atomic.h"
 #include "base/workqueue.h"
-#include "bsp/board/sysconf.h"
 
 struct helper_work_struct {
     struct work_struct work;

@@ -1,7 +1,7 @@
 /*
  * CopyRight 2022 wtcat
  */
-#include "bsp/board/sysconf.h"
+#include "configs/rtems_confdefs.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -108,8 +108,6 @@ void _shell_init(void) {
         rtems_mutex_unlock(&shell_mutex);
         return;
     }
-	free(shell_env);
-	shell_env = NULL;
 }
 
 #include <rtems/shellconfig.h>

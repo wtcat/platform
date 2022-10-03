@@ -24,7 +24,7 @@
 #include <rtems/bspIo.h>
 
 #include "base/compiler.h"
-#include "bsp/asm/unwind.h"
+#include "asm/unwind.h"
 
 
 //#define DEBUG_ON

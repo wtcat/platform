@@ -1,7 +1,7 @@
 /*
  * Copyright 2022 wtcat
  */
-#include "bsp/board/sysconf.h"
+#include "configs/rtems_confdefs.h"
 
 #if defined(CONFIGURE_SHELL_COMMAND_RAP) || \
     defined(CONFIGURE_SHELL_COMMAND_RTL)

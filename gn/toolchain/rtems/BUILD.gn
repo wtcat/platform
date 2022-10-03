@@ -42,8 +42,12 @@ gcc_toolchain("rtems") {
 }
 
 config("rtems_config") {
-    include_dirs = ["//embeded/rtems/include"]
     defines = []
+    include_dirs = [
+      "//embeded/rtems/include",
+      "${root_out_dir}"
+    ]
+    
     if (use_libbsd) {
       defines += ["__rtems_libbsd__"]
     }

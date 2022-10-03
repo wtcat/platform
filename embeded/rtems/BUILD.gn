@@ -26,12 +26,13 @@ group("all") {
 executable("rtems") {
   libs = []
   defines = []
-  sources = [ "main.c" ]
+  sources = [ "init/init.c" ]
   deps = [
     ":preprocess",
+    "//application",
     "//embeded/rootfs",
-    "//embeded/rtems/bsps/shared",
     "//embeded/rtems/component",
+    "//embeded/rtems/bsps/shared",
     "//embeded/rtems/bsps/${target_cpu}/${target_board}:board"
   ]
   configs += [
@@ -63,10 +64,10 @@ executable("rtems") {
       defines += ["RTEMS_BSD_CONFIG_SERVICE_TELNETD"]
       libs += ["telnetd"]
     }
-  }
-  if (use_gdbserver) {
-    defines += ["CONFIGURE_GDBSERVER"]
-    libs += ["debugger"]
+    if (use_gdbserver) {
+      defines += ["CONFIGURE_GDBSERVER"]
+      libs += ["debugger"]
+    }
   }
   if (use_devicetree) {
     defines +=["CONFIGURE_FDT"]
@@ -98,15 +99,13 @@ if (use_bin) {
 # Build pre-precess action
 group("preprocess") {
   base_path = rebase_path("//embeded/rtems")
-  common_path = "${base_path}/bsps/${target_cpu}"
-  board_path = "${common_path}/${target_board}/include"
+  build_dir = rebase_path("${root_out_dir}")
+  board_path = "${base_path}/bsps/${target_cpu}/${target_board}/include/configs"
   asm_path   = "${base_path}/bsps/${target_cpu}/include"
-  dst_asm_path   = "${base_path}/include/bsp/asm"
-  dst_board_path = "${base_path}/include/bsp/board"
   inputargs = [
-    "rm -rf ${dst_asm_path} ${dst_board_path}",
-    "ln -s  ${asm_path} ${dst_asm_path}",
-    "ln -s  ${board_path} ${dst_board_path}"
+    "rm -rf ${base_path}/include/asm ${build_dir}/configs",
+    "ln -s  ${asm_path}   ${base_path}/include/asm",
+    "ln -s  ${board_path} ${build_dir}/configs"
   ]
   exec_script("//gn/utils/shell.py", inputargs)
 }

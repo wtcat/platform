@@ -3,7 +3,7 @@
 #include "drivers/platform_bus.h"
 #include "drivers/mio.h"
 
-#include "bsp/board/pinctrl.h"
+#include "pinctrl.h"
 
 #ifdef DEBUG_ON
 #define pr_debug(fmt, ...) printk(fmt, ##__VA_ARGS__)

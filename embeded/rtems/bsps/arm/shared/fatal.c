@@ -11,9 +11,8 @@
 
 #ifdef CONFIGURE_BACKTRACE
 #include <rtems/printer.h>
-#include "bsp/asm/unwind.h"
+#include "asm/unwind.h"
 #endif
-
 #ifdef CONFIGURE_FNTRACE
 #include "base/callpath.h"
 #endif
