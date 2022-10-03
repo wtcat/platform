@@ -1,0 +1,4 @@
+
+component("lib") {
+    sources = ["xyz_modem.c"]
+}

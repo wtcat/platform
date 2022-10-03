@@ -7,7 +7,8 @@ component("shell") {
         "shell_backtrace.c",
         "shell_disk.c",
         "shell_mem.c",
-        "shell_misc.c"
+        "shell_misc.c",
+        "shell_xyzmodem.c"
     ]
     if (use_libbsd) {
         sources += [

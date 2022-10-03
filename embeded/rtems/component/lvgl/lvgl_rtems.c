@@ -57,6 +57,12 @@ static char dp_thread_stack[DP_THREAD_STACK_SIZE] __aligned(8);
 static int ui_thread_create(struct thread_arg *thread, void *stack, 
     size_t size, int piro);
 
+static void ui_thread_entry(rtems_task_argument arg) {
+    struct thread_arg *th = (struct thread_arg *)arg;
+    th->thread_entry(th);
+    rtems_task_exit();
+}
+
 static void ui_sevice_thread(void *arg) {
     struct ui_thread_arg *ui = (struct ui_thread_arg *)arg;
     struct ui_message msg;
@@ -104,12 +110,6 @@ static void ui_display_thread(void *arg) {
 
         /* Display process */
     }
-}
-
-static void ui_thread_entry(rtems_task_argument arg) {
-    struct thread_arg *th = (struct thread_arg *)arg;
-    th->thread_entry(th);
-    rtems_task_exit();
 }
 
 static int ui_thread_create(struct thread_arg *thread, void *stack, 
