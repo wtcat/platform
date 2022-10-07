@@ -48,7 +48,9 @@ extern "C"{
 #define DECLARE_BITMAP(name,bits) \
 	unsigned long name[BITS_TO_LONGS(bits)]
 
+#ifndef BIT
 #define	BIT(nr)			(1UL << (nr))
+#endif
 #define	BITS_PER_LONG	(sizeof(long) * __CHAR_BIT__)
 #define	BITMAP_FIRST_WORD_MASK(start)	(~0UL << ((start) % BITS_PER_LONG))
 #define	BITMAP_LAST_WORD_MASK(n)	(~0UL >> (BITS_PER_LONG - (n)))

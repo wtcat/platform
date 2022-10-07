@@ -45,10 +45,12 @@ extern "C"{
 #define IRQF_THREAD             (0x1u << 26)
 #define IRQF_THREADED(n)        ((((uint32_t)(n) & 0x1F) << 27) | IRQF_THREAD)
 #define IRQF_NTHREAD(n)         (((uint32_t)(n) >> 27) & 0x1F)
-#define IRQF_SOFT(svr, irq)     (IRQF_THREADED(svr) | IRQF_INDEX(irq))
-#define IRQF_SOFT_ABS(svr, irq) (IRQ_SOFT(svr, irq) | IRQF_ABS)
-#define IRQF_HARD(irq)           IRQF_INDEX(irq)
-#define IRQF_HARD_ABS(irq)      (IRQF_INDEX(irq) | IRQF_ABS)
+
+#define IRQF_SOFT_REL(svr, irq) (IRQF_THREADED(svr) | IRQF_INDEX(irq))
+#define IRQF_SOFT(svr, irq)     (IRQF_SOFT_REL(svr, irq) | IRQF_ABS)
+
+#define IRQF_HARD_REL(irq)      IRQF_INDEX(irq)
+#define IRQF_HARD(irq)          (IRQF_HARD_REL(irq) | IRQF_ABS)
 
 
 /* Bus resource class */
@@ -161,6 +163,10 @@ const struct dev_id *device_match(struct drvmgr_dev *dev,
 
 static inline const char *platform_dev_filename(struct drvmgr_dev *dev) {
 	return dev->name - 5;
+}
+
+static inline void *device_get_parent_priv(struct drvmgr_dev *dev) {
+	return dev->parent->dev->priv;
 }
 
 static inline struct dev_private *device_get_private(struct drvmgr_dev *dev) {

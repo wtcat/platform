@@ -1,6 +1,11 @@
 #Common arguments declare
 
 declare_args() {
+  # Target SoC 
+  target_soc = ""
+}
+
+declare_args() {
   #Generate binary file
   use_bin = false
   

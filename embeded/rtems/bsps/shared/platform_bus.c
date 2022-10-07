@@ -118,11 +118,12 @@ int platform_irq_map(struct drvmgr_dev *dev, int index) {
 	struct dev_private *priv;
 	if (!dev)
 		return -DRVMGR_EINVAL;
-	priv = dev->businfo;
-	if (IRQF_INDEX(index) >= (int)priv->nirq)
-		return -DRVMGR_EINVAL;
-	if (!(index & IRQF_ABS))
+	if (!(index & IRQF_ABS)) {
+		priv = dev->businfo;
+		if (IRQF_INDEX(index) >= priv->nirq)
+			return -DRVMGR_EINVAL;
 		return priv->irqs[IRQF_INDEX(index)];
+	}
 	return IRQF_INDEX(index);
 }
 

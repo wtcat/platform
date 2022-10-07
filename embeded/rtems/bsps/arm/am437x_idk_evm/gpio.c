@@ -344,7 +344,7 @@ static int gpio_bus_init(struct drvmgr_dev *dev) {
 	ret = platform_bus_device_register(dev, &gpio_bus_ops, 
 		DRVMGR_BUS_TYPE_GPIO);
 	if (ret) {
-		printk("Register GPIO bus device（%s） failed\n", dev->name);
+		printk("Register GPIO bus device(%s) failed\n", dev->name);
 		goto _free;
 	}
 	return 0;

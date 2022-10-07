@@ -29,7 +29,7 @@ extern "C"{
 #define GPIO_PULLDOWN (4ul << 8)
 
 struct gpio_operations {
-	int (*configure)(struct drvmgr_dev *dev, int pin, unsigned int mode);
+	int (*configure)(struct drvmgr_dev *dev, int pin, uint32_t mode);
     int (*set_port)(struct drvmgr_dev *dev, uint32_t mask, uint32_t value);
     int (*get_port)(struct drvmgr_dev *dev, uint32_t mask, uint32_t *value);
 	int (*set_pin)(struct drvmgr_dev *dev, int pin, int val);
