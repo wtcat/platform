@@ -100,7 +100,7 @@ int platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev,
 	int bustype) {
 	struct dev_private *priv;
 	struct dev_driver *ddrv;
-	if (!drv || !dev || !dev->parent || !dev->businfo)
+	if (!drv || !dev || !dev->parent)
 		return 0;
 	if (drv->bus_type != bustype ||
 		dev->parent->bus_type != bustype)

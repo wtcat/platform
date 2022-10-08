@@ -5,6 +5,7 @@
 #define DRIVER_OFW_PLATFORM_BUS_H_
 
 #include <drvmgr/drvmgr.h>
+#include <ofw/ofw.h>
 #include "base/compiler.h"
 
 #ifdef __cplusplus
@@ -55,22 +56,23 @@ struct dev_driver {
 
 struct dev_private {
 	const void *devops;  /* Device operations */
-    phandle_t np;
+    phandle_t np; /* Device tree node */
 };
 
-int platform_res_register(const struct bus_resource *const *r);
-int platform_dev_register(struct drvmgr_bus *parent,
-	const struct bus_resource *r);
-int platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev, 
-	int bustype);
-int platform_dev_populate_on_bus(struct drvmgr_bus *bus,
-	const struct bus_resource *const *r);
-int platform_bus_device_register(struct drvmgr_dev *dev,
+phandle_t ofw_platform_bus_get_node(struct drvmgr_dev *dev);
+int ofw_platform_bus_populate_device(struct drvmgr_bus *bus);
+int ofw_platform_bus_device_register(struct drvmgr_dev *dev,
 	struct drvmgr_bus_ops *bus_ops, int bustype);
+int ofw_platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev, 
+	int bustype);
+const struct dev_id *ofw_device_match(struct drvmgr_dev *dev, 
+	const struct dev_id *id_table);
 
 
-static inline const char *platform_dev_filename(struct drvmgr_dev *dev) {
-	return dev->name - 5;
+static inline void *device_match_data(struct drvmgr_dev *dev) {
+	const struct dev_id *id;
+	id = ofw_device_match(dev, ((struct dev_driver *)dev->drv)->ids);
+	return id->data;
 }
 
 static inline void *device_get_parent_priv(struct drvmgr_dev *dev) {
@@ -89,14 +91,7 @@ static inline const void *device_get_operations(struct drvmgr_dev *dev) {
 	return *(void **)(dev + 1);
 }
 
-static inline union drvmgr_key_value *
-devcie_get_property(struct drvmgr_dev *dev, const char *prop) {
-	struct dev_private *priv = device_get_private(dev);
-	return drvmgr_key_val_get((struct drvmgr_key *)priv->res->keys, 
-		(char *)prop, DRVMGR_KT_ANY);
-}
-
-#define platform_driver_init(drv) \
+#define _ofw_platform_driver_init(drv) \
 	RTEMS_STATIC_ASSERT(sizeof(drv) == sizeof(struct dev_driver), \
 		"Device driver object type error!"); \
 	static void platform_driver_##drv##_register(void) { \
@@ -107,10 +102,10 @@ devcie_get_property(struct drvmgr_dev *dev, const char *prop) {
 		RTEMS_SYSINIT_ORDER_MIDDLE \
 	)
 
-#define PLATFORM_DRIVER(name) \
-	static struct dev_driver __drv_##name; \
-	platform_driver_init(__drv_##name); \
-	static struct dev_driver __drv_##name
+#define OFW_PLATFORM_DRIVER(name) \
+	static struct dev_driver __ofw_drv_##name; \
+	_ofw_platform_driver_init(__ofw_drv_##name); \
+	static struct dev_driver __ofw_drv_##name
 
 #ifdef __cplusplus
 }

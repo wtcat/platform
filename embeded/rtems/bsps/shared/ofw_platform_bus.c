@@ -1,10 +1,10 @@
 /*
  * CopyRight(c) 2022 wtcat
  */
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
 
 #include <rtems/sysinit.h>
 #include <rtems/bspIo.h>
@@ -30,11 +30,16 @@ const struct dev_id *ofw_device_match(struct drvmgr_dev *dev,
 	return NULL;
 }
 
+phandle_t ofw_platform_bus_get_node(struct drvmgr_dev *dev) {
+	struct dev_private *priv = device_get_private(dev);
+	return priv->np;
+}
+
 int ofw_platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev, 
 	int bustype) {
 	struct dev_private *priv;
 	struct dev_driver *ddrv;
-	if (!drv || !dev || !dev->parent || !dev->businfo)
+	if (!drv || !dev || !dev->parent)
 		return 0;
 	if (drv->bus_type != bustype ||
 		dev->parent->bus_type != bustype)
@@ -48,27 +53,27 @@ int ofw_platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev,
 	return 0;
 }
 	
-int platform_irq_map(struct drvmgr_dev *dev, int index) {
-	struct dev_private *priv;
+int ofw_platform_irq_map(struct drvmgr_dev *dev, int index) {
+	// struct dev_private *priv;
 	if (!dev)
 		return -DRVMGR_EINVAL;
-	if (!(index & IRQF_ABS)) {
-		priv = dev->businfo;
-		if (IRQF_INDEX(index) >= priv->nirq)
-			return -DRVMGR_EINVAL;
-		return priv->irqs[IRQF_INDEX(index)];
-	}
+	// if (!(index & IRQF_ABS)) {
+	// 	priv = dev->businfo;
+	// 	if (IRQF_INDEX(index) >= priv->nirq)
+	// 		return -DRVMGR_EINVAL;
+	// 	return priv->irqs[IRQF_INDEX(index)];
+	// }
 	return IRQF_INDEX(index);
 }
 
-static int platform_bus_unite(struct drvmgr_drv *drv, struct drvmgr_dev *dev) {
-	return platform_bus_match(drv, dev, DRVMGR_BUS_TYPE_PLATFORM);
+static int ofw_platform_bus_unite(struct drvmgr_drv *drv, struct drvmgr_dev *dev) {
+	return ofw_platform_bus_match(drv, dev, DRVMGR_BUS_TYPE_PLATFORM);
 }
 
-static int platform_bus_intr_register(struct drvmgr_dev *dev, int index, 
+static int ofw_platform_bus_intr_register(struct drvmgr_dev *dev, int index, 
  const char *info, drvmgr_isr isr, void *arg) {
 	rtems_status_code sc;
-	int irq = platform_irq_map(dev, index);
+	int irq = ofw_platform_irq_map(dev, index);
 	if (irq < 0)
 		return DRVMGR_FAIL;
 	if (index & IRQF_THREAD) {
@@ -81,10 +86,10 @@ static int platform_bus_intr_register(struct drvmgr_dev *dev, int index,
 	return (int)sc;
 }
 
-static int platform_bus_intr_unregister(struct drvmgr_dev *dev, int index, 
+static int ofw_platform_bus_intr_unregister(struct drvmgr_dev *dev, int index, 
  drvmgr_isr isr, void *arg) {
 	rtems_status_code sc;
-	int irq = platform_irq_map(dev, index);
+	int irq = ofw_platform_irq_map(dev, index);
 	if (irq < 0)
 		return DRVMGR_FAIL;
 	if (index & IRQF_THREAD) {
@@ -96,41 +101,49 @@ static int platform_bus_intr_unregister(struct drvmgr_dev *dev, int index,
 	return sc;
 }
 	
-static int platform_bus_intr_clear(struct drvmgr_dev *dev, int index) {
+static int ofw_platform_bus_intr_clear(struct drvmgr_dev *dev, int index) {
 	(void) dev;
 	(void) index;
 	return DRVMGR_FAIL;
 }
 
-static int platform_bus_intr_mask(struct drvmgr_dev *dev, int index) {
-	int irq = platform_irq_map(dev, index);
+static int ofw_platform_bus_intr_mask(struct drvmgr_dev *dev, int index) {
+	int irq = ofw_platform_irq_map(dev, index);
 	if (irq < 0)
 		return DRVMGR_FAIL;
 	return rtems_interrupt_vector_disable((rtems_vector_number)irq);
 }
 
-static int platform_bus_intr_unmask(struct drvmgr_dev *dev, int index) {
-	int irq = platform_irq_map(dev, index);
+static int ofw_platform_bus_intr_unmask(struct drvmgr_dev *dev, int index) {
+	int irq = ofw_platform_irq_map(dev, index);
 	if (irq < 0)
 		return DRVMGR_FAIL;
 	return rtems_interrupt_vector_enable((rtems_vector_number)irq);
 }
 
 #ifdef RTEMS_SMP
-static int platform_bus_intr_set_affinity(struct drvmgr_dev *dev, 
+static int ofw_platform_bus_intr_set_affinity(struct drvmgr_dev *dev, 
 	int index, const Processor_mask *cpus) {
 	return DRVMGR_FAIL;
 }
 #endif
 
-static int platform_bus_get_params(struct drvmgr_dev *dev, 
+static int ofw_platform_bus_get_params(struct drvmgr_dev *dev, 
 	struct drvmgr_bus_params *param) {
 	(void) dev;
 	(void) param;
 	return DRVMGR_FAIL;
 }
+
+static int ofw_platform_bus_get_freq(struct drvmgr_dev *dev, int no, 
+	unsigned int *freq) {
+	(void) dev;
+	(void) no;
+	(void) freq;
+	return DRVMGR_FAIL;
+}
 	
-int ofw_platform_bus_populate(struct drvmgr_bus *bus) {
+int ofw_platform_bus_populate_device(struct drvmgr_bus *bus) {
     struct drvmgr_dev *dev;
     struct dev_private *priv;
     phandle_t child, parent;
@@ -188,20 +201,20 @@ int ofw_platform_bus_device_register(struct drvmgr_dev *dev,
 
 static struct drvmgr_bus_ops platform_bus_ops = {
 	.init = {
-		ofw_platform_bus_populate,
+		ofw_platform_bus_populate_device,
 	},
 	.remove         = NULL,
-	.unite		    = platform_bus_unite,
-	.int_register	= platform_bus_intr_register,
-	.int_unregister	= platform_bus_intr_unregister,
-	.int_clear	    = platform_bus_intr_clear,
-	.int_mask	    = platform_bus_intr_mask,
-	.int_unmask	    = platform_bus_intr_unmask,
+	.unite		    = ofw_platform_bus_unite,
+	.int_register	= ofw_platform_bus_intr_register,
+	.int_unregister	= ofw_platform_bus_intr_unregister,
+	.int_clear	    = ofw_platform_bus_intr_clear,
+	.int_mask	    = ofw_platform_bus_intr_mask,
+	.int_unmask	    = ofw_platform_bus_intr_unmask,
 #ifdef RTEMS_SMP
-	.int_set_affinity = platform_bus_intr_set_affinity
+	.int_set_affinity = ofw_platform_bus_intr_set_affinity
 #endif
-	.get_params	    = platform_bus_get_params,
-	.get_freq       = platform_bus_get_freq
+	.get_params	    = ofw_platform_bus_get_params,
+	.get_freq       = ofw_platform_bus_get_freq
 };
 
 static int ofw_platform_bus_init(struct drvmgr_dev *dev) {
@@ -220,17 +233,17 @@ static struct drvmgr_drv_ops platform_driver_ops = {
 static struct drvmgr_drv platform_bus_driver = {
 	.obj_type = DRVMGR_OBJ_DRV,
 	.drv_id   = DRIVER_ROOT_ID,
-	.name     = "root-bus",
+	.name     = "platform-bus",
 	.bus_type = DRVMGR_BUS_TYPE_ROOT,
 	.ops      = &platform_driver_ops
 };
 
-static void platform_bus_driver_register(void) {
+static void ofw_platform_bus_driver_register(void) {
 	/* Register root device driver */
 	drvmgr_root_drv_register(&platform_bus_driver);
 }
 
-RTEMS_SYSINIT_ITEM(platform_bus_driver_register,
+RTEMS_SYSINIT_ITEM(ofw_platform_bus_driver_register,
 	RTEMS_SYSINIT_BSP_PRE_DRIVERS,
 	RTEMS_SYSINIT_ORDER_MIDDLE
 );
