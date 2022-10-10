@@ -28,6 +28,10 @@ declare_args() {
 
   #Function call stack check
   use_fnstack_check = false
+
+  #Build devices by device tree (if true)
+  #Build devices by resources definition (if false)
+  use_ofw_bus = false
 }
 
 if (use_backtrace) {
