@@ -1,5 +1,6 @@
 import("//gn/toolchain/rtems/rtems.gni")
 
+
 component("board") {
   defines = []
   include_dirs = [
