@@ -1,0 +1,19 @@
+import("//gn/toolchain/rtems/rtems.gni")
+
+
+component("board") {
+  defines = []
+  include_dirs = [
+    "include"
+  ]
+  sources = [
+    "stm32_gpio.c"
+  ]
+
+  deps = ["//embeded/rtems/bsps/arm/shared"]
+  deps += ["//embeded/rtems/bsps/arm/shared/hal_stm32:stm32h7"]
+  configs = [
+    "//embeded/rtems/bsps/arm/shared/hal_stm32:stm32f7_config"
+  ]
+}
+

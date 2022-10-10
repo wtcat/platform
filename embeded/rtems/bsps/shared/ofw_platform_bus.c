@@ -52,15 +52,8 @@ int ofw_platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev,
 }
 	
 int ofw_platform_irq_map(struct drvmgr_dev *dev, int index) {
-	// struct dev_private *priv;
-	if (!dev)
+	if (!dev || !(index & IRQF_ABS))
 		return -DRVMGR_EINVAL;
-	// if (!(index & IRQF_ABS)) {
-	// 	priv = dev->businfo;
-	// 	if (IRQF_INDEX(index) >= priv->nirq)
-	// 		return -DRVMGR_EINVAL;
-	// 	return priv->irqs[IRQF_INDEX(index)];
-	// }
 	return IRQF_INDEX(index);
 }
 
