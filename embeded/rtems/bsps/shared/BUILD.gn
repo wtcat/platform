@@ -1,6 +1,13 @@
+import ("//gn/toolchain/rtems/rtems.gni")
+
 component("shared") {
-    sources = [
-        "platform_bus.c",
+    sources = []
+    if (use_ofw_bus) {
+        sources += ["ofw_platform_bus.c"]
+    } else {
+        sources += ["platform_bus.c"]
+    }
+    sources += [
         "vdma.c"
     ]
 }

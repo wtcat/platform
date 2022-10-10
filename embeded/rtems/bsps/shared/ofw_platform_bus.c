@@ -2,17 +2,15 @@
  * CopyRight(c) 2022 wtcat
  */
 #include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include <rtems/sysinit.h>
 #include <rtems/bspIo.h>
-#include <bsp.h>
 #include <bsp/irq-generic.h>
 #include <ofw/ofw.h>
 
 #include "drivers/ofw_platform_bus.h"
+
+
 
 #define ofw_foreach_child_node(parent, child) \
     for (child = rtems_ofw_child(parent); \
