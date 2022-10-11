@@ -6,7 +6,7 @@
 
 #include <rtems/bspIo.h>
 #include <rtems/sysinit.h>
-
+#include <rtems/score/armv7m.h>
 #include "base/compiler.h"
 
 
@@ -66,29 +66,8 @@ extern char stm32h7_memory_sdram_2_begin[];
 extern char stm32h7_memory_sdram_2_end[];
 extern char stm32h7_memory_sdram_2_size[];
 
-void __notrace bsp_start(void) {
-    bsp_interrupt_initialize();
-    rtems_cache_coherent_add_area(bsp_section_nocacheheap_begin,
-        (uintptr_t)bsp_section_nocacheheap_size);
-}
 
-/* For stm32_hal library */
-uint32_t HAL_GetTick(void) {
-  return rtems_clock_get_ticks_since_boot() *
-    rtems_configuration_get_milliseconds_per_tick();
-}
-
-void HAL_MspInit(void) {
-  __HAL_RCC_SYSCFG_CLK_ENABLE();
-}
-
-
-
-
-#include <stm32h7/memory.h>
-#include <stm32h7/mpu-config.h>
-
-const ARMV7M_MPU_Region_config stm32h7_config_mpu_region [] = {
+static const ARMV7M_MPU_Region_config stm32h7_mpu_map[] = {
     {
       .begin = stm32h7_memory_sram_axi_begin,
       .end = stm32h7_memory_sram_axi_end,
@@ -135,4 +114,51 @@ const ARMV7M_MPU_Region_config stm32h7_config_mpu_region [] = {
       .end = stm32h7_memory_null_end,
       .rasr = ARMV7M_MPU_RASR_XN | ARMV7M_MPU_RASR_ENABLE,
     }
-  };
+};
+
+void __notrace bsp_start(void) {
+    bsp_interrupt_initialize();
+    rtems_cache_coherent_add_area(bsp_section_nocacheheap_begin,
+        (uintptr_t)bsp_section_nocacheheap_size);
+}
+
+void __notrace bsp_start_hook_0(void) {
+  // if ((RCC->AHB3ENR & RCC_AHB3ENR_FMCEN) == 0) {
+  //   /*
+  //    * Only perform the low-level initialization if necessary.  An initialized
+  //    * FMC indicates that a boot loader already performed the low-level
+  //    * initialization.
+  //    */
+  //   SystemInit();
+  //   stm32h7_init_power();
+  //   stm32h7_init_oscillator();
+  //   stm32h7_init_clocks();
+  //   stm32h7_init_peripheral_clocks();
+  //   HAL_RCC_MCOConfig(RCC_MCO1, RCC_MCO1SOURCE_HSI, RCC_MCODIV_1);
+  //   HAL_Init();
+  //   SystemInit_ExtMemCtl();
+  // }
+
+  if ((SCB->CCR & SCB_CCR_IC_Msk) == 0) 
+    SCB_EnableICache();
+  if ((SCB->CCR & SCB_CCR_DC_Msk) == 0) 
+    SCB_EnableDCache();
+  _ARMV7M_MPU_Setup(stm32h7_mpu_map, RTEMS_ARRAY_SIZE(stm32h7_mpu_map));
+}
+
+void __notrace bsp_start_hook_1(void) {
+  bsp_start_copy_sections_compact();
+  SCB_CleanDCache();
+  SCB_InvalidateICache();
+  bsp_start_clear_bss();
+}
+
+/* For stm32_hal library */
+uint32_t HAL_GetTick(void) {
+  return rtems_clock_get_ticks_since_boot() *
+    rtems_configuration_get_milliseconds_per_tick();
+}
+
+void HAL_MspInit(void) {
+  __HAL_RCC_SYSCFG_CLK_ENABLE();
+}
