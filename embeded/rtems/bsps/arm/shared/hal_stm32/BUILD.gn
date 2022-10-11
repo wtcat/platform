@@ -145,6 +145,168 @@ config("stm32f4_config") {
     ]
 }
 
+# STM32H7
+component("stm32h7") {
+    sources = [
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_lptim",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_rtc_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_fmac",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_mmc_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_dma2d",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_lpuart",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_hash",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_adc",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_irda",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_tim",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_mmc",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_timebase_tim_template",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_dfsdm_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_smartcard_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_sram",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_dac_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_spdifrx",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_rng_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_exti",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_lptim",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_crc_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_rtc",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_ltdc",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_sd",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_flash_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_usb",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_opamp",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_i2s",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_delayblock",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_tim",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_iwdg",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_ramecc",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_i2s_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_sai",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_wwdg",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_dma",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_exti",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_cec",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_usart",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_eth",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_dfsdm",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_gpio",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_dac",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_hcd",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_timebase_rtc_wakeup_template",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_mdma",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_rng",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_fmc",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_dma_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_flash",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_hsem",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_comp",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_nand",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_cordic",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_dma",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_utils",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_pcd",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_cortex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_bdma",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_hrtim",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_spi_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_gpio",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_smbus",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_swpmi",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_opamp",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_usart_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_hrtim",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_sdram",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_dsi",
+        "stm32cube/stm32h7xx/drivers/src/Legacy/stm32h7xx_hal_eth",
+        "stm32cube/stm32h7xx/drivers/src/Legacy/stm32h7xx_hal_eth_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_ospi",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_tim_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_uart_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_gfxmmu",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_pwr",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_sdmmc",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_hash_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_qspi",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_comp",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_msp_template",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_pssi",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_sd_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_i2c_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_pwr_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_spi",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_fmac",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_rtc",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_ltdc_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_jpeg",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_timebase_rtc_alarm_template",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_mdios",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_adc",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_i2c",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_opamp_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_nor",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_dts",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_dac",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_spi",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_i2c",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_smbus_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_swpmi",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_smartcard",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_rng",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_dma2d",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_pwr",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_crc",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_otfdec",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_rcc",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_adc_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_crs",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_mdma",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_rcc",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_cordic",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_uart",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_usart",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_fdcan",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_rcc_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_cryp",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_eth_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_dcmi",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_cryp_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_sai_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_pcd_ex",
+        "stm32cube/stm32h7xx/drivers/src/stm32h7xx_ll_crc"
+    ]
+
+    include_dirs = ["."]
+    configs = [":stm32h7_config"]
+    component_type == "static_library"
+}
+
+config("stm32h7_config") {
+    assert(
+        target_soc == STM32H743xx ||
+        target_soc == STM32H753xx ||
+        target_soc == STM32H750xx ||
+        target_soc == STM32H742xx ||
+        target_soc == STM32H745xx ||
+        target_soc == STM32H755xx ||
+        target_soc == STM32H747xx ||
+        target_soc == STM32H757xx,
+        "Invalid STM32H7xx device"
+    )
+    configs = [":stm32cube_config"]
+    include_dirs = [
+        "stm32cube/stm32h7xx/soc",
+        "stm32cube/stm32h7xx/drivers/include",
+        "stm32cube/stm32h7xx/drivers/include/Legacy",
+    ]
+    defines = [
+        "CONFIG_SOC_SERIES_STM32H7X",
+        "CORE_CM7",
+        "${target_soc}"
+    ]
+}
+
+
 #COMMON
 config("stm32cube_config") {
     include_dirs = ["stm32cube/common_ii/include"]

@@ -3,6 +3,7 @@
  */
 #include <rtems/console.h>
 #include <bsp.h>
+#include <bsp/start.h>
 
 #ifdef RTEMS_DRVMGR_STARTUP
 #include <drvmgr/drvmgr.h>

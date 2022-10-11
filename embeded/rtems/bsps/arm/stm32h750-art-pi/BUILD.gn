@@ -7,7 +7,7 @@ component("board") {
     "include"
   ]
   sources = [
-    "stm32_gpio.c"
+    "stm32h2.c"
   ]
 
   deps = ["//embeded/rtems/bsps/arm/shared"]
