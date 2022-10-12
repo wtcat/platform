@@ -2,12 +2,16 @@
  * Copyright 2022 wtcat
  */
 #include <bsp.h>
+#include <bsp/start.h>
 #include <bsp/linker-symbols.h>
+#include <bsp/irq-generic.h>
 
 #include <rtems/bspIo.h>
 #include <rtems/sysinit.h>
 #include <rtems/score/armv7m.h>
+
 #include "base/compiler.h"
+#include "stm32h7xx.h"
 
 
 extern char stm32h7_memory_null_begin[];
@@ -161,4 +165,8 @@ uint32_t HAL_GetTick(void) {
 
 void HAL_MspInit(void) {
   __HAL_RCC_SYSCFG_CLK_ENABLE();
+}
+
+const void *bsp_fdt_get(void) {
+  return NULL;
 }

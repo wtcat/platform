@@ -2,6 +2,7 @@
  * CopyRight(c) 2022 wtcat
  */
 #include <errno.h>
+#include <string.h>
 
 #include <rtems/sysinit.h>
 #include <rtems/bspIo.h>

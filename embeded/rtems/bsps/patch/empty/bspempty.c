@@ -2,6 +2,8 @@
  * Copyright 2022 wtcat
  */
 #include <rtems/console.h>
+#include <rtems/bspIo.h>
+
 #include <bsp.h>
 #include <bsp/start.h>
 
@@ -37,10 +39,20 @@ uint32_t bsp_fdt_map_intr(const uint32_t *intr,
     return intr[1] + 0;
 }
 
-rtems_status_code RTEMS_WEAK console_initialize(rtems_device_major_number major,
+rtems_status_code console_initialize(rtems_device_major_number major,
     rtems_device_minor_number minor, void *arg) {
     (void) major;
     (void) minor;
     (void) arg;
     return RTEMS_SUCCESSFUL;
 }
+
+static void _bsp_empty_putchar(char c) {
+    (void)c;
+}
+
+static int _bsp_empty_getchar(void) {
+    return -1;
+}
+BSP_output_char_function_type BSP_output_char = _bsp_empty_putchar;
+BSP_polling_getchar_function_type BSP_poll_char = _bsp_empty_getchar;

@@ -1,100 +1,19 @@
 # Set build arguments here. See `gn help buildargs`.
 target_os = "rtems"
 target_cpu = "arm"
-target_soc = "am43xx"
+target_version = 6
 target_board = "am437x_idk_evm"
-rtems_tools = "/home/wt/development/rtems"
-rtems_version = 6
 
-optimize_level = "O2"
+compiler_cflags = "-O2"
 
-max_cpus = 1
-sched_priority = true
-
-use_verbose = true
+use_devicetree = true
+use_ofw_bus = false
 use_bin = true
 use_uboot = true
-use_devicetree = true
-use_media = true
-
-uboot_loadaddr = 2148548608
-#uboot_entryaddr = 0
-
-#====================
-# Base
-#====================
-max_tasks = 128
-max_posix_keys = 16
-max_timers = 64
-max_semaphores = 32
-max_fds = 128
-wkspace_size = 8388608  # 8MB
-max_priority = 127
-
-#====================
-# LIBBSD
-#====================
-use_libbsd = true
-use_bsdnet_ftpd = true
-use_bsdnet_telnet = true
-max_user_extensions = 3
-init_task_stack_size = 32768
-page_mbufs_size = 8388608  # 8MB
-bsd_log_level = "warning"
-
-#====================
-# LIBDL
-#====================
 use_rtl = true
-libdl_conf_content = "# Dynamic loader configure file\n/home/libdl*.a\n"
-
-#====================
-# Filesystem
-#====================
-use_dosfs = true
-
-#====================
-# Shell command
-#====================
-use_shell = true
-use_shell_script = true
-script_content = "#! joel -t JOEL -p 10 -s 8192\nsleep 2\nmkdir /home\nmount -t dosfs /dev/fdisk1 /home\n"
-
-#shell_all = true
-
-shell_irq = true
-shell_xmodem = true
-shell_clear = true
-shell_chmod = true
-shell_msdosfmt = true
-shell_mv = true
-shell_rm = true
-shell_ln = true
-shell_mknod = true
-shell_cat = true
-shell_mount = true
-shell_unmount = true
-shell_blksync = true
-shell_blkstats = true
-shell_profreport = true
-shell_echo = true
-shell_edit = true
-shell_joel = true
-
-#====================
-# Block device cache
-#====================
-use_bdbuf = true
-bdbuf_cache_size = 16777216 #16MB
-bdbuf_max_blksize = 16384 #16KB
-bdbuf_max_read_ahead_blks = 0
-bdbuf_max_write_blks = 32
-bdbuf_min_blksize = 512
-bdbuf_read_ahead_task_priority = 10
-bdbuf_swapout_block_hold = 5000
-bdbuf_swapout_period = 5000
-bdbuf_swapout_task_priority = 10
-bdbuf_swapout_worker_task_priority = 0
-bdbuf_swapout_worker_tasks = 0
-bdbuf_task_stack_size = 4096
-
+use_testsuite = true
+uboot_ldaddr = 2148548608
+use_libbsd = true
+use_gdbserver= true
+use_backtrace = true
+use_fntrace = true

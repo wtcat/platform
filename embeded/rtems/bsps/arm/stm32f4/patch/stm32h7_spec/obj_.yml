@@ -32,4 +32,5 @@ source:
 - bsps/shared/start/sbrk.c
 - bsps/shared/start/stackalloc.c
 - bsps/arm/empty/bspempty.c
+- bsps/arm/stm32h7/start/stm32h7_clkfreq.c
 type: build

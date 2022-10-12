@@ -45,6 +45,9 @@
   * @{
   */
 
+#ifdef __rtems__
+#include <bspopts.h>
+#endif /* __rtems__ */
 /**
   * @brief STM32 Family
   */
