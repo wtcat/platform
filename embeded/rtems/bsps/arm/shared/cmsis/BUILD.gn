@@ -1,0 +1,26 @@
+
+config("cortexM_config") {
+    include_dirs = ["CMSIS/Core/Include"]
+}
+
+config("cortexA_config") {
+    include_dirs = ["CMSIS/Core_A/Include"]
+}
+
+config("cortexR_config") {
+    include_dirs = ["CMSIS/Core_R/Include"]
+}
+
+# config("cortexDSP_config") {
+#     include_dirs = ["CMSIS/DSP/Include"]
+# }
+
+# component("cortex_dsp") {
+#     include_dirs = ["CMSIS/DSP/PrivateInclude"]
+#     sources = [
+
+#     ]
+#     configs = [
+#         ":cortexDSP_config"
+#     ]
+# }
