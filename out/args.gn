@@ -1,22 +1,19 @@
 # Set build arguments here. See `gn help buildargs`.
-# target_os = "rtems"
-# target_cpu = "arm"
-
 target_os = "rtems"
 target_cpu = "arm"
+target_soc = "STM32H750xx"
 target_version = 6
-target_board = "am437x_idk_evm"
+target_board = "stm32h750-art-pi"
 
-# rtems_package_path = "//rtems/build/arm/am437x_idk_evm"
 compiler_cflags = "-O2"
 
 use_devicetree = true
 use_bin = true
-use_uboot = true
-use_rtl = true
+use_uboot = false
+# use_rtl = true
 use_testsuite = true
-uboot_ldaddr = 2148548608
-use_libbsd = true
-use_gdbserver= true
-use_backtrace = true
-# use_fntrace = false
+# uboot_ldaddr = 2148548608
+# use_libbsd = true
+# use_gdbserver= true
+# use_backtrace = true
+# use_fntrace = true

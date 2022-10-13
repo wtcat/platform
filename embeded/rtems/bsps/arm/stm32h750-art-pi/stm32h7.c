@@ -11,7 +11,7 @@
 #include <rtems/score/armv7m.h>
 
 #include "base/compiler.h"
-#include "stm32h7xx.h"
+#include "stm32h7xx_ll_rcc.h"
 
 
 extern char stm32h7_memory_null_begin[];
@@ -169,4 +169,10 @@ void HAL_MspInit(void) {
 
 const void *bsp_fdt_get(void) {
   return NULL;
+}
+
+uint32_t stm32h7_systick_frequency(void) {
+  LL_RCC_ClocksTypeDef rcc_clks;
+  LL_RCC_GetSystemClocksFreq(&rcc_clks);
+  return rcc_clks.SYSCLK_Frequency;
 }

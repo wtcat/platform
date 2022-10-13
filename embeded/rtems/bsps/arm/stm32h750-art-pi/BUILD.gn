@@ -6,7 +6,9 @@ component("board") {
     "include"
   ]
   sources = [
-    "stm32h7.c"
+    "stm32h7.c",
+    "stm32h7_clk.c",
+    "stm32h7_dma.c"
   ]
 
   deps = ["//embeded/rtems/bsps/arm/shared"]

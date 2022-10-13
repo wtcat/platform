@@ -10,13 +10,28 @@
 #include <ofw/ofw.h>
 
 #include "drivers/ofw_platform_bus.h"
+#include "rtems/chain.h"
+#include "rtems/score/basedefs.h"
 
+#define OFW_DEBUG_ON
 
+#ifdef OFW_DEBUG_ON
+#define ofw_dbg(fmt, ...) printk(fmt, ##__VA_ARGS__)
+#else
+#define ofw_dbg(...)
+#endif
 
 #define ofw_foreach_child_node(parent, child) \
     for (child = rtems_ofw_child(parent); \
         child != 0; \
         child = rtems_ofw_peer(child))
+
+static RTEMS_CHAIN_DEFINE_EMPTY(ofw_root);
+
+static struct drvmgr_dev *device_from_private(struct dev_private *priv) {
+	struct drvmgr_dev *xdev = (struct drvmgr_dev *)priv;
+	return xdev - 1;
+}
 
 const struct dev_id *ofw_device_match(struct drvmgr_dev *dev, 
 	const struct dev_id *id_table) {
@@ -29,9 +44,21 @@ const struct dev_id *ofw_device_match(struct drvmgr_dev *dev,
 	return NULL;
 }
 
-phandle_t ofw_platform_bus_get_node(struct drvmgr_dev *dev) {
+phandle_t ofw_phandle_get(struct drvmgr_dev *dev) {
 	struct dev_private *priv = device_get_private(dev);
 	return priv->np;
+}
+
+struct drvmgr_dev *ofw_device_get(phandle_t np) {
+	rtems_chain_node *pnode = rtems_chain_first(&ofw_root);
+	while (!rtems_chain_is_tail(&ofw_root, pnode)) {
+		struct dev_private *priv = RTEMS_CONTAINER_OF(pnode, 
+			struct dev_private, node);
+		if (np == priv->np) 
+			return device_from_private(priv);
+		pnode = rtems_chain_next(pnode);
+	}
+	return NULL;
 }
 
 int ofw_platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev, 
@@ -63,7 +90,7 @@ static int ofw_platform_bus_unite(struct drvmgr_drv *drv, struct drvmgr_dev *dev
 }
 
 static int ofw_platform_bus_intr_register(struct drvmgr_dev *dev, int index, 
- const char *info, drvmgr_isr isr, void *arg) {
+	const char *info, drvmgr_isr isr, void *arg) {
 	rtems_status_code sc;
 	int irq = ofw_platform_irq_map(dev, index);
 	if (irq < 0)
@@ -150,6 +177,7 @@ int ofw_platform_bus_populate_device(struct drvmgr_bus *bus) {
         int len = rtems_ofw_get_prop(child, "rtems,path", buffer, sizeof(buffer));
         if (len <= 0)
             continue;
+		ofw_dbg("DevNode register: %s\n", buffer);
         drvmgr_alloc_dev(&dev, sizeof(struct dev_private) + len + 1);
         _Assert(dev != NULL);
         priv = device_get_private(dev);
@@ -166,9 +194,12 @@ int ofw_platform_bus_populate_device(struct drvmgr_bus *bus) {
         dev->name = name;
         dev->next_in_drv = NULL;
         dev->bus = NULL;
+		rtems_chain_append(&ofw_root, &priv->node);
         err = drvmgr_dev_register(dev);
-        if (err)
+        if (err) {
+			printk("DevError***: register %s failed(%d)\n", name, err);
             break;
+		}
     }
     return err;
 }

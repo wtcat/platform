@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <stddef.h>
 
-#include "drivers/platform_bus.h"
+#include "drivers/devbase.h"
 
 #ifdef __cplusplus
 extern "C" {

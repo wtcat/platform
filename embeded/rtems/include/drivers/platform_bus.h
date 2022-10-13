@@ -26,10 +26,7 @@
 #ifndef DRIVER_PLATFORM_BUS_H_
 #define DRIVER_PLATFORM_BUS_H_
 
-#include <rtems/sysinit.h>
-#include <drvmgr/drvmgr.h>
-
-#include "base/compiler.h"
+#include "drivers/devbase.h"
 
 #ifdef __cplusplus
 extern "C"{
@@ -99,34 +96,6 @@ extern "C"{
 		RTEMS_SYSINIT_ORDER_MIDDLE \
 	)
 
-/* 
- * Bus types 
- */
-enum drvmgr_bus_type {
-	DRVMGR_BUS_TYPE_PLATFORM	= 10,
-#define DRIVER_PLATFORM_ID		DRIVER_ROOTBUS_ID(DRVMGR_BUS_TYPE_PLATFORM)
-	DRVMGR_BUS_TYPE_DMA,
-#define DRIVER_DMA_ID		    DRIVER_ROOTBUS_ID(DRVMGR_BUS_TYPE_DMA)
-	DRVMGR_BUS_TYPE_GPIO,
-#define DRIVER_GPIO_ID		    DRIVER_ROOTBUS_ID(DRVMGR_BUS_TYPE_GPIO)
-	DRVMGR_BUS_TYPE_I2C,
-#define DRIVER_I2C_ID		    DRIVER_ROOTBUS_ID(DRVMGR_BUS_TYPE_I2C)
-	DRVMGR_BUS_TYPE_SPI,
-#define DRIVER_SPI_ID		    DRIVER_ROOTBUS_ID(DRVMGR_BUS_TYPE_SPI)
-};
-
-
-	
-struct dev_id {
-	const char *compatible;
-	void *data;
-};
-
-struct dev_driver {
-	struct drvmgr_drv drv;
-	const struct dev_id *const ids;
-};
-
 struct bus_resource {
 	RESOURCE_BASE_DECLARE
 };
@@ -165,22 +134,6 @@ static inline const char *platform_dev_filename(struct drvmgr_dev *dev) {
 	return dev->name - 5;
 }
 
-static inline void *device_get_parent_priv(struct drvmgr_dev *dev) {
-	return dev->parent->dev->priv;
-}
-
-static inline struct dev_private *device_get_private(struct drvmgr_dev *dev) {
-	return (struct dev_private *)(dev + 1);
-}
-
-static inline struct drvmgr_dev *device_get_parent(struct drvmgr_dev *dev) {
-	return dev->parent->dev;
-}
-
-static inline const void *device_get_operations(struct drvmgr_dev *dev) {
-	return *(void **)(dev + 1);
-}
-
 static inline int platform_irq_count_get(struct drvmgr_key *keys) {
 	return platform_res_count_get(keys, "IRQ", 3);	
 }
@@ -214,17 +167,6 @@ devcie_get_property(struct drvmgr_dev *dev, const char *prop) {
 		(char *)prop, DRVMGR_KT_ANY);
 }
 
-#define platform_driver_init(drv) \
-	RTEMS_STATIC_ASSERT(sizeof(drv) == sizeof(struct dev_driver), \
-		"Device driver object type error!"); \
-	static void platform_driver_##drv##_register(void) { \
-		drvmgr_drv_register((struct drvmgr_drv *)&drv); \
-	}	\
-	RTEMS_SYSINIT_ITEM(platform_driver_##drv##_register, \
-		RTEMS_SYSINIT_DRVMGR,  \
-		RTEMS_SYSINIT_ORDER_MIDDLE \
-	)
-
 #define platform_devres_init(res) \
 	static void platform_resource_##res##_register(void) { \
 		platform_res_register((const struct bus_resource *)&res); \
@@ -241,7 +183,7 @@ devcie_get_property(struct drvmgr_dev *dev, const char *prop) {
 
 #define PLATFORM_DRIVER(name) \
 	static struct dev_driver __drv_##name; \
-	platform_driver_init(__drv_##name); \
+	__platform_driver_init(__drv_##name); \
 	static struct dev_driver __drv_##name
 
 #ifdef __cplusplus
