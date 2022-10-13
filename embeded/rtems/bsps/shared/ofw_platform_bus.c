@@ -172,6 +172,8 @@ int ofw_platform_bus_populate_device(struct drvmgr_bus *bus) {
     priv = device_get_private(bus->dev);
     parent = priv->np;
     ofw_foreach_child_node(parent, child) {
+		if (!rtems_ofw_has_prop(child, "compatible"))
+			continue;
         if (!rtems_ofw_node_status(child))
             continue;
         int len = rtems_ofw_get_prop(child, "rtems,path", buffer, sizeof(buffer));
