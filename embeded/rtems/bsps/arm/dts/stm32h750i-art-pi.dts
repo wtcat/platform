@@ -149,6 +149,7 @@
 		compatible = "winbond,w25q128", "jedec,spi-nor";
 		reg = <0>;
 		spi-max-frequency = <80000000>;
+		rtems,path = "/dev/flash";
 
 		partition@0 {
 			label = "root filesystem";
@@ -178,6 +179,7 @@
 		device-wakeup-gpios = <&gpioi 10 GPIO_ACTIVE_HIGH>;
 		shutdown-gpios = <&gpioi 11 GPIO_ACTIVE_HIGH>;
 		max-speed = <115200>;
+		rtems,path = "/dev/bluetooth";
 	};
 };
 
