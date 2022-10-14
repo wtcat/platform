@@ -26,6 +26,7 @@
         child != 0; \
         child = rtems_ofw_peer(child))
 
+static phandle_t ofw_chosen, ofw_alise;
 static RTEMS_CHAIN_DEFINE_EMPTY(ofw_root);
 
 static struct drvmgr_dev *device_from_private(struct dev_private *priv) {
@@ -264,6 +265,8 @@ static struct drvmgr_drv platform_bus_driver = {
 };
 
 static void ofw_platform_bus_driver_register(void) {
+	ofw_chosen = rtems_ofw_find_device("/chosen");
+	ofw_alise = rtems_ofw_find_device("/alise");
 	/* Register root device driver */
 	drvmgr_root_drv_register(&platform_bus_driver);
 }
