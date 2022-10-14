@@ -3,6 +3,7 @@
  */
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
 
 #include <rtems/console.h>
 #include <rtems/termiostypes.h>
@@ -13,8 +14,6 @@
 
 #include "drivers/clock.h"
 #include "drivers/ofw_platform_bus.h"
-#include "drivers/mio.h"
-#include "rtems/rtems/intr.h"
 #include "stm32h7xx_ll_usart.h"
 
 struct stm32h7_uart {
@@ -27,23 +26,95 @@ struct stm32h7_uart {
     int clkid;
     int irqno;
     const char *buf;
+    size_t transmited;
+    size_t length;
 };
+
+#define stm32h7_uart_context(_base) \
+    RTEMS_CONTAINER_OF((_base), struct stm32h7_uart, base);
 
 //void LL_USART_EnableDMAReq_TX(USART_TypeDef *USARTx)
 //void LL_USART_DisableDMAReq_RX(USART_TypeDef *USARTx)
 
+static struct drvmgr_dev *stdout_device;
+static int stdout_baudrate = 115200;
+
 static bool stm32h7_uart_set_termios(rtems_termios_device_context *base, 
     const struct termios *t);
 
-static inline struct stm32h7_uart *stm32h7_uart_context(rtems_termios_device_context *base) {
-    return RTEMS_CONTAINER_OF(base, struct stm32h7_uart, base);
+static size_t stm32h7_uart_fifo_write(USART_TypeDef *reg, const char *buf, 
+    size_t size) {
+    size_t idx = 0;
+    while (reg->ISR & USART_ISR_TXE_TXFNF) {
+        reg->TDR = buf[idx];
+        idx++;
+    }
+    return idx;
+}
+
+static bool uart_options_parse(const char *s, int *baudrate, uint32_t *cflags) {
+    uint32_t cc = 0;
+    int bdr = 0;
+
+    while (*s != '\0') {
+        if (!isdigit((int)*s)) 
+            break;
+        bdr = bdr * 10 + (*s - '0');
+    }
+    if (*s == 'N' || *s == 'n') {
+        s++;
+    } else if (*s == 'O' || *s == 'o') {
+        cc |= PARENB | PARODD;
+        s++;
+    } else if (*s == 'E' || *s == 'e') {
+        cc |= PARENB;
+        s++;
+    } else {
+        return false;
+    }
+    if (!isdigit((int)*s) || s[1] != '\0')
+        return false;
+    switch (*s - '0') {
+    case 7:
+        cc |= CS7;
+        break;
+    case 8:
+        cc |= CS8;
+        break;
+    default:
+        return false;
+    }
+    if (baudrate)
+        *baudrate = bdr;
+    if (cflags)
+        *cflags = cc;
+    return true;
 }
 
 static void stm32h7_uart_isr(void *arg) {
     struct stm32h7_uart *uart = (struct stm32h7_uart *)arg;
+    USART_TypeDef *reg = uart->reg;
+    uint32_t status = reg->ISR;
 
-    rtems_termios_enqueue_raw_characters(uart->tty, buf, i);
-    rtems_termios_dequeue_characters(uart->tty, platdata->total);
+    reg->ICR = USART_ICR_RTOCF | USART_ICR_TXFECF;
+    if (status & (USART_ISR_RTOF|USART_ISR_RXFF)) {
+        char rxfifo[16];
+        int i = 0;
+        while (reg->ISR & USART_ISR_RXNE_RXFNE) {
+            rxfifo[i] = (char)reg->RDR;
+            i++;
+        }
+        rtems_termios_enqueue_raw_characters(uart->tty, rxfifo, i);
+    }
+    if (status & USART_ISR_TXFE) {
+        size_t remain = uart->length - uart->transmited;
+        if (remain > 0) {
+            uart->buf += uart->transmited;
+            uart->transmited += stm32h7_uart_fifo_write(reg, uart->buf, remain);
+        } else {
+            rtems_termios_dequeue_characters(uart->tty, uart->transmited);
+        }
+    }
 }
 
 static bool stm32h7_uart_open(struct rtems_termios_tty *tty,
@@ -55,7 +126,9 @@ static bool stm32h7_uart_open(struct rtems_termios_tty *tty,
     if (clk_enable(uart->clk, &uart->clkid))
         return false;
     uart->tty = tty;
-    rtems_termios_set_initial_baud(tty, xxx);
+    tty->termios.c_ispeed = stdout_baudrate;
+    tty->termios.c_ospeed = stdout_baudrate;
+    // rtems_termios_set_initial_baud(tty, stdout_baudrate);
     return stm32h7_uart_set_termios(base, term);
 }
 
@@ -71,10 +144,6 @@ static void stm32h7_uart_close(struct rtems_termios_tty *tty,
     clk_disable(uart->clk, &uart->clkid);
 }
 
-static void ns16550_putc_poll(rtems_termios_device_context *base, 
-    char ch) {
-}
-
 static bool stm32h7_uart_set_termios(rtems_termios_device_context *base, 
     const struct termios *t) {
     struct stm32h7_uart *uart = stm32h7_uart_context(base);
@@ -87,8 +156,7 @@ static bool stm32h7_uart_set_termios(rtems_termios_device_context *base,
     *  Assert ensures there is no division by 0.
     */
     LL_USART_StructInit(&ll_struct);
-    bdr = rtems_termios_baud_to_number(t->c_ospeed);
-    _Assert(bdr != 0);
+    bdr = t->c_ospeed;
     ll_struct.BaudRate = bdr;
 
     /* Parity */
@@ -121,7 +189,7 @@ static bool stm32h7_uart_set_termios(rtems_termios_device_context *base,
     }
 
     /* Stop Bits */
-    if (t->c_cflag & CSTOPB) 
+    if (t->c_cflag & CSTOPB)
         ll_struct.StopBits = LL_USART_STOPBITS_2; /* 2 stop bits */
     else
         ll_struct.StopBits = LL_USART_STOPBITS_1;
@@ -132,7 +200,10 @@ static bool stm32h7_uart_set_termios(rtems_termios_device_context *base,
         uart->cflag = t->c_cflag;
         uart->bdr = bdr;
         LL_USART_Disable(uart->reg);
+        LL_USART_DisableFIFO(uart->reg);
         LL_USART_Init(uart->reg, &ll_struct);
+        LL_USART_ConfigFIFOsThreshold(uart->reg, LL_USART_FIFOTHRESHOLD_1_8, 
+            LL_USART_FIFOTHRESHOLD_7_8);
         LL_USART_EnableFIFO(uart->reg);
     }
     rtems_termios_device_lock_release(base, &ctx);
@@ -143,13 +214,21 @@ static void stm32h7_uart_write(rtems_termios_device_context *base,
     const char *buf, size_t len) {
     struct stm32h7_uart *uart = stm32h7_uart_context(base);
     if (len > 0) {
+        uart->buf = buf;
+        uart->length = len;
+        uart->transmited = stm32h7_uart_fifo_write(uart->reg, buf, len);
         LL_USART_EnableIT_TXFE(uart->reg);
     } else {
         LL_USART_DisableIT_TXFE(uart->reg);
     }
 }
 
-static int stm32h7_uart_polled_getchar(rtems_termios_device_context *base) {
+static void stm32h7_uart_polled_putchar(USART_TypeDef *reg, char ch) {
+    while (reg->ISR & USART_ISR_BUSY);
+    reg->TDR = ch;
+}
+
+static int stm32h7_uart_polled_getchar(USART_TypeDef *reg) {
     return -1;
 }
 
@@ -157,15 +236,9 @@ static const rtems_termios_device_handler stm32h7_uart_ops = {
     .first_open     = stm32h7_uart_open,
     .last_close     = stm32h7_uart_close,
     .set_attributes = stm32h7_uart_set_termios,
- #ifdef USE_INTR_MODE   
     .write          = stm32h7_uart_write,
     .poll_read      = NULL,
     .mode           = TERMIOS_IRQ_DRIVEN
-#else
-    .write          = stm32h7_uart_polled_write,
-    .poll_read      = stm32h7_uart_polled_getchar,
-    .mode           = TERMIOS_POLLED
-#endif
 };
 
 static int stm32h7_uart_preprobe(struct drvmgr_dev *dev) {
@@ -191,6 +264,7 @@ static int stm32h7_uart_preprobe(struct drvmgr_dev *dev) {
     }
     uart->reg = (void *)reg.start;
     uart->irqno = (int)irq;
+    dev->priv = uart;
     rtems_termios_device_context_initialize(&uart->base, dev->name);
     sc = rtems_termios_device_install(dev->name, &stm32h7_uart_ops, 
         NULL, &uart->base);
@@ -208,29 +282,63 @@ _freem:
 }
 
 static int stm32h7_uart_probe(struct drvmgr_dev *dev) {
+    struct dev_private *devp = device_get_private(dev);
     struct stm32h7_uart *uart = dev->priv;
+    pcell_t clks[2];
     int ret;
-   
-    
+    if (rtems_ofw_get_enc_prop(devp->np, "clocks", clks, sizeof(clks)) < 0)
+        return -ENODATA;
+    uart->clk = ofw_device_get_by_phandle(clks[0]);
+    if (!uart->clk)
+        return -ENODATA;
+    uart->clkid = clks[1];
     ret = drvmgr_interrupt_register(dev, IRQF_HARD(uart->irqno), dev->name, 
         stm32h7_uart_isr, uart);
     return ret;
 }
 
 static void stm32h7_uart_putc(char c) {
-    if (stdout_path) {
-        struct ns16550_priv *platdata = stdout_path->priv;
-        ns16550_putc_poll(&platdata->base, c);
+    struct drvmgr_dev *stddev = stdout_device;
+    if (likely(stddev)) {
+        struct stm32h7_uart *uart = stddev->priv;
+        stm32h7_uart_polled_putchar(uart->reg, c);
     }
 }
 
-static int stm32h7_uart_post(struct drvmgr_dev *dev) {
-    union drvmgr_key_value *prop = devcie_get_property(dev, "stdout");
-    if (prop) {
-        link(dev->name, CONSOLE_DEVICE_NAME);
-        stdout_path = dev;
-        BSP_output_char = stm32h7_uart_putc;
+static int stm32h7_uart_postprobe(struct drvmgr_dev *dev) {
+    phandle_t chosen, aliase;
+    char *path = NULL;
+    char *prop = NULL;
+    char *next;
+
+    chosen = rtems_ofw_find_device("/chosen");
+    if (chosen < 0)
+        goto _out;
+    aliase = rtems_ofw_find_device("/aliases");
+        goto _out;
+    if (rtems_ofw_get_prop_alloc(chosen, "stdout-path", (void **)&prop) < 0)
+        goto _out;
+    for (next = prop; *next != '\0'; next++) {
+        if (*next == ':') {
+            *next++ = '\0';
+            break;
+        }
     }
+    if (rtems_ofw_get_prop_alloc(aliase, prop, (void **)&path) < 0)
+        goto _out;
+    
+    stdout_device = ofw_device_get_by_path(path);
+    if (!stdout_device) 
+        goto _out;
+
+    uart_options_parse(next, &stdout_baudrate, NULL);
+    link(stdout_device->name, CONSOLE_DEVICE_NAME);
+    BSP_output_char = stm32h7_uart_putc;
+_out:
+    if (prop)
+        free(prop);
+    if (path)
+        free(path);
     return 0;
 }
 
@@ -238,7 +346,7 @@ static struct drvmgr_drv_ops uart_driver_ops = {
 	.init = {
 		stm32h7_uart_preprobe,
         stm32h7_uart_probe,
-        stm32h7_uart_post
+        stm32h7_uart_postprobe
 	},
 };
 

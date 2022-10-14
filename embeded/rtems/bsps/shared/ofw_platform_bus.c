@@ -10,8 +10,7 @@
 #include <ofw/ofw.h>
 
 #include "drivers/ofw_platform_bus.h"
-#include "rtems/chain.h"
-#include "rtems/score/basedefs.h"
+
 
 #define OFW_DEBUG_ON
 
@@ -26,7 +25,7 @@
         child != 0; \
         child = rtems_ofw_peer(child))
 
-static phandle_t ofw_chosen, ofw_alise;
+
 static RTEMS_CHAIN_DEFINE_EMPTY(ofw_root);
 
 static struct drvmgr_dev *device_from_private(struct dev_private *priv) {
@@ -50,7 +49,7 @@ phandle_t ofw_phandle_get(struct drvmgr_dev *dev) {
 	return priv->np;
 }
 
-struct drvmgr_dev *ofw_device_get(phandle_t np) {
+struct drvmgr_dev *ofw_device_get_by_phandle(phandle_t np) {
 	rtems_chain_node *pnode = rtems_chain_first(&ofw_root);
 	while (!rtems_chain_is_tail(&ofw_root, pnode)) {
 		struct dev_private *priv = RTEMS_CONTAINER_OF(pnode, 
@@ -59,6 +58,13 @@ struct drvmgr_dev *ofw_device_get(phandle_t np) {
 			return device_from_private(priv);
 		pnode = rtems_chain_next(pnode);
 	}
+	return NULL;
+}
+
+struct drvmgr_dev *ofw_device_get_by_path(const char *path) {
+	phandle_t np = rtems_ofw_find_device(path);
+	if (np >= 0) 
+		return ofw_device_get_by_phandle(np);
 	return NULL;
 }
 
@@ -265,8 +271,6 @@ static struct drvmgr_drv platform_bus_driver = {
 };
 
 static void ofw_platform_bus_driver_register(void) {
-	ofw_chosen = rtems_ofw_find_device("/chosen");
-	ofw_alise = rtems_ofw_find_device("/alise");
 	/* Register root device driver */
 	drvmgr_root_drv_register(&platform_bus_driver);
 }

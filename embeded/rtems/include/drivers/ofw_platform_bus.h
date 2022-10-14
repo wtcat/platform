@@ -20,6 +20,9 @@ struct dev_private {
     phandle_t np; /* Device tree node */
 };
 
+struct drvmgr_dev *ofw_device_get_by_path(const char *path);
+struct drvmgr_dev *ofw_device_get_by_phandle(phandle_t np);
+
 phandle_t ofw_platform_bus_get_node(struct drvmgr_dev *dev);
 int ofw_platform_bus_populate_device(struct drvmgr_bus *bus);
 int ofw_platform_bus_device_register(struct drvmgr_dev *dev,
