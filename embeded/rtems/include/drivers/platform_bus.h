@@ -34,22 +34,6 @@ extern "C"{
 
 #define DRVMGR_WARN "DRVMGR_WARNING: " 
 
-/*
- * System Interupt Flags
- */
-#define IRQF_INDEX(n)           ((uint32_t)(n) & 0xFFFF)
-#define IRQF_ABS                (0x1u << 16)
-#define IRQF_THREAD             (0x1u << 26)
-#define IRQF_THREADED(n)        ((((uint32_t)(n) & 0x1F) << 27) | IRQF_THREAD)
-#define IRQF_NTHREAD(n)         (((uint32_t)(n) >> 27) & 0x1F)
-
-#define IRQF_SOFT_REL(svr, irq) (IRQF_THREADED(svr) | IRQF_INDEX(irq))
-#define IRQF_SOFT(svr, irq)     (IRQF_SOFT_REL(svr, irq) | IRQF_ABS)
-
-#define IRQF_HARD_REL(irq)      IRQF_INDEX(irq)
-#define IRQF_HARD(irq)          (IRQF_HARD_REL(irq) | IRQF_ABS)
-
-
 /* Bus resource class */
 #define DEVICE_RESOURCE_BASE \
 	const char *compatible; \

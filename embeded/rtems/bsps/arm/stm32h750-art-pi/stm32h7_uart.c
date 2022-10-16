@@ -14,6 +14,8 @@
 
 #include "drivers/clock.h"
 #include "drivers/ofw_platform_bus.h"
+
+#undef B0
 #include "stm32h7xx_ll_usart.h"
 
 struct stm32h7_uart {
@@ -96,8 +98,8 @@ static void stm32h7_uart_isr(void *arg) {
     USART_TypeDef *reg = uart->reg;
     uint32_t status = reg->ISR;
 
-    reg->ICR = USART_ICR_RTOCF | USART_ICR_TXFECF;
-    if (status & (USART_ISR_RTOF|USART_ISR_RXFF)) {
+    reg->ICR = USART_ICR_IDLECF | USART_ICR_TXFECF;
+    if (status & (USART_ISR_IDLE | USART_ISR_RXFF)) {
         char rxfifo[16];
         int i = 0;
         while (reg->ISR & USART_ISR_RXNE_RXFNE) {
@@ -199,12 +201,13 @@ static bool stm32h7_uart_set_termios(rtems_termios_device_context *base,
     if (bdr != uart->bdr || t->c_cflag != uart->cflag) {
         uart->cflag = t->c_cflag;
         uart->bdr = bdr;
-        LL_USART_Disable(uart->reg);
-        LL_USART_DisableFIFO(uart->reg);
+        uart->reg->CR1 = 0;
+        uart->reg->CR2 = 0;
+        uart->reg->CR3 = 0;
         LL_USART_Init(uart->reg, &ll_struct);
         LL_USART_ConfigFIFOsThreshold(uart->reg, LL_USART_FIFOTHRESHOLD_1_8, 
-            LL_USART_FIFOTHRESHOLD_7_8);
-        LL_USART_EnableFIFO(uart->reg);
+            LL_USART_FIFOTHRESHOLD_8_8);
+        uart->reg->CR1 |=  USART_CR1_IDLEIE | USART_CR1_RXFFIE | USART_CR1_FIFOEN | USART_CR1_UE;
     }
     rtems_termios_device_lock_release(base, &ctx);
     return true;
@@ -224,7 +227,7 @@ static void stm32h7_uart_write(rtems_termios_device_context *base,
 }
 
 static void stm32h7_uart_polled_putchar(USART_TypeDef *reg, char ch) {
-    while (reg->ISR & USART_ISR_BUSY);
+    while (!(reg->ISR & USART_ISR_TXE_TXFNF));
     reg->TDR = ch;
 }
 
@@ -355,7 +358,7 @@ static const struct dev_id id_table[] = {
     {NULL, NULL}
 };
 
-PLATFORM_DRIVER(stm32h7_uart) = {
+OFW_PLATFORM_DRIVER(stm32h7_uart) = {
     .drv = {
         .drv_id   = DRIVER_PLATFORM_ID,
         .name     = "uart",

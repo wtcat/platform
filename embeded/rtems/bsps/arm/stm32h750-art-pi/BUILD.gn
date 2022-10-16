@@ -8,7 +8,8 @@ component("board") {
   sources = [
     "stm32h7.c",
     "stm32h7_clk.c",
-    "stm32h7_dma.c"
+    "stm32h7_uart.c",
+    "stm32h750-art-pi.c"
   ]
 
   deps = ["//embeded/rtems/bsps/arm/shared"]

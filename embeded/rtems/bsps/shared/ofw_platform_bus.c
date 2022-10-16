@@ -63,7 +63,7 @@ struct drvmgr_dev *ofw_device_get_by_phandle(phandle_t np) {
 
 struct drvmgr_dev *ofw_device_get_by_path(const char *path) {
 	phandle_t np = rtems_ofw_find_device(path);
-	if (np >= 0) 
+	if ((int)np >= 0) 
 		return ofw_device_get_by_phandle(np);
 	return NULL;
 }

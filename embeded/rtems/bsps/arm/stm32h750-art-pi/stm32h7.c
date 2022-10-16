@@ -12,6 +12,7 @@
 
 #include "base/compiler.h"
 #include "stm32h7xx_ll_rcc.h"
+#include "stm32h7xx_ll_usart.h"
 
 
 extern char stm32h7_memory_null_begin[];
@@ -70,6 +71,7 @@ extern char stm32h7_memory_sdram_2_begin[];
 extern char stm32h7_memory_sdram_2_end[];
 extern char stm32h7_memory_sdram_2_size[];
 
+#define EARLY_UART UART4
 
 static const ARMV7M_MPU_Region_config stm32h7_mpu_map[] = {
     {
@@ -120,13 +122,21 @@ static const ARMV7M_MPU_Region_config stm32h7_mpu_map[] = {
     }
 };
 
+static void __notrace stm32h7_early_uart_putc(char c) {
+    while (!(EARLY_UART->ISR & USART_ISR_TXE_TXFNF));
+    EARLY_UART->TDR = c;
+}
+
 void __notrace bsp_start(void) {
+printk("BSP<10>\n");
     bsp_interrupt_initialize();
     rtems_cache_coherent_add_area(bsp_section_nocacheheap_begin,
         (uintptr_t)bsp_section_nocacheheap_size);
+printk("BSP<11>\n");
 }
 
 void __notrace bsp_start_hook_0(void) {
+  BSP_output_char = stm32h7_early_uart_putc;
   // if ((RCC->AHB3ENR & RCC_AHB3ENR_FMCEN) == 0) {
   //   /*
   //    * Only perform the low-level initialization if necessary.  An initialized
@@ -155,6 +165,8 @@ void __notrace bsp_start_hook_1(void) {
   SCB_CleanDCache();
   SCB_InvalidateICache();
   bsp_start_clear_bss();
+  BSP_output_char = stm32h7_early_uart_putc;
+printk("BSP<8>\n");
 }
 
 /* For stm32_hal library */
@@ -168,7 +180,8 @@ void HAL_MspInit(void) {
 }
 
 const void *bsp_fdt_get(void) {
-  return NULL;
+extern const unsigned char stm32h7_art_pi_dts[];
+  return stm32h7_art_pi_dts;
 }
 
 uint32_t stm32h7_systick_frequency(void) {
