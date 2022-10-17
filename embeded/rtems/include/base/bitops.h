@@ -36,6 +36,7 @@
 #ifndef	COMPONENT_BITOPS_H_
 #define	COMPONENT_BITOPS_H_
 
+#include <string.h>
 #include <sys/param.h>
 #include <sys/errno.h>
 

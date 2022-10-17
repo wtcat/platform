@@ -4,9 +4,10 @@
 #ifndef DRIVER_OFW_PLATFORM_BUS_H_
 #define DRIVER_OFW_PLATFORM_BUS_H_
 
-#include "drivers/devbase.h"
-#include "rtems/chain.h"
+#include <rtems/chain.h>
 #include <ofw/ofw.h>
+
+#include "drivers/devbase.h"
 
 #ifdef __cplusplus
 extern "C"{
@@ -39,6 +40,11 @@ static inline void *device_match_data(struct drvmgr_dev *dev) {
 	return id->data;
 }
 
+#define ofw_foreach_child_node(parent, child) \
+    for (child = rtems_ofw_child(parent); \
+        child != 0; \
+        child = rtems_ofw_peer(child))
+		
 #define OFW_PLATFORM_DRIVER(name) \
 	static struct dev_driver __ofw_drv_##name; \
 	__platform_driver_init(__ofw_drv_##name); \

@@ -20,12 +20,6 @@
 #define ofw_dbg(...)
 #endif
 
-#define ofw_foreach_child_node(parent, child) \
-    for (child = rtems_ofw_child(parent); \
-        child != 0; \
-        child = rtems_ofw_peer(child))
-
-
 static RTEMS_CHAIN_DEFINE_EMPTY(ofw_root);
 
 static struct drvmgr_dev *device_from_private(struct dev_private *priv) {
@@ -70,7 +64,6 @@ struct drvmgr_dev *ofw_device_get_by_path(const char *path) {
 
 int ofw_platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev, 
 	int bustype) {
-	struct dev_private *priv;
 	struct dev_driver *ddrv;
 	if (!drv || !dev || !dev->parent)
 		return 0;
@@ -78,12 +71,15 @@ int ofw_platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev,
 		dev->parent->bus_type != bustype)
 		return 0;
 	ddrv = RTEMS_CONTAINER_OF(drv, struct dev_driver, drv);
-	priv = device_get_private(dev);
-	for (int index = 0; ddrv->ids[index].compatible; index++) {
-        if (rtems_ofw_is_node_compatible(priv->np, ddrv->ids[index].compatible))
-            return 1;
+	if (ddrv->ids) {
+		struct dev_private *priv = device_get_private(dev);
+		for (int index = 0; ddrv->ids[index].compatible; index++) {
+			if (rtems_ofw_is_node_compatible(priv->np, ddrv->ids[index].compatible))
+				return 1;
+		}
+		return 0;
 	}
-	return 0;
+	return 1;
 }
 	
 int ofw_platform_irq_map(struct drvmgr_dev *dev, int index) {
@@ -179,8 +175,8 @@ int ofw_platform_bus_populate_device(struct drvmgr_bus *bus) {
     priv = device_get_private(bus->dev);
     parent = priv->np;
     ofw_foreach_child_node(parent, child) {
-		if (!rtems_ofw_has_prop(child, "compatible"))
-			continue;
+		// if (!rtems_ofw_has_prop(child, "compatible"))
+		// 	continue;
         if (!rtems_ofw_node_status(child))
             continue;
         int len = rtems_ofw_get_prop(child, "rtems,path", buffer, sizeof(buffer));

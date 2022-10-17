@@ -4,7 +4,7 @@
 #ifndef DRIVER_GPIOD_H_
 #define DRIVER_GPIOD_H_
 
-#include "drivers/platform_bus.h"
+#include "drivers/devbase.h"
 #include <drvmgr/drvmgr.h>
 
 #ifdef __cplusplus
@@ -22,11 +22,14 @@ extern "C"{
 #define GPIO_LEVEL_LOW     (1ul << 3)
 #define GPIO_INTR(type)  (GPIO_INPUT | (type))
 
-#define GPIO_MASK(n)  ((n) & 0x0F00)
-#define GPIO_INPUT    (1ul << 8)
-#define GPIO_OUTPUT   (2ul << 8)
-#define GPIO_PULLUP   (3ul << 8)
-#define GPIO_PULLDOWN (4ul << 8)
+#define GPIO_MASK(n)  ((n) & 0xFF00)
+#define GPIO_INPUT    (0x01u << 8)
+#define GPIO_OUTPUT   (0x02u << 8)
+#define GPIO_PULLUP   (0x04u << 8)
+#define GPIO_PULLDOWN (0x08u << 8)
+#define GPIO_OPENDRAIN (0x10u << 8)
+#define GPIO_OUTPUT_INIT_HIGH (0x20u << 8)
+#define GPIO_OUTPUT_INIT_LOW  (0x40u << 8)
 
 struct gpio_operations {
 	int (*configure)(struct drvmgr_dev *dev, int pin, uint32_t mode);
