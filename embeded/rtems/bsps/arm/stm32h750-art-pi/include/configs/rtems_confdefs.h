@@ -77,7 +77,7 @@
 #if defined(__rtems_libbsd__)
 #define CONFIGURE_BDBUF_CACHE_MEMORY_SIZE (256ul * 1024)
 #else
-#define CONFIGURE_BDBUF_CACHE_MEMORY_SIZE (64ul * 1024)
+#define CONFIGURE_BDBUF_CACHE_MEMORY_SIZE (16ul * 1024)
 #endif
 
 /* Generated from spec:/acfg/if/bdbuf-max-read-ahead-blocks */
@@ -835,7 +835,7 @@
  * which enable floating point support.
  * @endparblock
  */
-#define CONFIGURE_MAXIMUM_TASKS 64
+#define CONFIGURE_MAXIMUM_TASKS 32
 
 /* Generated from spec:/acfg/if/max-thread-local-storage-size */
 
@@ -2035,7 +2035,7 @@
  * This filesystem requires a Block Device Cache configuration, see
  * #CONFIGURE_APPLICATION_NEEDS_LIBBLOCK.
  */
-#define CONFIGURE_FILESYSTEM_DOSFS
+// #define CONFIGURE_FILESYSTEM_DOSFS
 
 /* Generated from spec:/acfg/if/filesystem-ftpfs */
 
@@ -2576,7 +2576,7 @@
  * This is an advanced configuration option.  Use it only if you know exactly
  * what you are doing.
  */
-#define CONFIGURE_EXECUTIVE_RAM_SIZE (2048 * 1024)
+#define CONFIGURE_EXECUTIVE_RAM_SIZE (256 * 1024)
 
 /* Generated from spec:/acfg/if/extra-task-stacks */
 

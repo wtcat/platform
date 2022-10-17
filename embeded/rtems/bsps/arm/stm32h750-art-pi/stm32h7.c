@@ -166,7 +166,6 @@ void __notrace bsp_start_hook_1(void) {
   SCB_InvalidateICache();
   bsp_start_clear_bss();
   BSP_output_char = stm32h7_early_uart_putc;
-printk("BSP<8>\n");
 }
 
 /* For stm32_hal library */
