@@ -85,11 +85,9 @@ static void __notrace stm32h7_early_uart_putc(char c) {
 }
 
 void __notrace bsp_start(void) {
-printk("BSP<10>\n");
     bsp_interrupt_initialize();
     rtems_cache_coherent_add_area(bsp_section_nocacheheap_begin,
         (uintptr_t)bsp_section_nocacheheap_size);
-printk("BSP<11>\n");
 }
 
 void __notrace bsp_start_hook_0(void) {

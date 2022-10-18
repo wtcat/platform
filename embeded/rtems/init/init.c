@@ -15,7 +15,6 @@
 #include "shell/shell_utils.h"
 
 #define MS(ms) RTEMS_MILLISECONDS_TO_TICKS(ms)
-#define kerror(fmt, ...) rtems_panic("<*Kernel Panic*>: "fmt, ##__VA_ARGS__) 
 
 void RTEMS_WEAK _shell_init(void) {
 }
@@ -29,7 +28,7 @@ static void rootfs_init(void) {
   extern const size_t __rootfs_image_size;
   int err = Untar_FromMemory((char*)__rootfs_image, __rootfs_image_size);
   if (err)
-    kerror("make rootfs failed(%d)\n", err);
+    rtems_panic("make rootfs failed(%d)\n", err);
 }
 
 static rtems_task Init(rtems_task_argument arg) {
@@ -38,12 +37,12 @@ static rtems_task Init(rtems_task_argument arg) {
 
   /* Run startup script */
   if (shell_run_script("/etc/start.rs"))
-    kerror("run /etc/start.rs failed\n");
+    rtems_panic("run /etc/start.rs failed\n");
 
 #if defined(__rtems_libbsd__)
   /* Setup run environment for freebsd */
   if (rtems_bsd_initialize())
-    kerror("libbsd startup failed\n");
+    rtems_panic("libbsd startup failed\n");
 
   /* Run configure script */
   rtems_bsd_run_etc_rc_conf(MS(5000), true);

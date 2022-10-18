@@ -3,7 +3,10 @@ import ("//gn/toolchain/rtems/rtems.gni")
 component("shared") {
     sources = []
     if (use_ofw_bus) {
-        sources += ["ofw_platform_bus.c"]
+        sources += [
+            "ofw_root_bus.c",
+            "ofw_platform_bus.c"
+        ]
     } else {
         sources += ["platform_bus.c"]
     }

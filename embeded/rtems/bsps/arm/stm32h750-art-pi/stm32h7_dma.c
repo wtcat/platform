@@ -19,15 +19,14 @@
 #include <rtems/bspIo.h>
 #include <rtems/malloc.h>
 
-#include "stm32/stm32_clock.h"
-#undef PAGESIZE
-#include "stm32/stm32_dma.h"
-#include "stm32/stm32_com.h"
-
 #include "base/macros.h"
 #include "drivers/dma.h"
 #include "drivers/clock.h"
 #include "drivers/ofw_platform_bus.h"
+
+#include "stm32/stm32_clock.h"
+#include "stm32/stm32_dma.h"
+#include "stm32/stm32_com.h"
 
 #define DMA_STREAM_COUNT 8
 #define STREAM_OFFSET 1
