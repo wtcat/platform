@@ -244,6 +244,7 @@
 			clocks = <&rcc DMA1_CK>;
 			#dma-cells = <4>;
 			st,mem2mem;
+			dma-offset = <0>;
 			dma-requests = <8>;
 			status = "disabled";
 			rtems,path = "/dev/dma1";
@@ -263,6 +264,7 @@
 			clocks = <&rcc DMA2_CK>;
 			#dma-cells = <4>;
 			st,mem2mem;
+			dma-offset = <8>;
 			dma-requests = <8>;
 			status = "disabled";
 			rtems,path = "/dev/dma2";
@@ -274,9 +276,10 @@
 			#dma-cells = <3>;
 			dma-channels = <16>;
 			dma-requests = <128>;
+			dma-generators = <8>;
 			dma-masters = <&dma1 &dma2>;
 			clocks = <&rcc DMA1_CK>;
-			rtems,path = "/dev/dmamux1";
+			rtems,path = "/dev/dmamux";
 		};
 
 		adc_12: adc@40022000 {

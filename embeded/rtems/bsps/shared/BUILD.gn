@@ -8,6 +8,7 @@ component("shared") {
         sources += ["platform_bus.c"]
     }
     sources += [
-        "vdma.c"
+        "vdma.c",
+        "dma.c"
     ]
 }

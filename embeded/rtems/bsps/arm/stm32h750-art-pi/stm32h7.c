@@ -17,59 +17,16 @@
 
 extern char stm32h7_memory_null_begin[];
 extern char stm32h7_memory_null_end[];
-extern char stm32h7_memory_null_size[];
-
-extern char stm32h7_memory_itcm_begin[];
-extern char stm32h7_memory_itcm_end[];
-extern char stm32h7_memory_itcm_size[];
-
-extern char stm32h7_memory_flash_begin[];
-extern char stm32h7_memory_flash_end[];
-extern char stm32h7_memory_flash_size[];
-
-extern char stm32h7_memory_dtcm_begin[];
-extern char stm32h7_memory_dtcm_end[];
-extern char stm32h7_memory_dtcm_size[];
 
 extern char stm32h7_memory_sram_axi_begin[];
 extern char stm32h7_memory_sram_axi_end[];
-extern char stm32h7_memory_sram_axi_size[];
-
-extern char stm32h7_memory_sram_1_begin[];
-extern char stm32h7_memory_sram_1_end[];
-extern char stm32h7_memory_sram_1_size[];
-
-extern char stm32h7_memory_sram_2_begin[];
-extern char stm32h7_memory_sram_2_end[];
-extern char stm32h7_memory_sram_2_size[];
-
-extern char stm32h7_memory_sram_3_begin[];
-extern char stm32h7_memory_sram_3_end[];
-extern char stm32h7_memory_sram_3_size[];
-
-extern char stm32h7_memory_sram_4_begin[];
-extern char stm32h7_memory_sram_4_end[];
-extern char stm32h7_memory_sram_4_size[];
-
-extern char stm32h7_memory_sram_backup_begin[];
-extern char stm32h7_memory_sram_backup_end[];
-extern char stm32h7_memory_sram_backup_size[];
-
-extern char stm32h7_memory_peripheral_begin[];
-extern char stm32h7_memory_peripheral_end[];
-extern char stm32h7_memory_peripheral_size[];
 
 extern char stm32h7_memory_sdram_1_begin[];
 extern char stm32h7_memory_sdram_1_end[];
-extern char stm32h7_memory_sdram_1_size[];
-
-extern char stm32h7_memory_quadspi_begin[];
-extern char stm32h7_memory_quadspi_end[];
-extern char stm32h7_memory_quadspi_size[];
 
 extern char stm32h7_memory_sdram_2_begin[];
 extern char stm32h7_memory_sdram_2_end[];
-extern char stm32h7_memory_sdram_2_size[];
+
 
 #define EARLY_UART UART4
 

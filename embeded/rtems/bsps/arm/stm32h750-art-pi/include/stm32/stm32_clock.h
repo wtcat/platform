@@ -6,7 +6,7 @@
 #define STM32_CLOCK_H_
 
 #include <stdint.h>
-#include <stm32_ll_bus.h>
+#include "stm32h7xx_ll_bus.h"
 
 #ifdef __cplusplus
 extern "C"{

@@ -15,32 +15,34 @@
  *        implemented in dma_stm32_v*.c
  */
 #include <errno.h>
+#include <stdlib.h>
 #include <rtems/bspIo.h>
+#include <rtems/malloc.h>
+
+#include "stm32/stm32_clock.h"
+#undef PAGESIZE
+#include "stm32/stm32_dma.h"
+#include "stm32/stm32_com.h"
 
 #include "base/macros.h"
-#include "base/bitops.h"
 #include "drivers/dma.h"
 #include "drivers/clock.h"
 #include "drivers/ofw_platform_bus.h"
 
-#include "stm32/stm32_clock.h"
-#include "stm32/stm32_dma.h"
-#include "stm32/stm32_com.h"
-
-#define CONFIG_DMA_STM32_V1 1
-#define CONFIG_DMAMUX_STM32 1
 #define DMA_STREAM_COUNT 8
+#define STREAM_OFFSET 1
+#define STM32_DMA_HAL_OVERRIDE      0x7F
 
-#define LOG_ERR(fmt, ...) printk("DMA-Error***:" fmt, ##__VA_ARGS__)
+#define LOG_ERR(fmt, ...) printk("Error***:" fmt, ##__VA_ARGS__)
+#define LOG_WRN(fmt, ...) printk("Warning***:" fmt, ##__VA_ARGS__)
 
 struct stm32_dma {
-	struct dma_context context;
     DMA_TypeDef *dma;
     struct drvmgr_dev *clk;
     int clkid;
-    int irqs[DMA_STREAM_COUNT];
     bool support_m2m;
 	uint32_t max_streams;
+	long channels;
 #ifdef CONFIG_DMAMUX_STM32
 	uint8_t offset; /* position in the list of dmamux channel list */
 #endif
@@ -59,12 +61,12 @@ static uint32_t table_p_size[] = {
 	LL_DMA_PDATAALIGN_WORD,
 };
 
-static void stm32_dma_dump_stream_irq(struct drvmgr_dev *dev, uint32_t id) {
+static void _stm32_dma_dump_stream_irq(struct drvmgr_dev *dev, uint32_t id) {
 	struct stm32_dma *priv = dev->priv;
 	stm32_dma_dump_stream_irq(priv->dma, id);
 }
 
-static void stm32_dma_clear_stream_irq(struct drvmgr_dev *dev, uint32_t id) {
+static void _stm32_dma_clear_stream_irq(struct drvmgr_dev *dev, uint32_t id) {
 	struct stm32_dma *priv = dev->priv;
 	dma_stm32_clear_tc(priv->dma, id);
 	dma_stm32_clear_ht(priv->dma, id);
@@ -111,8 +113,8 @@ static void stm32_dma_irq_handler(struct drvmgr_dev *dev, uint32_t id) {
 				     callback_arg, -EIO);
 	} else {
 		LOG_ERR("Transfer Error.");
-		stm32_dma_dump_stream_irq(dev, id);
-		stm32_dma_clear_stream_irq(dev, id);
+		_stm32_dma_dump_stream_irq(dev, id);
+		_stm32_dma_clear_stream_irq(dev, id);
 		stream->dma_callback(dev, stream->user_data,
 				     callback_arg, -EIO);
 	}
@@ -194,22 +196,20 @@ static int stm32_dma_get_periph_increment(enum dma_addr_adj increment,
 	return 0;
 }
 
-static int stm32_dma_disable_stream(DMA_TypeDef *dma, uint32_t id) {
+DMA_STM32_EXPORT_API int stm32_dma_disable_stream(DMA_TypeDef *dma, uint32_t id) {
 	int count = 0;
-	for (;;) {
-		if (stm32_dma_disable_stream(dma, id) == 0) {
+	while (true) {
+		if (_stm32_dma_disable_stream(dma, id) == 0)
 			return 0;
-		}
 		/* After trying for 5 seconds, give up */
-		if (count++ > (5 * 1000)) {
+		if (count++ > (5 * 1000)) 
 			return -EBUSY;
-		}
-		k_sleep(K_MSEC(1));
+		rtems_task_wake_after(RTEMS_MILLISECONDS_TO_TICKS(1));
 	}
 	return 0;
 }
 
-static int dma_stm32_configure(struct drvmgr_dev *dev, uint32_t id,
+DMA_STM32_EXPORT_API int dma_stm32_configure(struct drvmgr_dev *dev, uint32_t id,
     struct dma_config *config) {
 	struct stm32_dma *priv = dev->priv;
 	struct dma_stm32_stream *stream =
@@ -249,7 +249,7 @@ static int dma_stm32_configure(struct drvmgr_dev *dev, uint32_t id,
 		return -EBUSY;
 	}
 
-	stm32_dma_clear_stream_irq(dev, id);
+	_stm32_dma_clear_stream_irq(dev, id);
 
 	if (config->head_block->block_size > DMA_STM32_MAX_DATA_ITEMS) {
 		LOG_ERR("Data size too big: %d\n",
@@ -259,7 +259,7 @@ static int dma_stm32_configure(struct drvmgr_dev *dev, uint32_t id,
 
 #ifdef CONFIG_DMA_STM32_V1
 	if ((config->channel_direction == MEMORY_TO_MEMORY) &&
-		(!dev_config->support_m2m)) {
+		(!priv->support_m2m)) {
 		LOG_ERR("Memcopy not supported for device %s",
 			dev->name);
 		return -ENOTSUP;
@@ -414,13 +414,12 @@ static int dma_stm32_configure(struct drvmgr_dev *dev, uint32_t id,
 					config->dest_data_size;
 	}
 
-#if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_dma_v2) || DT_HAS_COMPAT_STATUS_OKAY(st_stm32_dmamux)
 	/*
 	 * the with dma V2 and dma mux,
 	 * the request ID is stored in the dma_slot
 	 */
 	DMA_InitStruct.PeriphRequest = config->dma_slot;
-#endif
+
 	LL_DMA_Init(dma, dma_stm32_id_to_stream(id), &DMA_InitStruct);
 
 	LL_DMA_EnableIT_TC(dma, dma_stm32_id_to_stream(id));
@@ -442,8 +441,8 @@ static int dma_stm32_configure(struct drvmgr_dev *dev, uint32_t id,
 	return ret;
 }
 
-static int dma_stm32_reload(struct drvmgr_dev *dev, uint32_t id,
-	uint32_t src, uint32_t dst, size_t size) {
+DMA_STM32_EXPORT_API int dma_stm32_reload(struct drvmgr_dev *dev, uint32_t id,
+	dma_addr_t src, dma_addr_t dst, size_t size) {
     struct stm32_dma *priv = dev->priv;
 	DMA_TypeDef *dma = priv->dma;
 	struct dma_stm32_stream *stream;
@@ -487,7 +486,7 @@ static int dma_stm32_reload(struct drvmgr_dev *dev, uint32_t id,
 	return 0;
 }
 
-static int dma_stm32_start(struct drvmgr_dev *dev, uint32_t id) {
+DMA_STM32_EXPORT_API int dma_stm32_start(struct drvmgr_dev *dev, uint32_t id) {
     struct stm32_dma *priv = dev->priv;
 	DMA_TypeDef *dma = priv->dma;
 
@@ -495,18 +494,15 @@ static int dma_stm32_start(struct drvmgr_dev *dev, uint32_t id) {
 	id = id - STREAM_OFFSET;
 
 	/* Only M2P or M2M mode can be started manually. */
-	if (id >= config->max_streams) {
+	if (id >= DMA_STREAM_COUNT) 
 		return -EINVAL;
-	}
-
-	stm32_dma_clear_stream_irq(dev, id);
-
+	
+	_stm32_dma_clear_stream_irq(dev, id);
 	stm32_dma_enable_stream(dma, id);
-
 	return 0;
 }
 
-static int dma_stm32_stop(struct drvmgr_dev *dev, uint32_t id) {
+DMA_STM32_EXPORT_API int dma_stm32_stop(struct drvmgr_dev *dev, uint32_t id) {
 	struct stm32_dma *priv = dev->priv;
 	struct dma_stm32_stream *stream = &priv->streams[id - STREAM_OFFSET];
 	DMA_TypeDef *dma = priv->dma;
@@ -514,10 +510,9 @@ static int dma_stm32_stop(struct drvmgr_dev *dev, uint32_t id) {
 	/* give channel from index 0 */
 	id = id - STREAM_OFFSET;
 
-	if (id >= priv->max_streams) {
+	if (id >= DMA_STREAM_COUNT) 
 		return -EINVAL;
-	}
-
+	
 #if !defined(CONFIG_DMAMUX_STM32) || defined(CONFIG_SOC_SERIES_STM32H7X)
 	LL_DMA_DisableIT_TC(dma, dma_stm32_id_to_stream(id));
 #endif /* CONFIG_DMAMUX_STM32 */
@@ -526,7 +521,7 @@ static int dma_stm32_stop(struct drvmgr_dev *dev, uint32_t id) {
 	stm32_dma_disable_fifo_irq(dma, id);
 #endif
 	stm32_dma_disable_stream(dma, id);
-	stm32_dma_clear_stream_irq(dev, id);
+	_stm32_dma_clear_stream_irq(dev, id);
 
 	/* Finally, flag stream as free */
 	stream->busy = false;
@@ -534,7 +529,7 @@ static int dma_stm32_stop(struct drvmgr_dev *dev, uint32_t id) {
 	return 0;
 }
 
-static int stm32_dma_get_status(struct drvmgr_dev *dev,
+DMA_STM32_EXPORT_API int dma_stm32_get_status(struct drvmgr_dev *dev,
 	uint32_t id, struct dma_status *stat) {
 	struct stm32_dma *priv = dev->priv;
 	DMA_TypeDef *dma = priv->dma;
@@ -542,7 +537,7 @@ static int stm32_dma_get_status(struct drvmgr_dev *dev,
 
 	/* give channel from index 0 */
 	id = id - STREAM_OFFSET;
-	if (id >= config->max_streams) {
+	if (id >= DMA_STREAM_COUNT) {
 		return -EINVAL;
 	}
 
@@ -556,10 +551,10 @@ static int stm32_dma_get_status(struct drvmgr_dev *dev,
 
 static const struct dma_operations stm32_dma_ops = {
 	.reload		 = dma_stm32_reload,
-	.config		 = dma_stm32_configure,
+	.configure   = dma_stm32_configure,
 	.start		 = dma_stm32_start,
 	.stop		 = dma_stm32_stop,
-	.get_status	 = stm32_dma_get_status,
+	.get_status	 = dma_stm32_get_status,
 };
 
 static void stm32_dma_stream0_isr(void *arg) {
@@ -595,18 +590,31 @@ static void stm32_dma_stream7_isr(void *arg) {
 }
 
 static int stm32_dma_preprobe(struct drvmgr_dev *dev) {
+	struct dev_private *devp = device_get_private(dev);
+	rtems_ofw_memory_area reg;
     struct stm32_dma *priv;
+	pcell_t offset;
     
-
+	if (rtems_ofw_get_reg(devp->np, &reg, sizeof(reg)) < 0) 
+		return -ENOSTR;
+	if (rtems_ofw_get_enc_prop(devp->np, "dma-offset", &offset, sizeof(offset)) < 0)
+		return -ENOSTR;
 	priv = rtems_calloc(1, sizeof(*priv));
-    if (!priv)
-        return -ENOMEM;
+	if (!priv)
+		return -ENOMEM;
+	priv->dma = (void *)reg.start; 
+	priv->offset = offset;
+    priv->support_m2m = rtems_ofw_has_prop(devp->np, "st,mem2mem");
+	dev->priv = priv;
+    devp->devops = &stm32_dma_ops;
     return 0;
 }
+
 static int stm32_dma_probe(struct drvmgr_dev *dev) {
-	struct stm32_dma *priv = dev->priv;
 	struct dev_private *devp = device_get_private(dev);
-	int err;
+	struct stm32_dma *priv = dev->priv;
+	rtems_vector_number irqs[DMA_STREAM_COUNT];
+	int ret;
 
 	drvmgr_isr isrs[] = {
 		stm32_dma_stream0_isr,
@@ -619,34 +627,31 @@ static int stm32_dma_probe(struct drvmgr_dev *dev) {
 		stm32_dma_stream7_isr
 	};
 
+	ret = rtems_ofw_get_interrupts(devp->np, irqs, sizeof(irqs));
+	if (ret != DMA_STREAM_COUNT) {
+		ret = -EINVAL;
+		goto _failed;
+	}
     if (stm32_ofw_get_clkdev(devp->np, &priv->clk, &priv->clkid)) {
-        free(priv);
-        return -ENODEV;
+        ret = -ENODEV;
+		goto _failed;
     }
-    priv->support_m2m = rtems_ofw_has_prop(devp->np, "st,mem2mem");
-    devp->devops = stm32_dma_ops;
-
-	for (uint32_t i = 0; i < priv->max_streams; i++) {
-		err = drvmgr_interrupt_register(dev, IRQF_HARD(i), 
+	for (uint32_t i = 0; i < DMA_STREAM_COUNT; i++) {
+		ret = drvmgr_interrupt_register(dev, IRQF_HARD(irqs[i]), 
 			dev->name, isrs[i], dev);
-		if (err)
+		if (ret)
 			goto _failed;
 		priv->streams[i].busy = false;
 #ifdef CONFIG_DMAMUX_STM32
 		/* each further stream->mux_channel is fixed here */
-		priv->streams[i].mux_channel = i + config->offset;
+		priv->streams[i].mux_channel = i + priv->offset;
 #endif /* CONFIG_DMAMUX_STM32 */
 	}
-
-	priv->context.magic = 0;
-	priv->context.dma_channels = 0;
-	priv->context.atomic = 0;
-	dev->priv = priv;
-	clk_enable(priv, &priv->clkid);
+	clk_enable(priv->clk, &priv->clkid);
 	return 0;
 _failed:
 	free(priv);
-	return err;
+	return ret;
 }
 
 static const struct dev_id id_table[] = {
@@ -661,7 +666,7 @@ static struct drvmgr_drv_ops stm32_dma_driver = {
 	},
 };
 		
-PLATFORM_DRIVER(stm32_dma) = {
+OFW_PLATFORM_DRIVER(stm32_dma) = {
 	.drv = {
 		.drv_id   = DRIVER_PLATFORM_ID,
 		.name     = "dma",

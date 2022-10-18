@@ -11,6 +11,9 @@ component("board") {
     "stm32h7_com.c",
     "stm32h7_gpio.c",
     "stm32h7_pinctrl.c",
+    "stm32h7_dma.c",
+    "stm32h7_dma_v1.c",
+    "stm32h7_dmamux.c",
     "stm32h7_uart.c",
     "stm32h750-art-pi.c"
   ]

@@ -12,20 +12,18 @@
 #define DRIVER_DMA_H_
 
 #include <errno.h>
+#include <stdint.h>
 #include <stdbool.h>
-#include <drvmgr/drvmgr.h>
 
-#include "component/bitops.h"
+#include <rtems/thread.h>
+
+#include "drivers/devbase.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#if (sizeof(void*) == 4)
-typedef uint32_t dma_addr_t;
-#else
-typedef uint64_t dma_addr_t;
-#endif
+typedef uintptr_t dma_addr_t;
 
 /* magic code to identify context content */
 #define DMA_MAGIC 0x47494749
@@ -193,9 +191,12 @@ struct dma_status {
  *
  */
 struct dma_context {
+#define DMA_CHANNEL_SIZE(channels) \
+	(sizeof(long) * BITS_TO_LONGS(channels))
+	rtems_mutex lock;
 	uint32_t magic;
-	int dma_channels;
-	unsigned long *atomic;
+	uint32_t dma_channels;
+	long *dma_bitmaps;
 };
 
 /* DMA operations */
@@ -353,30 +354,8 @@ static inline int dma_get_status(struct drvmgr_dev *dev, uint32_t channel,
  * @retval dma channel if successful.
  * @retval Negative errno code if failure.
  */
-static inline int dma_request_channel(struct drvmgr_dev *dev,
-    void *filter_param) {
-	int i = 0;
-	int channel = -EINVAL;
-    _Assert(dev != NULL);
-    _Assert(dev->priv != NULL);
-    const struct dma_operations *ops = dmad_get_operations(dev);
-	struct dma_context *dma_ctx = dmad_get_context(dev);
-	if (dma_ctx->magic != DMA_MAGIC)
-		return channel;
-	for (i = 0; i < dma_ctx->dma_channels; i++) {
-		if (!atomic_test_and_set_bit(dma_ctx->atomic, i)) {
-			channel = i;
-			if (ops->dma_chan_filter &&
-			    !ops->dma_chan_filter(dev, channel, filter_param)) {
-				atomic_clear_bit(dma_ctx->atomic, channel);
-				continue;
-			}
-			break;
-		}
-	}
-	return channel;
-}
-
+int dma_request_channel(struct drvmgr_dev *dev, void *filter_param);
+    
 /**
  * @brief release DMA channel.
  *
@@ -386,16 +365,19 @@ static inline int dma_request_channel(struct drvmgr_dev *dev,
  * @param channel  channel number
  *
  */
-static inline void dma_release_channel(struct drvmgr_dev *dev,
-    uint32_t channel) {
-	struct dma_context *dma_ctx = dmad_get_context(dev);
-	if (dma_ctx->magic != DMA_MAGIC) 
-		return;
-	if (channel < dma_ctx->dma_channels) 
-		atomic_clear_bit(dma_ctx->atomic, channel);
-}
+void dma_release_channel(struct drvmgr_dev *dev, uint32_t channel);
 
-
+/**
+ * @brief Initialize DMA context.
+ *
+ * @param dev  Pointer to the device context structure for the driver instance.
+ * @param bitmaps  Pointer to the bitmap buffer.
+ * @param channel  channel number
+ *
+ */
+void dma_context_init(struct dma_context *ctx, void *bitmaps, 
+    uint32_t channel);
+	
 #ifdef __cplusplus
 }
 #endif

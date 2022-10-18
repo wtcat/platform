@@ -7,12 +7,18 @@
 /**
  * @brief DMA low level driver implementation for F2/F4/F7 series SoCs.
  */
+#include <errno.h>
+#include <rtems/score/basedefs.h>
+#include <rtems/score/assert.h>
+#include <rtems/bspIo.h>
 
+#include "drivers/dma.h"
 #include "stm32/stm32_dma.h"
 
 
-#define LOG_INF(fmt, ....) printk(fmt, ##__VA_ARGS__)
+#define LOG_INF(fmt, ...) printk(fmt, ##__VA_ARGS__)
 #define LOG_ERR LOG_INF
+#define LOG_WRN LOG_ERR
 
 /* DMA burst length */
 #define BURST_TRANS_LENGTH_1			0
@@ -270,7 +276,7 @@ void stm32_dma_enable_stream(DMA_TypeDef *dma, uint32_t id) {
 	LL_DMA_EnableStream(dma, dma_stm32_id_to_stream(id));
 }
 
-int stm32_dma_disable_stream(DMA_TypeDef *dma, uint32_t id) {
+int _stm32_dma_disable_stream(DMA_TypeDef *dma, uint32_t id) {
 	LL_DMA_DisableStream(dma, dma_stm32_id_to_stream(id));
 	if (!LL_DMA_IsEnabledStream(dma, dma_stm32_id_to_stream(id)))
 		return 0;

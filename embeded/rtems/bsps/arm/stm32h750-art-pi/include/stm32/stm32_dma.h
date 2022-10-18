@@ -10,14 +10,18 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <stm32_ll_dma.h>
+#include "stm32h7xx_ll_dma.h"
 
 #define CONFIG_DMA_STM32_V1 1
+#define CONFIG_DMAMUX_STM32 1
 
 /* Maximum data sent in single transfer (Bytes) */
 #define DMA_STM32_MAX_DATA_ITEMS	0xffff
 
 struct drvmgr_dev;
+struct dma_config;
+struct dma_status;
+
 typedef void (*dma_callback_t)(struct drvmgr_dev *dev, void *user_data,
 			       uint32_t channel, int status);
 struct dma_stm32_stream {
@@ -89,7 +93,7 @@ void stm32_dma_clear_stream_irq(DMA_TypeDef *dma, uint32_t id);
 bool stm32_dma_is_irq_happened(DMA_TypeDef *dma, uint32_t id);
 bool stm32_dma_is_unexpected_irq_happened(DMA_TypeDef *dma, uint32_t id);
 void stm32_dma_enable_stream(DMA_TypeDef *dma, uint32_t id);
-int stm32_dma_disable_stream(DMA_TypeDef *dma, uint32_t id);
+int _stm32_dma_disable_stream(DMA_TypeDef *dma, uint32_t id);
 
 #if !defined(CONFIG_DMAMUX_STM32)
 void stm32_dma_config_channel_function(DMA_TypeDef *dma, uint32_t id,
@@ -107,13 +111,13 @@ uint32_t stm32_dma_get_pburst(struct dma_config *config, bool source_periph);
 #ifdef CONFIG_DMAMUX_STM32
 /* dma_stm32_ api functions are exported to the dmamux_stm32 */
 #define DMA_STM32_EXPORT_API
-int dma_stm32_configure(const struct device *dev, uint32_t id,
+int dma_stm32_configure(struct drvmgr_dev *dev, uint32_t id,
 				struct dma_config *config);
-int dma_stm32_reload(const struct device *dev, uint32_t id,
+int dma_stm32_reload(struct drvmgr_dev *dev, uint32_t id,
 			uint32_t src, uint32_t dst, size_t size);
-int dma_stm32_start(const struct device *dev, uint32_t id);
-int dma_stm32_stop(const struct device *dev, uint32_t id);
-int dma_stm32_get_status(const struct device *dev, uint32_t id,
+int dma_stm32_start(struct drvmgr_dev *dev, uint32_t id);
+int dma_stm32_stop(struct drvmgr_dev *dev, uint32_t id);
+int dma_stm32_get_status(struct drvmgr_dev *dev, uint32_t id,
 				struct dma_status *stat);
 #else
 #define DMA_STM32_EXPORT_API static
