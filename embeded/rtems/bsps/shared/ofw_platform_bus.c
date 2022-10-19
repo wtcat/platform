@@ -164,8 +164,9 @@ static int ofw_platform_bus_get_freq(struct drvmgr_dev *dev, int no,
 	(void) freq;
 	return DRVMGR_FAIL;
 }
-	
-int ofw_bus_populate_device(struct drvmgr_bus *bus, phandle_t parent) {
+
+int __ofw_bus_populate_device(struct drvmgr_bus *bus, phandle_t parent, 
+	int (*filter)(phandle_t, char *devname, size_t max)) {
 	struct dev_private *devp;
     struct drvmgr_dev *dev;
     phandle_t child;
@@ -173,18 +174,27 @@ int ofw_bus_populate_device(struct drvmgr_bus *bus, phandle_t parent) {
     int len, err = -EINVAL;
 
     ofw_foreach_child_node(parent, child) {
+       if (!rtems_ofw_node_status(child))
+            continue;
+//TODO: remove begin
 		len = rtems_ofw_get_prop(child, "compatible", buffer, sizeof(buffer));
 		if (len > 0) {
 			buffer[len] = '\0';
 			printk("** %s **\n", buffer);
 		}
-		// if (!rtems_ofw_has_prop(child, "compatible"))
-		// 	continue;
-        if (!rtems_ofw_node_status(child))
-            continue;
-        len = rtems_ofw_get_prop(child, "rtems,path", buffer, sizeof(buffer));
-        if (len <= 0)
-            continue;
+//TODO: remove end
+		if (filter) {
+			len = filter(child, buffer, sizeof(buffer));
+			if (len <= 0)
+				continue;
+		} else {
+			if (!rtems_ofw_has_prop(child, "compatible"))
+				continue;
+			len = rtems_ofw_get_prop(child, "rtems,path", buffer, sizeof(buffer));
+			if (len <= 0)
+				continue;
+		}
+
 		ofw_dbg("DevNode register: %s\n", buffer);
         drvmgr_alloc_dev(&dev, sizeof(struct dev_private) + len + 1);
         _Assert(dev != NULL);
@@ -212,6 +222,10 @@ int ofw_bus_populate_device(struct drvmgr_bus *bus, phandle_t parent) {
     return err;	
 }
 
+int ofw_bus_populate_device(struct drvmgr_bus *bus, phandle_t parent) {
+	return __ofw_bus_populate_device(bus, parent, NULL);
+}
+
 int ofw_platform_bus_populate_device(struct drvmgr_bus *bus) {
 	struct dev_private *devp =device_get_private(bus->dev);
 	return ofw_bus_populate_device(bus, devp->np);
@@ -235,6 +249,11 @@ int ofw_platform_bus_device_register(struct drvmgr_dev *dev,
 	return drvmgr_bus_register(dev->bus);
 }
 
+static const struct dev_id id_table[] = {
+    {.compatible = "simple-bus", NULL},
+    {NULL, NULL}
+};
+
 static struct drvmgr_bus_ops platform_bus_ops = {
 	.init = {
 		ofw_platform_bus_populate_device,
@@ -253,16 +272,10 @@ static struct drvmgr_bus_ops platform_bus_ops = {
 	.get_freq       = ofw_platform_bus_get_freq
 };
 
-
 static int platform_bus_probe(struct drvmgr_dev *dev) {
 	return ofw_platform_bus_device_register(dev, &platform_bus_ops, 
 		DRVMGR_BUS_TYPE_PLATFORM);
 }
-
-static const struct dev_id id_table[] = {
-    {.compatible = "simple-bus", NULL},
-    {NULL, NULL}
-};
 
 static struct drvmgr_drv_ops platform_bus_driver = {
 	.init = {
@@ -272,9 +285,9 @@ static struct drvmgr_drv_ops platform_bus_driver = {
 		
 OFW_PLATFORM_DRIVER(platform_bus) = {
 	.drv = {
-		.drv_id   = DRIVER_PINCTRL_ID,
+		.drv_id   = DRIVER_PLATFORM_ID,
 		.name     = "platform-bus",
-		.bus_type = DRVMGR_BUS_TYPE_PLATFORM,
+		.bus_type = DRVMGR_BUS_TYPE_ROOT,
 		.ops      = &platform_bus_driver
 	},
 	.ids = id_table

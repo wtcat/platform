@@ -21,6 +21,9 @@ struct dev_private {
     phandle_t np; /* Device tree node */
 };
 
+int __ofw_bus_populate_device(struct drvmgr_bus *bus, phandle_t parent, 
+	int (*filter)(phandle_t, char *devname, size_t max));
+	
 struct drvmgr_dev *ofw_device_get_by_path(const char *path);
 struct drvmgr_dev *ofw_device_get_by_phandle(phandle_t np);
 

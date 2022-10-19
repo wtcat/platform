@@ -32,8 +32,8 @@
 #define STREAM_OFFSET 1
 #define STM32_DMA_HAL_OVERRIDE      0x7F
 
-#define LOG_ERR(fmt, ...) printk("Error***:" fmt, ##__VA_ARGS__)
-#define LOG_WRN(fmt, ...) printk("Warning***:" fmt, ##__VA_ARGS__)
+#define LOG_ERR(fmt, ...) printk(fmt, ##__VA_ARGS__)
+#define LOG_WRN LOG_ERR
 
 struct stm32_dma {
     DMA_TypeDef *dma;
