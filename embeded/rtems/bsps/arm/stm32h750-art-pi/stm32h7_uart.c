@@ -314,6 +314,8 @@ static int stm32h7_uart_postprobe(struct drvmgr_dev *dev) {
     char *prop = NULL;
     char *next;
 
+    if (stdout_device)
+        return 0;
     chosen = rtems_ofw_find_device("/chosen");
     if (chosen < 0)
         goto _out;
@@ -330,11 +332,10 @@ static int stm32h7_uart_postprobe(struct drvmgr_dev *dev) {
     if (rtems_ofw_get_prop_alloc(aliase, prop, (void **)&path) < 0)
         goto _out;
     
+    uart_options_parse(next, &stdout_baudrate, NULL);
     stdout_device = ofw_device_get_by_path(path);
     if (!stdout_device) 
         goto _out;
-
-    uart_options_parse(next, &stdout_baudrate, NULL);
     link(stdout_device->name, CONSOLE_DEVICE_NAME);
     BSP_output_char = stm32h7_uart_putc;
 _out:
