@@ -252,6 +252,8 @@ void __notrace bsp_start(void) {
 
 void __notrace bsp_start_hook_0(void) {
   BSP_output_char = stm32h7_early_uart_putc;
+  if (!(RCC->AHB3ENR & RCC_AHB3ENR_FMCEN))
+    stm32h7_sdram_init();
   // if ((RCC->AHB3ENR & RCC_AHB3ENR_FMCEN) == 0) {
   //   /*
   //    * Only perform the low-level initialization if necessary.  An initialized
