@@ -1,13 +1,16 @@
 /*
  * Copyright (c) 2022 wtcat
  */
-#include <bsp.h>
-#include <bsp/bootcard.h>
+#include <inttypes.h>
+
 #include <rtems/bspIo.h>
 #include <rtems/version.h>
 #include <rtems/score/heap.h>
 #include <rtems/score/threadimpl.h>
-#include <inttypes.h>
+
+#include <bsp.h>
+#include <bsp/bootcard.h>
+#include <bsp/linker-symbols.h>
 
 #ifdef CONFIGURE_BACKTRACE
 #include <rtems/printer.h>
@@ -16,6 +19,32 @@
 #ifdef CONFIGURE_FNTRACE
 #include "base/callpath.h"
 #endif
+
+#ifdef ARM_MULTILIB_ARCH_V7M
+
+static void armv7m_dump_callpath(int depth) {
+    uint32_t *sptr = NULL;
+    __asm__ volatile (
+        "mov %[sptr], sp\n"
+        : [sptr] "=r" (sptr)
+        ::
+    );
+    if (sptr != NULL) {
+        printk("*** CallStack dump ***\n");
+        printk("addr2line -e rtems.elf -f -a ");
+        for (int i = 0, j = 0; i < 128; i++) {
+            if (sptr[i] >= (uint32_t)bsp_section_start_begin &&
+                sptr[i] < (uint32_t)bsp_section_text_end &&
+                (sptr[i] & 0x1)) {
+                printk("0x%08x ", sptr[i]);
+                if (++j >= depth) 
+                    break;
+            }
+        }
+        printk("\n\n");
+    }
+}
+#endif /* ARM_MULTILIB_ARCH_V7M */
 
 void bsp_fatal_extension(rtems_fatal_source source, bool unused,
     rtems_fatal_code code) {
@@ -97,6 +126,12 @@ void bsp_fatal_extension(rtems_fatal_source source, bool unused,
         printk("%s code: %ju (0x%08jx)\n", type, (uintmax_t)code, (uintmax_t)code);
     }
 
+    if (source != RTEMS_FATAL_SOURCE_EXCEPTION &&
+        source != INTERNAL_ERROR_CORE ) {
+#ifdef ARM_MULTILIB_ARCH_V7M
+        armv7m_dump_callpath(20);
+#endif
+    }
     printk("RTEMS version: %s\nRTEMS tools: %s\n", rtems_version(), __VERSION__);
     executing = _Thread_Get_executing();
     if (executing != NULL) {
