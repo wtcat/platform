@@ -6,6 +6,7 @@
 #include <rtems/bspIo.h>
 #include <rtems/sysinit.h>
 #include <bsp/irq-generic.h>
+#include <sys/errno.h>
 
 #include "stm32h7xx_ll_gpio.h"
 #include "stm32h7xx_ll_exti.h"
@@ -448,6 +449,7 @@ static int stm32_gpio_preprobe(struct drvmgr_dev *dev) {
     struct dev_private *devp = device_get_private(dev);
     rtems_ofw_memory_area reg;
     struct stm32h7_gpio *priv;
+	pcell_t prop[3];
     char bank_name[16];
     int ret;
 
@@ -463,8 +465,12 @@ static int stm32_gpio_preprobe(struct drvmgr_dev *dev) {
         free(priv);
         ret = -ENOSTR;
     }
+	ret = rtems_ofw_get_enc_prop(rtems_ofw_parent(devp->np), "ranges", 
+		prop, sizeof(prop));
+	if (ret < 0)
+		return -EFAULT;
     priv->port = bank_name[4] - 'A';
-    priv->gpio = (GPIO_TypeDef *)reg.start;
+    priv->gpio = (GPIO_TypeDef *)(reg.start + prop[1]);
     priv->exti = &exti_controller;
     dev->priv = priv;
     devp->devops = &stm32_gpio_ops;

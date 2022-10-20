@@ -75,10 +75,12 @@ int ofw_platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev,
 		struct dev_private *priv = device_get_private(dev);
 		for (int index = 0; ddrv->ids[index].compatible; index++) {
 			if (rtems_ofw_is_node_compatible(priv->np, ddrv->ids[index].compatible))
-				return 1;
+				goto _ok;
 		}
 		return 0;
 	}
+_ok:
+	ofw_dbg("device register: %s\n", dev->name);
 	return 1;
 }
 	
@@ -176,13 +178,6 @@ int __ofw_bus_populate_device(struct drvmgr_bus *bus, phandle_t parent,
     ofw_foreach_child_node(parent, child) {
        if (!rtems_ofw_node_status(child))
             continue;
-//TODO: remove begin
-		len = rtems_ofw_get_prop(child, "compatible", buffer, sizeof(buffer));
-		if (len > 0) {
-			buffer[len] = '\0';
-			printk("** %s **\n", buffer);
-		}
-//TODO: remove end
 		if (filter) {
 			len = filter(child, buffer, sizeof(buffer));
 			if (len <= 0)
@@ -195,7 +190,6 @@ int __ofw_bus_populate_device(struct drvmgr_bus *bus, phandle_t parent,
 				continue;
 		}
 
-		ofw_dbg("DevNode register: %s\n", buffer);
         drvmgr_alloc_dev(&dev, sizeof(struct dev_private) + len + 1);
         _Assert(dev != NULL);
         devp = device_get_private(dev);
@@ -215,7 +209,7 @@ int __ofw_bus_populate_device(struct drvmgr_bus *bus, phandle_t parent,
 		rtems_chain_append(&ofw_root, &devp->node);
         err = drvmgr_dev_register(dev);
         if (err) {
-			printk("DevError***: register %s failed(%d)\n", name, err);
+			printk("device register %s failed(%d)\n", name, err);
             break;
 		}
     }

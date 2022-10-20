@@ -16,6 +16,14 @@ struct stm32h7_pinctrl {
     struct drvmgr_dev *gpios[];
 };
 
+static int ofw_pinctrl_bus_filter(phandle_t np, char *devname, size_t max) {
+	int len;
+	len = rtems_ofw_get_prop(np, "rtems,path", devname, max);
+	if (len <= 0)
+		return -EINVAL;
+	return len;
+}
+
 static int stm32h7_setup_pinctrl(struct drvmgr_dev *pinctrl, phandle_t np) {
 extern void stm32_gpio_setup(struct drvmgr_dev *dev, int pin, int conf, int altf);
     struct stm32h7_pinctrl *priv = pinctrl->priv;
@@ -61,9 +69,15 @@ static const struct pinctrl_operations stm32h7_pinctrl_ops = {
     .set_state = stm32h7_pinctrl_set
 };
 
+static int ofw_pinctrl_bus_populate_device(struct drvmgr_bus *bus) {
+    struct dev_private *devp =device_get_private(bus->dev);
+    return __ofw_bus_populate_device(bus, devp->np, 
+        ofw_pinctrl_bus_filter);
+}
+
 static struct drvmgr_bus_ops stm32h7_pinctrl_bus = {
 	.init = {
-		ofw_platform_bus_populate_device,
+		ofw_pinctrl_bus_populate_device,
 	},
     .unite = stm32h7_pinctrl_bus_unite
 };

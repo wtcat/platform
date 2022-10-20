@@ -95,8 +95,10 @@ void __notrace bsp_start(void) {
 
 void __notrace bsp_start_hook_0(void) {
   BSP_output_char = stm32h7_early_uart_putc;
-  if (!(RCC->AHB3ENR & RCC_AHB3ENR_FMCEN))
+  if (!(RCC->AHB3ENR & RCC_AHB3ENR_FMCEN)) {
     stm32h7_sdram_init();
+    printk("** BSP SDRAM setup OK**\n");
+  }
   // if ((RCC->AHB3ENR & RCC_AHB3ENR_FMCEN) == 0) {
   //   /*
   //    * Only perform the low-level initialization if necessary.  An initialized
@@ -118,6 +120,10 @@ void __notrace bsp_start_hook_0(void) {
   if ((SCB->CCR & SCB_CCR_DC_Msk) == 0) 
     SCB_EnableDCache();
   _ARMV7M_MPU_Setup(stm32h7_mpu_map, RTEMS_ARRAY_SIZE(stm32h7_mpu_map));
+    // volatile int *ptest = (volatile int *)0xC0000000;
+    // *ptest = 0xDEADBEEF;
+    // if (*ptest != 0xDEADBEEF)
+    //   printk("** SDRAM TEST FAILED! **\n");
 }
 
 void __notrace bsp_start_hook_1(void) {
