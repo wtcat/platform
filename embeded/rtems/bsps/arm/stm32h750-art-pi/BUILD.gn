@@ -7,6 +7,7 @@ component("board") {
   ]
   sources = [
     "stm32h7.c",
+    "stm32h7_sdram.c",
     "stm32h7_clk.c",
     "stm32h7_com.c",
     "stm32h7_gpio.c",

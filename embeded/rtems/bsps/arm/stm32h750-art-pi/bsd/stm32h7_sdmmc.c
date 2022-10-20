@@ -331,8 +331,7 @@ st_sdmmc_attach(device_t dev)
 			"could not allocate dlyb resource\n");
 		error = ENXIO;
 		goto _end;
-	}
-	sc->dlyb = (DLYB_TypeDef *)sc->res[RES_MEM_DLYB]->r_bushandle;	
+	}	
 	
 	sc->res[RES_IRQ_SDMMC] = bus_alloc_resource(dev, SYS_RES_IRQ,
 		&rid, 0, ~0, 1, RF_ACTIVE);
@@ -372,15 +371,14 @@ st_sdmmc_attach(device_t dev)
 		error = ENOSTR;
 		goto _end;
 	}
-	sc->cfg.data_lines = prop;
-
-
-	st_sdmmc_get_config((uintptr_t)sc->sdmmc, &sc->cfg);
-	if (sc->cfg.data_lines == 0) {
-		device_printf(dev, "config not found!\n");
+	if (prop != 4 && prop != 8) {
+		device_printf(dev, "Bad bus-width value %u\n", prop);
 		error = EINVAL;
 		goto _end;
 	}
+	sc->cfg.data_lines = prop;
+	sc->cfg.dirpol = true;
+	sc->cfg.ocr_voltage = MMC_OCR_320_330 | MMC_OCR_330_340; /* 3.3v */
 
 	st_sdmmc_hw_init(sc);
 
@@ -396,7 +394,8 @@ st_sdmmc_attach(device_t dev)
 	
 	sc->host.host_ocr = sc->cfg.ocr_voltage &
 		((1 << (MMC_OCR_MAX_VOLTAGE_SHIFT + 1)) - 1);
-	sc->host.caps = MMC_CAP_HSPEED;
+	if (OF_hasprop(node, "cap-sd-highspeed"))
+		sc->host.caps = MMC_CAP_HSPEED;
 	if (sc->cfg.data_lines >= 4) {
 		sc->host.caps |= MMC_CAP_4_BIT_DATA;
 	}

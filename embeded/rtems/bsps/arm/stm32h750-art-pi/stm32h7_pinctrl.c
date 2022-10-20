@@ -26,16 +26,13 @@ extern void stm32_gpio_setup(struct drvmgr_dev *dev, int pin, int conf, int altf
 
     if (rtems_ofw_get_enc_prop(np, "pinctrl-0", &parent, sizeof(parent)) < 0)
         return -ENOSTR;
-
     ofw_foreach_child_node(parent, child) {
         int n = rtems_ofw_get_enc_prop(child, "pinmux", pins, sizeof(pins));
         if (n < 0)
             return -ENOSTR;
-
         rtems_ofw_get_enc_prop(child, "slew-rate", &ospeed, sizeof(ospeed));
         if (rtems_ofw_has_prop(child, "drive-push-pull"))
             conf = STM32_OTYPER_PUSH_PULL;
-
         for (int i = 0; i < n; i++) {
             int af = pins[i] & 0xFF;
             int port = (pins[i] >> 12) & 0xF;

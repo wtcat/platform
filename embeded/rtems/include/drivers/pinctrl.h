@@ -18,6 +18,8 @@ struct pinctrl_operations {
 static inline int pinctrl_generic_set_state(struct drvmgr_dev *pctldev, 
     struct drvmgr_dev *config) {
     const struct pinctrl_operations *ops = device_get_operations(pctldev);
+    _Assert(pctldev != NULL);
+    _Assert(ops != NULL);
     _Assert(ops->set_state != NULL);
     return ops->set_state(pctldev, config);
 }
