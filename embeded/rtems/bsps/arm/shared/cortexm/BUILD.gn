@@ -1,0 +1,9 @@
+
+component("cortexm_shared") {
+    sources = [
+        "cortexm_dwt.c"
+    ]
+    configs = [
+        "//embeded/rtems/bsps/arm/shared/hal_stm32:cortexm_config"
+    ]
+}

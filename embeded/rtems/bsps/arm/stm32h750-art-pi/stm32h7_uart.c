@@ -62,6 +62,7 @@ static bool uart_options_parse(const char *s, int *baudrate, uint32_t *cflags) {
         if (!isdigit((int)*s)) 
             break;
         bdr = bdr * 10 + (*s - '0');
+        s++;
     }
     if (*s == 'N' || *s == 'n') {
         s++;
@@ -111,8 +112,8 @@ static void stm32h7_uart_isr(void *arg) {
     if (status & USART_ISR_TXFE) {
         size_t remain = uart->length - uart->transmited;
         if (remain > 0) {
-            uart->buf += uart->transmited;
-            uart->transmited += stm32h7_uart_fifo_write(reg, uart->buf, remain);
+            uart->transmited += stm32h7_uart_fifo_write(reg, 
+                &uart->buf[uart->transmited], remain);
         } else {
             rtems_termios_dequeue_characters(uart->tty, uart->transmited);
         }
@@ -125,11 +126,13 @@ static bool stm32h7_uart_open(struct rtems_termios_tty *tty,
     rtems_libio_open_close_args_t *args) {
     (void) args;
     struct stm32h7_uart *uart = stm32h7_uart_context(base);
+printk("***stm32h7_uart_open ***\n");
     if (clk_enable(uart->clk, &uart->clkid))
         return false;
     uart->tty = tty;
     tty->termios.c_ispeed = stdout_baudrate;
     tty->termios.c_ospeed = stdout_baudrate;
+printk("Open UART buardrate: %d\n", stdout_baudrate);
     // rtems_termios_set_initial_baud(tty, stdout_baudrate);
     return stm32h7_uart_set_termios(base, term);
 }
@@ -289,11 +292,14 @@ static int stm32h7_uart_probe(struct drvmgr_dev *dev) {
     struct stm32h7_uart *uart = dev->priv;
     pcell_t clks[2];
     int ret;
+
     if (rtems_ofw_get_enc_prop(devp->np, "clocks", clks, sizeof(clks)) < 0)
         return -ENODATA;
     uart->clk = ofw_device_get_by_phandle(clks[0]);
-    if (!uart->clk)
+    if (!uart->clk) {
+        printk("Not found clock device for %s\n", dev->name);
         return -ENODATA;
+    }
     uart->clkid = clks[1];
     ret = drvmgr_interrupt_register(dev, IRQF_HARD(uart->irqno), dev->name, 
         stm32h7_uart_isr, uart);
@@ -319,7 +325,8 @@ static int stm32h7_uart_postprobe(struct drvmgr_dev *dev) {
     chosen = rtems_ofw_find_device("/chosen");
     if (chosen < 0)
         goto _out;
-    aliase = rtems_ofw_find_device("/aliases");
+    aliase = rtems_ofw_find_device("/aliases"); 
+    if (aliase < 0)
         goto _out;
     if (rtems_ofw_get_prop_alloc(chosen, "stdout-path", (void **)&prop) < 0)
         goto _out;
@@ -329,10 +336,10 @@ static int stm32h7_uart_postprobe(struct drvmgr_dev *dev) {
             break;
         }
     }
+
     if (rtems_ofw_get_prop_alloc(aliase, prop, (void **)&path) < 0)
-        goto _out;
-    
-    uart_options_parse(next, &stdout_baudrate, NULL);
+        goto _out;  
+    uart_options_parse(next, &stdout_baudrate, NULL);   
     stdout_device = ofw_device_get_by_path(path);
     if (!stdout_device) 
         goto _out;

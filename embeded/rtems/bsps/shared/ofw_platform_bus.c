@@ -20,7 +20,12 @@
 #define ofw_dbg(...)
 #endif
 
-static RTEMS_CHAIN_DEFINE_EMPTY(ofw_root);
+#define OFW_FOREACH_DEVICE(head, pnode) \
+	for (pnode = rtems_chain_first(head); \
+		!rtems_chain_is_tail(head, pnode); \
+		pnode = rtems_chain_next(pnode))
+
+static RTEMS_CHAIN_DEFINE_EMPTY(ofw_device_list);
 
 static struct drvmgr_dev *device_from_private(struct dev_private *priv) {
 	struct drvmgr_dev *xdev = (struct drvmgr_dev *)priv;
@@ -44,13 +49,27 @@ phandle_t ofw_phandle_get(struct drvmgr_dev *dev) {
 }
 
 struct drvmgr_dev *ofw_device_get_by_phandle(phandle_t np) {
-	rtems_chain_node *pnode = rtems_chain_first(&ofw_root);
-	while (!rtems_chain_is_tail(&ofw_root, pnode)) {
+	struct drvmgr_dev *dev;
+	rtems_chain_node *pnode;
+	OFW_FOREACH_DEVICE(&ofw_device_list, pnode) {
 		struct dev_private *priv = RTEMS_CONTAINER_OF(pnode, 
 			struct dev_private, node);
-		if (np == priv->np) 
-			return device_from_private(priv);
-		pnode = rtems_chain_next(pnode);
+		dev = device_from_private(priv);
+		if (np == (phandle_t)dev->businfo)
+			return dev;
+	}
+	return NULL;
+}
+
+struct drvmgr_dev *ofw_device_get_by_devnode(phandle_t devnode) {
+	struct drvmgr_dev *dev;
+	rtems_chain_node *pnode;
+	OFW_FOREACH_DEVICE(&ofw_device_list, pnode) {
+		struct dev_private *priv = RTEMS_CONTAINER_OF(pnode, 
+			struct dev_private, node);
+		dev = device_from_private(priv);
+		if (devnode == priv->np)
+			return dev;
 	}
 	return NULL;
 }
@@ -58,7 +77,7 @@ struct drvmgr_dev *ofw_device_get_by_phandle(phandle_t np) {
 struct drvmgr_dev *ofw_device_get_by_path(const char *path) {
 	phandle_t np = rtems_ofw_find_device(path);
 	if ((int)np >= 0) 
-		return ofw_device_get_by_phandle(np);
+		return ofw_device_get_by_devnode(np);
 	return NULL;
 }
 
@@ -172,6 +191,7 @@ int __ofw_bus_populate_device(struct drvmgr_bus *bus, phandle_t parent,
 	struct dev_private *devp;
     struct drvmgr_dev *dev;
     phandle_t child;
+	pcell_t prop;
     char buffer[128];
     int len, err = -EINVAL;
 
@@ -206,7 +226,9 @@ int __ofw_bus_populate_device(struct drvmgr_bus *bus, phandle_t parent,
         dev->name = name;
         dev->next_in_drv = NULL;
         dev->bus = NULL;
-		rtems_chain_append(&ofw_root, &devp->node);
+		if (rtems_ofw_get_enc_prop(devp->np, "phandle", &prop, sizeof(prop)) > 0) 
+			dev->businfo = (void *)prop;
+		rtems_chain_append(&ofw_device_list, &devp->node);
         err = drvmgr_dev_register(dev);
         if (err) {
 			printk("device register %s failed(%d)\n", name, err);

@@ -1,5 +1,7 @@
 import("//gn/common.gni")
 
+_CORTEXM_DEFINES = []
+
 # STM32F4
 if (target_soc == "STM32F405xx" ||
     target_soc == "STM32F415xx" ||
@@ -24,7 +26,7 @@ if (target_soc == "STM32F405xx" ||
     target_soc == "STM32F412Vx" ||
     target_soc == "STM32F413xx" ||
     target_soc == "STM32F423xx") {
-
+    _CORTEXM_DEFINES +=["CORE_CM4"]
     component("stm32f4") {
         sources = [
             "stm32cube/stm32f4xx/drivers/src/stm32f4xx_ll_adc.c",
@@ -153,6 +155,7 @@ else if (target_soc == "STM32H743xx" ||
     target_soc == "STM32H755xx" ||
     target_soc == "STM32H747xx" ||
     target_soc == "STM32H757xx") {
+    _CORTEXM_DEFINES +=["CORE_CM7"]
     component("stm32h7") {
         sources = [
             "stm32cube/stm32h7xx/drivers/src/stm32h7xx_hal_lptim.c",
@@ -321,6 +324,14 @@ config("stm32cube_config") {
         "USE_HAL_DRIVER",
         "USE_FULL_LL_DRIVER"
     ]
+    configs = [
+        "//embeded/rtems/bsps/arm/shared/cmsis:cortexM_config"
+    ]
+}
+
+#CortexM configurations
+config("cortexm_config") {
+    defines = _CORTEXM_DEFINES
     configs = [
         "//embeded/rtems/bsps/arm/shared/cmsis:cortexM_config"
     ]

@@ -16,9 +16,9 @@ extern "C"{
 typedef rtems_ofw_memory_area ofw_reg_t;
 
 struct dev_private {
-	rtems_chain_node node;
-	const void *devops;  /* Device operations */
+	const void *devops;  /* Device operations must be at first */
     phandle_t np; /* Device tree node */
+	rtems_chain_node node;
 };
 
 int __ofw_bus_populate_device(struct drvmgr_bus *bus, phandle_t parent, 

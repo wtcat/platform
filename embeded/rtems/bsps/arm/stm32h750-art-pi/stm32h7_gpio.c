@@ -490,11 +490,6 @@ static int stm32_gpio_probe(struct drvmgr_dev *dev) {
     return 0;
 }
 
-static const struct dev_id id_table[] = {
-    {.compatible = "st,stm32h7-gpio", NULL},
-    {NULL, NULL}
-};
-
 static struct drvmgr_drv_ops stm32h7_gpio_driver = {
 	.init = {
         stm32_gpio_preprobe,
@@ -508,6 +503,5 @@ OFW_PLATFORM_DRIVER(stm32h7_gpio) = {
 		.name     = "gpio",
 		.bus_type = DRVMGR_BUS_TYPE_PINCTRL,
 		.ops      = &stm32h7_gpio_driver
-	},
-	.ids = id_table
+	}
 };

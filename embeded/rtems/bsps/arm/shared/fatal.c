@@ -11,6 +11,9 @@
 #include <bsp.h>
 #include <bsp/bootcard.h>
 #include <bsp/linker-symbols.h>
+#include <sys/cdefs.h>
+
+#include "base/compiler.h"
 
 #ifdef CONFIGURE_BACKTRACE
 #include <rtems/printer.h>
@@ -22,13 +25,16 @@
 
 #ifdef ARM_MULTILIB_ARCH_V7M
 
-static void armv7m_dump_callpath(int depth) {
+static __always_inline uint32_t *_armv7m_get_sp(void) {
     uint32_t *sptr = NULL;
     __asm__ volatile (
         "mov %[sptr], sp\n"
         : [sptr] "=r" (sptr)
-        ::
-    );
+        ::);
+    return sptr;
+}
+
+static void armv7m_dump_callpath(const uint32_t *sptr, int depth) {
     if (sptr != NULL) {
         printk("*** CallStack dump ***\n");
         printk("addr2line -e rtems.elf -f -a ");
@@ -68,13 +74,14 @@ void bsp_fatal_extension(rtems_fatal_source source, bool unused,
 #if (BSP_PRINT_EXCEPTION_CONTEXT) || BSP_VERBOSE_FATAL_EXTENSION
     if (source == RTEMS_FATAL_SOURCE_EXCEPTION ||
         source == INTERNAL_ERROR_CORE ) {
+        const rtems_exception_frame *frame = (const rtems_exception_frame *)code;
     #if defined(CONFIGURE_BACKTRACE) || defined(CONFIGURE_FNTRACE)
         rtems_printer printer;
     #endif
     #ifdef CONFIGURE_BACKTRACE
         rtems_print_printer_printk(&printer);
         if (source == RTEMS_FATAL_SOURCE_EXCEPTION)
-            __stack_backtrace(&printer, (rtems_exception_frame *)code, NULL);
+            __stack_backtrace(&printer, frame, NULL);
         else
             __stack_backtrace(&printer, NULL, NULL);
     #endif
@@ -82,7 +89,10 @@ void bsp_fatal_extension(rtems_fatal_source source, bool unused,
         rtems_print_printer_printk(&printer);
         callpath_print_current(&printer);
     #endif
-        rtems_exception_frame_print((const rtems_exception_frame *)code);
+        rtems_exception_frame_print(frame);
+    #ifdef ARM_MULTILIB_ARCH_V7M
+        armv7m_dump_callpath((void *)frame->register_sp, 20);
+    #endif /* ARM_MULTILIB_ARCH_V7M */
     }
 #endif
 #if BSP_VERBOSE_FATAL_EXTENSION
@@ -129,7 +139,8 @@ void bsp_fatal_extension(rtems_fatal_source source, bool unused,
     if (source != RTEMS_FATAL_SOURCE_EXCEPTION &&
         source != INTERNAL_ERROR_CORE ) {
 #ifdef ARM_MULTILIB_ARCH_V7M
-        armv7m_dump_callpath(20);
+        uint32_t *_sp = _armv7m_get_sp();
+        armv7m_dump_callpath(_sp, 20);
 #endif
     }
     printk("RTEMS version: %s\nRTEMS tools: %s\n", rtems_version(), __VERSION__);

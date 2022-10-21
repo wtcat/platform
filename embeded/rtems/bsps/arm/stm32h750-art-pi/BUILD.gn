@@ -19,10 +19,12 @@ component("board") {
     "stm32h7_uart.c"
   ]
 
-  deps = ["//embeded/rtems/bsps/arm/shared"]
-  deps += ["//embeded/rtems/bsps/arm/shared/hal_stm32:stm32h7"]
+  deps =  ["//embeded/rtems/bsps/arm/shared"]
+  deps += [
+    "//embeded/rtems/bsps/arm/shared/hal_stm32:stm32h7"
+  ]
   configs = [
-    "//embeded/rtems/bsps/arm/shared/hal_stm32:stm32h7_config"
+    "//embeded/rtems/bsps/arm/shared/hal_stm32:stm32h7_config",
   ]
 }
 
