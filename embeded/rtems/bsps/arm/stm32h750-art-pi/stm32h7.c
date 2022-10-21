@@ -124,6 +124,8 @@ void __notrace bsp_start_hook_0(void) {
     // *ptest = 0xDEADBEEF;
     // if (*ptest != 0xDEADBEEF)
     //   printk("** SDRAM TEST FAILED! **\n");
+    extern char __bsp_dtb_size[];
+    printk("%x", (uintptr_t)__bsp_dtb_size);
 }
 
 void __notrace bsp_start_hook_1(void) {
@@ -142,11 +144,6 @@ uint32_t HAL_GetTick(void) {
 
 void HAL_MspInit(void) {
   __HAL_RCC_SYSCFG_CLK_ENABLE();
-}
-
-const void *bsp_fdt_get(void) {
-extern const unsigned char stm32h7_art_pi_dts[];
-  return stm32h7_art_pi_dts;
 }
 
 uint32_t stm32h7_systick_frequency(void) {
