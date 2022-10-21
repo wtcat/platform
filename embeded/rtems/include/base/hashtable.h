@@ -104,15 +104,6 @@ static inline void hash_del(struct hlist_node *node)
 }
 
 /**
- * hash_del_rcu - remove an object from a rcu enabled hashtable
- * @node: &struct hlist_node of the object to remove
- */
-static inline void hash_del_rcu(struct hlist_node *node)
-{
-	hlist_del_init_rcu(node);
-}
-
-/**
  * hash_for_each - iterate over a hashtable
  * @name: hashtable to iterate
  * @bkt: integer to use as bucket loop cursor

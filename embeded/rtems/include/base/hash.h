@@ -21,15 +21,17 @@ extern "C"{
  * fs/inode.c.  It's not actually prime any more (the previous primes
  * were actively bad for hashing), but the name remains.
  */
-#if BITS_PER_LONG == 32
+#if defined(__have_long32)
 #define GOLDEN_RATIO_PRIME GOLDEN_RATIO_32
 #define hash_long(val, bits) hash_32(val, bits)
-#elif BITS_PER_LONG == 64
+
+#elif defined(__have_long64)
 #define hash_long(val, bits) hash_64(val, bits)
 #define GOLDEN_RATIO_PRIME GOLDEN_RATIO_64
+
 #else
 #error Wordsize not 32 or 64
-#endif
+#endif /* __have_long32 */
 
 /*
  * This hash multiplies the input by a large odd number and takes the
@@ -50,11 +52,6 @@ extern "C"{
  */
 #define GOLDEN_RATIO_32 0x61C88647
 #define GOLDEN_RATIO_64 0x61C8864680B583EBull
-
-#ifdef CONFIG_HAVE_ARCH_HASH
-/* This header may use the GOLDEN_RATIO_xx constants */
-#include "bsp/asm/hash.h"
-#endif
 
 /*
  * The _generic versions exist only so lib/test_hash.c can compare
@@ -86,7 +83,7 @@ static inline uint32_t hash_32_generic(uint32_t val, unsigned int bits)
 #endif
 static __always_inline uint32_t hash_64_generic(uint64_t val, unsigned int bits)
 {
-#if BITS_PER_LONG == 64
+#ifdef __have_long64
 	/* 64x64-bit multiply is efficient on all 64-bit processors */
 	return val * GOLDEN_RATIO_64 >> (64 - bits);
 #else
@@ -105,7 +102,7 @@ static inline uint32_t hash32_ptr(const void *ptr)
 {
 	unsigned long val = (unsigned long)ptr;
 
-#if BITS_PER_LONG == 64
+#ifdef __have_long64
 	val ^= (val >> 32);
 #endif
 	return (uint32_t)val;
