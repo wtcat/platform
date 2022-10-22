@@ -18,6 +18,8 @@
 #undef B0
 #include "stm32h7xx_ll_usart.h"
 
+#define UART_FIFO_SIZE 8
+
 struct stm32h7_uart {
     rtems_termios_device_context base;
     rtems_termios_tty *tty;
@@ -47,7 +49,9 @@ static bool stm32h7_uart_set_termios(rtems_termios_device_context *base,
 static size_t stm32h7_uart_fifo_write(USART_TypeDef *reg, const char *buf, 
     size_t size) {
     size_t idx = 0;
-    while (reg->ISR & USART_ISR_TXE_TXFNF) {
+    size_t bytes = min_t(size_t, size, UART_FIFO_SIZE);
+    while (idx < bytes) {
+        //if (reg->ISR & USART_ISR_TXE_TXFNF)
         reg->TDR = buf[idx];
         idx++;
     }
@@ -101,7 +105,7 @@ static void stm32h7_uart_isr(void *arg) {
 
     reg->ICR = USART_ICR_IDLECF | USART_ICR_TXFECF;
     if (status & (USART_ISR_IDLE | USART_ISR_RXFF)) {
-        char rxfifo[16];
+        char rxfifo[32];
         int i = 0;
         while (reg->ISR & USART_ISR_RXNE_RXFNE) {
             rxfifo[i] = (char)reg->RDR;
@@ -109,13 +113,16 @@ static void stm32h7_uart_isr(void *arg) {
         }
         rtems_termios_enqueue_raw_characters(uart->tty, rxfifo, i);
     }
-    if (status & USART_ISR_TXFE) {
-        size_t remain = uart->length - uart->transmited;
+    if ((status & USART_ISR_TXFE) && uart->length > 0) {
+        size_t transmited = uart->transmited;
+        size_t remain = uart->length - transmited;
         if (remain > 0) {
-            uart->transmited += stm32h7_uart_fifo_write(reg, 
-                &uart->buf[uart->transmited], remain);
+            transmited = stm32h7_uart_fifo_write(reg, &uart->buf[transmited], remain);
+            uart->transmited += transmited;
         } else {
-            rtems_termios_dequeue_characters(uart->tty, uart->transmited);
+            uart->length = 0;
+            uart->transmited = 0;
+            rtems_termios_dequeue_characters(uart->tty, transmited);
         }
     }
 }
@@ -126,13 +133,13 @@ static bool stm32h7_uart_open(struct rtems_termios_tty *tty,
     rtems_libio_open_close_args_t *args) {
     (void) args;
     struct stm32h7_uart *uart = stm32h7_uart_context(base);
-printk("***stm32h7_uart_open ***\n");
+
     if (clk_enable(uart->clk, &uart->clkid))
         return false;
     uart->tty = tty;
     tty->termios.c_ispeed = stdout_baudrate;
     tty->termios.c_ospeed = stdout_baudrate;
-printk("Open UART buardrate: %d\n", stdout_baudrate);
+
     // rtems_termios_set_initial_baud(tty, stdout_baudrate);
     return stm32h7_uart_set_termios(base, term);
 }

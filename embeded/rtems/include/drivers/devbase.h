@@ -7,6 +7,7 @@
 #include <rtems/sysinit.h>
 #include <drvmgr/drvmgr.h>
 #include "base/compiler.h"
+#include "base/minmax.h"
 
 #ifdef __cplusplus
 extern "C"{
