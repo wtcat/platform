@@ -601,6 +601,7 @@ static int stm32_dma_preprobe(struct drvmgr_dev *dev) {
 	priv = rtems_calloc(1, sizeof(*priv));
 	if (!priv)
 		return -ENOMEM;
+	priv->max_streams = DMA_STREAM_COUNT;
 	priv->dma = (void *)reg.start; 
 	priv->offset = offset;
     priv->support_m2m = rtems_ofw_has_prop(devp->np, "st,mem2mem");

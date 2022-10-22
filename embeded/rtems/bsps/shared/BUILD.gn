@@ -12,6 +12,7 @@ component("shared") {
     }
     sources += [
         "vdma.c",
-        "dma.c"
+        "dma.c",
+        "mdma.c"
     ]
 }

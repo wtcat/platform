@@ -142,6 +142,8 @@ struct dma_block_config {
  * @param user_data  private data from DMA client.
  * @param dma_callback see dma_callback_t for details
  */
+typedef void (*dma_transfer_cb_t)(struct drvmgr_dev *dev, void *user_data, 
+	uint32_t channel, int status);
 struct dma_config {
 	uint32_t  dma_slot :             7;
 	uint32_t  channel_direction :    3;
@@ -160,9 +162,20 @@ struct dma_config {
 	uint32_t  dest_burst_length :   16;
 	uint32_t block_count;
 	struct dma_block_config *head_block;
-    void (*dma_callback)(struct drvmgr_dev *dev, void *user_data, 
-        uint32_t channel, int status);
+	dma_transfer_cb_t dma_callback;
     void *user_data;
+};
+
+/* DMA memcpy descriptor */
+struct mdma_desc {
+    struct drvmgr_dev *mdma;
+    void (*release)(struct mdma_desc *);
+    rtems_id thread;
+    int error;
+    size_t length;
+    size_t nblks;
+    struct dma_config head;
+    struct dma_block_config blks[];
 };
 
 /**
@@ -211,6 +224,8 @@ struct dma_operations {
 				struct dma_status *status);
     bool (*chan_filter)(struct drvmgr_dev *dev, int channel, 
                 void *filter_param);
+	struct mdma_desc *(*memcpy_prepare)(struct drvmgr_dev *dev, void *dst, 
+		const void *src, size_t size);
 };
 
 #define dmad_get_operations(dev) \
@@ -342,6 +357,20 @@ static inline int dma_get_status(struct drvmgr_dev *dev, uint32_t channel,
 	return -ENOSYS;
 }
 
+
+static inline struct mdma_desc *dma_memcpy_prepare(struct drvmgr_dev *dev, 
+	void *dst, const void *src, size_t size) {
+    _Assert(dev != NULL);
+    const struct dma_operations *ops = dmad_get_operations(dev);
+	return ops->memcpy_prepare(dev, dst, src, size);
+}
+
+ssize_t dma_memcpy_sync(void *dst, const void *src, size_t size);
+
+ssize_t dma_memcpy_async(void *dst, const void *src, size_t size, 
+    dma_transfer_cb_t cb, void *arg);
+
+int dma_mdev_register(struct drvmgr_dev *mdma);
 /**
  * @brief request DMA channel.
  *

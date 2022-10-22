@@ -50,6 +50,8 @@ struct stm32h7_dmamux {
 	struct dmamux_stm32_channel mux_channels[];
 };
 
+#define dma_dbg(fmt, ...) printk(fmt, ##__VA_ARGS__)
+
 static int dmamux_stm32_configure(struct drvmgr_dev *dev, uint32_t id,
     struct dma_config *config) {
     struct stm32h7_dmamux *priv = dev->priv;
@@ -81,6 +83,10 @@ static int dmamux_stm32_configure(struct drvmgr_dev *dev, uint32_t id,
 	 * This dmamux channel 'id' is now used for this peripheral request
 	 * It gives this mux request ID to the dma through the config.dma_slot
 	 */
+	dma_dbg("** dmamux_stm32_configure: %s stream(%d) channel(%d) request_id(%d)\n", 
+			priv->mux_channels[id].dev_dma->name, 
+			priv->mux_channels[id].dma_id,
+			id, request_id);
 	if (dma_stm32_configure(priv->mux_channels[id].dev_dma,
 			priv->mux_channels[id].dma_id, config) != 0) {
 		printk("cannot configure the dmamux.");
@@ -89,7 +95,6 @@ static int dmamux_stm32_configure(struct drvmgr_dev *dev, uint32_t id,
 
 	/* set the Request Line ID to this dmamux channel i */
 	LL_DMAMUX_SetRequestID(priv->dmamux, id, request_id);
-
 	return 0;
 }
 
@@ -106,6 +111,7 @@ static int dmamux_stm32_start(struct drvmgr_dev *dev, uint32_t id) {
 		printk("cannot start the dmamux channel %d.", id);
 		return -EINVAL;
 	}
+
 	return 0;
 }
 
@@ -165,20 +171,60 @@ int dmamux_stm32_get_status(struct drvmgr_dev *dev, uint32_t id,
 	return 0;
 }
 
+static struct mdma_desc *dmamux_memcpy_prepare(struct drvmgr_dev *dev, void *dst, 
+	const void *src, size_t size) {
+    struct dma_config *cfg;
+    struct dma_block_config *blk;
+    struct mdma_desc *desc;
+    size_t vsize;
+
+	if (size > 0xFFFF)
+		return NULL;
+    vsize = sizeof(struct dma_block_config);
+    desc = rtems_calloc(1, sizeof(struct mdma_desc) + vsize);
+    if (desc == NULL)
+        return NULL;
+
+    blk = &desc->blks[0];
+    blk->block_size = size & 0xFFFF;
+    blk->dest_address = (dma_addr_t)dst;
+    blk->dest_addr_adj = DMA_ADDR_ADJ_INCREMENT;
+    blk->source_address = (dma_addr_t)src;
+    blk->source_addr_adj = DMA_ADDR_ADJ_INCREMENT;
+	
+    cfg = &desc->head;
+    cfg->channel_direction = MEMORY_TO_MEMORY;
+    cfg->dma_slot = 0; /* m2m */
+    cfg->dest_data_size = 1;
+    cfg->dest_burst_length = 1;
+    cfg->source_burst_length = 1;
+    cfg->source_data_size = 1;
+    cfg->block_count = 1;
+    cfg->head_block = blk;
+    desc->release = (void (*)(struct mdma_desc *))free;
+    desc->length = size;
+	desc->mdma = dev;
+    return desc;
+}
+
 static const struct dma_operations stm32h7_dma_ops = {
 	.reload		 = dmamux_stm32_reload,
 	.configure	 = dmamux_stm32_configure,
 	.start		 = dmamux_stm32_start,
 	.stop		 = dmamux_stm32_stop,
-	.get_status	 = dmamux_stm32_get_status
+	.get_status	 = dmamux_stm32_get_status,
+	.memcpy_prepare = dmamux_memcpy_prepare
 };
 
 
 static int dmamux_stm32_preprobe(struct drvmgr_dev *dev) {
     struct dev_private *devp = device_get_private(dev);
     struct stm32h7_dmamux *priv;
+	rtems_ofw_memory_area reg;
     pcell_t chan, req, gen;
-
+    
+	if (rtems_ofw_get_reg(devp->np, &reg, sizeof(reg)) < 0) 
+		return -ENOSTR;	
 	if (rtems_ofw_get_enc_prop(devp->np, "dma-channels", &chan, sizeof(chan)) < 0)
 		return -ENOSTR;
 	if (rtems_ofw_get_enc_prop(devp->np, "dma-requests", &req, sizeof(req)) < 0)
@@ -192,6 +238,7 @@ static int dmamux_stm32_preprobe(struct drvmgr_dev *dev) {
     priv->channel_nb = (uint8_t)chan;
     priv->gen_nb = (uint8_t)gen;
     priv->req_nb = (uint8_t)req;
+	priv->dmamux = (DMAMUX_Channel_TypeDef *)reg.start;
     dev->priv = priv;
 	return 0;
 }
@@ -227,6 +274,7 @@ static int dmamux_stm32_probe(struct drvmgr_dev *dev) {
     }
 	devp->devops = &stm32h7_dma_ops;
     clk_enable(priv->clk, &priv->clkid);
+	dma_mdev_register(dev);
 	return 0;
 
 _free:
