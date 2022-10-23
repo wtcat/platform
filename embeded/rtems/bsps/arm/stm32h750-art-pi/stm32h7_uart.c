@@ -13,6 +13,7 @@
 #include <bsp/irq-generic.h>
 
 #include "drivers/clock.h"
+#include "drivers/dma.h"
 #include "drivers/ofw_platform_bus.h"
 
 #undef B0

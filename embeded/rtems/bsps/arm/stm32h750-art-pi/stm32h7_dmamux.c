@@ -46,7 +46,6 @@ struct stm32h7_dmamux {
 	uint8_t channel_nb;	/* total nb of channels */
 	uint8_t gen_nb;	/* total nb of Request generator */
 	uint8_t req_nb;	/* total nb of Peripheral Request inputs */
-	long dma_channel[1];
 	struct dmamux_stm32_channel mux_channels[];
 };
 
@@ -222,6 +221,7 @@ static int dmamux_stm32_preprobe(struct drvmgr_dev *dev) {
     struct stm32h7_dmamux *priv;
 	rtems_ofw_memory_area reg;
     pcell_t chan, req, gen;
+	int err;
     
 	if (rtems_ofw_get_reg(devp->np, &reg, sizeof(reg)) < 0) 
 		return -ENOSTR;	
@@ -234,13 +234,16 @@ static int dmamux_stm32_preprobe(struct drvmgr_dev *dev) {
     priv = rtems_calloc(1, sizeof(*priv) + chan * sizeof(struct dmamux_stm32_channel));
 	if (!priv)
 		return -ENOMEM;
-	dma_context_init(&priv->context, priv->dma_channel, chan);
-    priv->channel_nb = (uint8_t)chan;
-    priv->gen_nb = (uint8_t)gen;
-    priv->req_nb = (uint8_t)req;
-	priv->dmamux = (DMAMUX_Channel_TypeDef *)reg.start;
-    dev->priv = priv;
-	return 0;
+	err = dma_context_init(&priv->context, chan);
+	if (!err) {
+		priv->channel_nb = (uint8_t)chan;
+		priv->gen_nb = (uint8_t)gen;
+		priv->req_nb = (uint8_t)req;
+		priv->dmamux = (DMAMUX_Channel_TypeDef *)reg.start;
+		devp->devops = &stm32h7_dma_ops;
+		dev->priv = priv;
+	}
+	return err;
 }
 
 static int dmamux_stm32_probe(struct drvmgr_dev *dev) {
@@ -272,7 +275,6 @@ static int dmamux_stm32_probe(struct drvmgr_dev *dev) {
         priv->mux_channels[i].dev_dma = (i < 8)? dma1: dma2;
         priv->mux_channels[i].dma_id = i + 1;
     }
-	devp->devops = &stm32h7_dma_ops;
     clk_enable(priv->clk, &priv->clkid);
 	dma_mdev_register(dev);
 	return 0;

@@ -6,6 +6,10 @@
 
 #include <rtems/sysinit.h>
 #include <drvmgr/drvmgr.h>
+#ifdef CONFIG_OFW
+#include <ofw/ofw.h>
+#include "ofw/ofw_extension.h"
+#endif
 #include "base/compiler.h"
 #include "base/minmax.h"
 

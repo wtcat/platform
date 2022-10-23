@@ -5,6 +5,9 @@ import("//gn/toolchain/rtems/rtems.gni")
 
 config("feature_flags") {
   defines = []
+  if (use_ofw_bus) {
+    defines += ["CONFIG_OFW"]
+  }
 }
 
 # Debug/release ----------------------------------------------------------------

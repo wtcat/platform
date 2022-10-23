@@ -166,6 +166,13 @@ struct dma_config {
     void *user_data;
 };
 
+#ifdef CONFIG_OFW
+struct ofw_dmachan {
+	struct drvmgr_dev *dev;
+	int channel;
+};
+#endif
+
 /* DMA memcpy descriptor */
 struct mdma_desc {
     struct drvmgr_dev *mdma;
@@ -210,6 +217,9 @@ struct dma_context {
 	uint32_t magic;
 	uint32_t dma_channels;
 	long *dma_bitmaps;
+#ifdef CONFIG_OFW
+	struct ofw_dmachan *chans;
+#endif
 };
 
 /* DMA operations */
@@ -404,9 +414,13 @@ void dma_release_channel(struct drvmgr_dev *dev, uint32_t channel);
  * @param channel  channel number
  *
  */
-void dma_context_init(struct dma_context *ctx, void *bitmaps, 
-    uint32_t channel);
+int dma_context_init(struct dma_context *ctx, uint32_t max_channels);
 	
+#ifdef CONFIG_OFW
+struct ofw_dmachan *ofw_dma_chan_request(phandle_t np, const char *name, 
+    pcell_t *pcell, size_t maxsize);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

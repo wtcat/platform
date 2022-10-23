@@ -77,7 +77,6 @@ ssize_t dma_memcpy_async(void *dst, const void *src, size_t size,
         goto _free_ch;
     }
 
-    desc->mdma = mdma_device;
     desc->head.dma_callback = cb;
     desc->head.user_data = arg;
     ret = dma_configure(desc->mdma, chan, &desc->head);

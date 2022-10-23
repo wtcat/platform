@@ -1,7 +1,6 @@
 import("//gn/toolchain/rtems/rtems.gni")
 
 component("board") {
-  defines = []
   include_dirs = [
     "include"
   ]
@@ -19,12 +18,12 @@ component("board") {
     "stm32h7_uart.c"
   ]
 
-  deps =  ["//embeded/rtems/bsps/arm/shared"]
-  deps += [
+  deps = [
+    "//embeded/rtems/bsps/arm/shared",
     "//embeded/rtems/bsps/arm/shared/hal_stm32:stm32h7"
   ]
   configs = [
-    "//embeded/rtems/bsps/arm/shared/hal_stm32:stm32h7_config",
+    "//embeded/rtems/bsps/arm/shared/hal_stm32:stm32h7_config"
   ]
 }
 
