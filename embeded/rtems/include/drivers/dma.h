@@ -173,6 +173,7 @@ struct scatterlist {
 
 struct dma_chan {
 	struct drvmgr_dev *dev;
+	struct dma_config config;
 	int channel;
 };
 

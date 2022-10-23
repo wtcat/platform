@@ -7,6 +7,7 @@
 
 #include <rtems/console.h>
 #include <rtems/termiostypes.h>
+#include <rtems/rtems/cache.h> 
 #include <rtems/bspIo.h>
 #include <rtems/malloc.h>
 
@@ -33,8 +34,10 @@ struct stm32h7_uart {
     const char *buf;
     size_t transmited;
     size_t length;
-    struct ofw_dmachan *tx;
-    struct ofw_dmachan *rx;
+    struct dma_chan *tx;
+    struct dma_chan *rx;
+    char *rxbuf;
+    size_t rxbuf_size;
 };
 
 #define stm32h7_uart_context(_base) \
@@ -59,6 +62,43 @@ static size_t stm32h7_uart_fifo_write(USART_TypeDef *reg, const char *buf,
         idx++;
     }
     return idx;
+}
+
+static int stm32h7_uart_dma_transmit(struct stm32h7_uart *uart, 
+    const void *buffer, size_t size) {
+    struct dma_chan *tx = uart->tx;
+    struct dma_block_config blk;
+
+    _Assert(size < 65536);
+    blk.block_size = size;
+    blk.dest_address = (dma_addr_t)&uart->reg->TDR;
+    blk.dest_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
+    blk.source_address = (dma_addr_t)buffer;
+    blk.source_addr_adj = DMA_ADDR_ADJ_INCREMENT;
+    tx->config.head_block = &blk;
+    tx->config.block_count = 1;
+    int ret = dma_configure(tx->dev, tx->channel, &tx->config);
+    if (!ret)
+        ret = dma_start(tx->dev, tx->channel);
+    return 0;
+}
+
+static int stm32h7_uart_dma_receive(struct stm32h7_uart *uart) {
+    struct dma_chan *rx = uart->rx;
+    struct dma_block_config blk;
+
+    blk.block_size = uart->rxbuf_size;
+    blk.source_address = (dma_addr_t)&uart->reg->RDR;
+    blk.source_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
+    blk.dest_address = (dma_addr_t)uart->rxbuf;
+    blk.dest_addr_adj = DMA_ADDR_ADJ_INCREMENT;
+    blk.source_reload_en = true;
+    rx->config.head_block = &blk;
+    rx->config.block_count = 1;
+    int ret = dma_configure(rx->dev, rx->channel, &rx->config);
+    if (!ret)
+        ret = dma_start(rx->dev, rx->channel);
+    return 0;
 }
 
 static bool uart_options_parse(const char *s, int *baudrate, uint32_t *cflags) {
@@ -99,6 +139,20 @@ static bool uart_options_parse(const char *s, int *baudrate, uint32_t *cflags) {
     if (cflags)
         *cflags = cc;
     return true;
+}
+
+static void stm32h7_uart_dmarx_isr(struct drvmgr_dev *dev, void *arg, 
+    uint32_t channel, int status) {
+    struct stm32h7_uart *uart = (struct stm32h7_uart *)arg;
+    struct dma_status stat;
+    size_t rxbytes;
+    (void) channel;
+    (void) dev;
+
+    dma_get_status(dev, channel, &stat);
+    rxbytes = uart->rxbuf_size - stat.pending_length;
+    rtems_cache_invalidate_multiple_data_lines(uart->rxbuf, rxbytes);
+    rtems_termios_enqueue_raw_characters(uart->tty, uart->rxbuf, rxbytes);
 }
 
 static void stm32h7_uart_isr(void *arg) {
@@ -157,6 +211,13 @@ static void stm32h7_uart_close(struct rtems_termios_tty *tty,
     uart->reg->CR3 = 0;
     uart->tty = NULL;
     clk_disable(uart->clk, &uart->clkid);
+    if (uart->rx) {
+        dma_stop(uart->rx->dev, uart->rx->channel);
+        rtems_cache_coherent_free(uart->rxbuf);
+        uart->rxbuf = NULL;
+    }
+    if (uart->tx)
+        dma_stop(uart->tx->dev, uart->tx->channel);
 }
 
 static bool stm32h7_uart_set_termios(rtems_termios_device_context *base, 
@@ -333,13 +394,41 @@ static void stm32h7_uart_putc(char c) {
 static int stm32h7_uart_extprobe(struct drvmgr_dev *dev) {
     struct dev_private *devp = device_get_private(dev);
     struct stm32h7_uart *uart = dev->priv;
-    pcell_t pecs[3];
+    pcell_t specs[3];
 
-    uart->tx = ofw_dma_chan_request(devp->np, "tx", pecs, sizeof(pecs));
+    uart->tx = ofw_dma_chan_request(devp->np, "tx", 
+        specs, sizeof(specs));
     if (uart->tx) {
-        
+        struct dma_config *config = &uart->tx->config;
+        config->dma_slot = specs[0];
+        config->channel_direction = MEMORY_TO_PERIPHERAL;
+        config->dest_data_size = 1;
+        config->dest_burst_length = 1;
+        config->source_burst_length = 1;
+        config->source_data_size = 1;
     }
 
+    uart->rx = ofw_dma_chan_request(devp->np, "rx", 
+        specs, sizeof(specs));
+    if (uart->rx) {
+        uart->rxbuf_size = 1200;
+        uart->rxbuf = rtems_cache_coherent_allocate(uart->rxbuf_size, 4, 0);
+        if (!uart->rxbuf) {
+            dma_release_channel(uart->rx->dev, uart->rx->channel);
+            return -ENOMEM;
+        }
+        struct dma_config *config = &uart->rx->config;
+        config->dma_slot = specs[0];
+        config->channel_direction = PERIPHERAL_TO_MEMORY;
+        config->dest_data_size = 1;
+        config->dest_burst_length = 1;
+        config->source_burst_length = 1;
+        config->source_data_size = 1;
+        config->complete_callback_en = 1;
+        config->dma_callback = stm32h7_uart_dmarx_isr;
+        config->user_data = uart;
+    }
+    
     return 0;
 }
 
