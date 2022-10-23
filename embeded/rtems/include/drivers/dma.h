@@ -166,17 +166,27 @@ struct dma_config {
     void *user_data;
 };
 
-#ifdef CONFIG_OFW
-struct ofw_dmachan {
+struct scatterlist {
+	dma_addr_t dma_address;
+	size_t length;
+};
+
+struct dma_chan {
 	struct drvmgr_dev *dev;
 	int channel;
 };
-#endif
+
+struct dma_async_tx_descriptor {
+	struct dma_chan *chan;
+	uint32_t flags;
+	void (*callback)(void *param);
+	void *param;
+};
 
 /* DMA memcpy descriptor */
-struct mdma_desc {
+struct dma_mem_descriptor {
     struct drvmgr_dev *mdma;
-    void (*release)(struct mdma_desc *);
+    void (*release)(struct dma_mem_descriptor *);
     rtems_id thread;
     int error;
     size_t length;
@@ -218,7 +228,7 @@ struct dma_context {
 	uint32_t dma_channels;
 	long *dma_bitmaps;
 #ifdef CONFIG_OFW
-	struct ofw_dmachan *chans;
+	struct dma_chan *chans;
 #endif
 };
 
@@ -234,8 +244,9 @@ struct dma_operations {
 				struct dma_status *status);
     bool (*chan_filter)(struct drvmgr_dev *dev, int channel, 
                 void *filter_param);
-	struct mdma_desc *(*memcpy_prepare)(struct drvmgr_dev *dev, void *dst, 
+	struct dma_mem_descriptor *(*memcpy_prepare)(struct drvmgr_dev *dev, void *dst, 
 		const void *src, size_t size);
+	
 };
 
 #define dmad_get_operations(dev) \
@@ -368,7 +379,7 @@ static inline int dma_get_status(struct drvmgr_dev *dev, uint32_t channel,
 }
 
 
-static inline struct mdma_desc *dma_memcpy_prepare(struct drvmgr_dev *dev, 
+static inline struct dma_mem_descriptor *dma_memcpy_prepare(struct drvmgr_dev *dev, 
 	void *dst, const void *src, size_t size) {
     _Assert(dev != NULL);
     const struct dma_operations *ops = dmad_get_operations(dev);
@@ -417,7 +428,7 @@ void dma_release_channel(struct drvmgr_dev *dev, uint32_t channel);
 int dma_context_init(struct dma_context *ctx, uint32_t max_channels);
 	
 #ifdef CONFIG_OFW
-struct ofw_dmachan *ofw_dma_chan_request(phandle_t np, const char *name, 
+struct dma_chan *ofw_dma_chan_request(phandle_t np, const char *name, 
     pcell_t *pcell, size_t maxsize);
 #endif
 

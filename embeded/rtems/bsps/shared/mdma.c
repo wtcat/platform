@@ -13,12 +13,12 @@ static void dma_memcpy_cb(struct drvmgr_dev *dev, void *arg,
     uint32_t channel, int status) {
     (void) dev;
     (void) channel;
-    struct mdma_desc *desc = (struct mdma_desc *)arg;
+    struct dma_mem_descriptor *desc = (struct dma_mem_descriptor *)arg;
     desc->error = status;
     rtems_event_transient_send(desc->thread);
 }
 
-static int dma_wait_transfer_complete(struct mdma_desc *desc, int chan) {
+static int dma_wait_transfer_complete(struct dma_mem_descriptor *desc, int chan) {
     int ret;
     desc->error = -1;
     desc->thread = rtems_task_self();
@@ -31,7 +31,7 @@ static int dma_wait_transfer_complete(struct mdma_desc *desc, int chan) {
 }
 
 ssize_t dma_memcpy_sync(void *dst, const void *src, size_t size) {
-    struct mdma_desc *desc;
+    struct dma_mem_descriptor *desc;
     int chan, ret;
 
     chan = dma_request_channel(mdma_device, NULL);
@@ -63,7 +63,7 @@ _free_ch:
 
 ssize_t dma_memcpy_async(void *dst, const void *src, size_t size, 
     dma_transfer_cb_t cb, void *arg) {
-    struct mdma_desc *desc;
+    struct dma_mem_descriptor *desc;
     int chan, ret;
 
     chan = dma_request_channel(mdma_device, NULL);

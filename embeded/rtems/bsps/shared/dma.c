@@ -21,7 +21,7 @@ int dma_context_init(struct dma_context *ctx, uint32_t max_channels) {
     size_t alloc_size = 0;
     char *p;
 #ifdef CONFIG_OFW
-    alloc_size += sizeof(struct ofw_dmachan) * max_channels;
+    alloc_size += sizeof(struct dma_chan) * max_channels;
 #endif
     p = rtems_calloc(1, alloc_size + DMA_CHANNEL_SIZE(max_channels));
     if (!p)
@@ -31,7 +31,7 @@ int dma_context_init(struct dma_context *ctx, uint32_t max_channels) {
     ctx->magic = DMA_MAGIC;
     ctx->dma_bitmaps = (void *)(p + alloc_size);
 #ifdef CONFIG_OFW
-    ctx->chans = (struct ofw_dmachan *)p;
+    ctx->chans = (struct dma_chan *)p;
 #endif
     return 0;
 }
@@ -76,7 +76,7 @@ void dma_release_channel(struct drvmgr_dev *dev, uint32_t channel) {
 }
 
 #ifdef CONFIG_OFW
-struct ofw_dmachan *ofw_dma_chan_request(phandle_t np, const char *name, 
+struct dma_chan *ofw_dma_chan_request(phandle_t np, const char *name, 
     pcell_t *pcell, size_t maxsize) {
     struct drvmgr_dev *dev;
     struct dma_context *ctx;

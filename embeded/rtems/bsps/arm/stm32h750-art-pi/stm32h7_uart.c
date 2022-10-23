@@ -33,6 +33,8 @@ struct stm32h7_uart {
     const char *buf;
     size_t transmited;
     size_t length;
+    struct ofw_dmachan *tx;
+    struct ofw_dmachan *rx;
 };
 
 #define stm32h7_uart_context(_base) \
@@ -218,7 +220,13 @@ static bool stm32h7_uart_set_termios(rtems_termios_device_context *base,
         LL_USART_Init(uart->reg, &ll_struct);
         LL_USART_ConfigFIFOsThreshold(uart->reg, LL_USART_FIFOTHRESHOLD_1_8, 
             LL_USART_FIFOTHRESHOLD_8_8);
-        uart->reg->CR1 |=  USART_CR1_IDLEIE | USART_CR1_RXFFIE | USART_CR1_FIFOEN | USART_CR1_UE;
+        if (uart->tx)
+            LL_USART_EnableDMAReq_TX(uart->reg);
+        if (uart->rx)
+            LL_USART_EnableDMAReq_RX(uart->reg);
+        else
+            uart->reg->CR1 |= USART_CR1_RXFFIE;
+        uart->reg->CR1 |=  USART_CR1_IDLEIE | USART_CR1_FIFOEN | USART_CR1_UE;
     }
     rtems_termios_device_lock_release(base, &ctx);
     return true;
@@ -322,6 +330,19 @@ static void stm32h7_uart_putc(char c) {
     }
 }
 
+static int stm32h7_uart_extprobe(struct drvmgr_dev *dev) {
+    struct dev_private *devp = device_get_private(dev);
+    struct stm32h7_uart *uart = dev->priv;
+    pcell_t pecs[3];
+
+    uart->tx = ofw_dma_chan_request(devp->np, "tx", pecs, sizeof(pecs));
+    if (uart->tx) {
+        
+    }
+
+    return 0;
+}
+
 static int stm32h7_uart_postprobe(struct drvmgr_dev *dev) {
     phandle_t chosen, aliase;
     char *path = NULL;
@@ -365,6 +386,7 @@ static struct drvmgr_drv_ops uart_driver_ops = {
 	.init = {
 		stm32h7_uart_preprobe,
         stm32h7_uart_probe,
+        stm32h7_uart_extprobe,
         stm32h7_uart_postprobe
 	},
 };

@@ -170,17 +170,17 @@ int dmamux_stm32_get_status(struct drvmgr_dev *dev, uint32_t id,
 	return 0;
 }
 
-static struct mdma_desc *dmamux_memcpy_prepare(struct drvmgr_dev *dev, void *dst, 
+static struct dma_mem_descriptor *dmamux_memcpy_prepare(struct drvmgr_dev *dev, void *dst, 
 	const void *src, size_t size) {
     struct dma_config *cfg;
     struct dma_block_config *blk;
-    struct mdma_desc *desc;
+    struct dma_mem_descriptor *desc;
     size_t vsize;
 
 	if (size > 0xFFFF)
 		return NULL;
     vsize = sizeof(struct dma_block_config);
-    desc = rtems_calloc(1, sizeof(struct mdma_desc) + vsize);
+    desc = rtems_calloc(1, sizeof(struct dma_mem_descriptor) + vsize);
     if (desc == NULL)
         return NULL;
 
@@ -200,7 +200,7 @@ static struct mdma_desc *dmamux_memcpy_prepare(struct drvmgr_dev *dev, void *dst
     cfg->source_data_size = 1;
     cfg->block_count = 1;
     cfg->head_block = blk;
-    desc->release = (void (*)(struct mdma_desc *))free;
+    desc->release = (void (*)(struct dma_mem_descriptor *))free;
     desc->length = size;
 	desc->mdma = dev;
     return desc;
