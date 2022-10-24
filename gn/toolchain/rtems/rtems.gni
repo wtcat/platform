@@ -56,6 +56,5 @@ if (use_libbsd) {
 }
 
 declare_args() {
-  target_board = ""
   target_version = 5
 }

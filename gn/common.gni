@@ -3,6 +3,9 @@
 declare_args() {
   # Target SoC 
   target_soc = ""
+
+  # Target Board
+  target_board = ""
 }
 
 declare_args() {

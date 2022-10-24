@@ -193,7 +193,7 @@ static bool uart_options_parse(const char *s, int *baudrate,
     return true;
 }
 
-static inline void stm32h7_uart_rx_isr_process(struct stm32h7_uart *uart, 
+static __always_inline void stm32h7_uart_rx_isr_process(struct stm32h7_uart *uart, 
     USART_TypeDef *reg) {
     if (!uart->rx) {
         char rxfifo[32];
@@ -226,7 +226,7 @@ static inline void stm32h7_uart_rx_isr_process(struct stm32h7_uart *uart,
     }
 }
 
-static inline void stm32h7_uart_tx_isr_process(struct stm32h7_uart *uart,
+static __always_inline void stm32h7_uart_tx_isr_process(struct stm32h7_uart *uart,
     USART_TypeDef *reg) {
     if (uart->length > 0) {
         if (uart->tx) {
@@ -247,15 +247,15 @@ static inline void stm32h7_uart_tx_isr_process(struct stm32h7_uart *uart,
     }
 }
 
-static void stm32h7_uart_isr(void *arg) {
+static void __fastcode stm32h7_uart_isr(void *arg) {
     struct stm32h7_uart *uart = (struct stm32h7_uart *)arg;
     USART_TypeDef *reg = uart->reg;
-    uint32_t status = reg->ISR & uart->intmsk;
+    uint32_t status = reg->ISR;
 
     reg->ICR = status;
+    status &= uart->intmsk;
     if (status & (USART_ISR_IDLE | USART_ISR_RXFF)) 
         stm32h7_uart_rx_isr_process(uart, reg);
-    
     if (status & (USART_ISR_TXFE | USART_ISR_TC)) 
         stm32h7_uart_tx_isr_process(uart, reg);
 }

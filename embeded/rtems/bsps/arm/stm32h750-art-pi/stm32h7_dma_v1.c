@@ -23,7 +23,7 @@
 /* DMA burst length */
 #define BURST_TRANS_LENGTH_1			0
 
-uint32_t dma_stm32_id_to_stream(uint32_t id) {
+uint32_t __fastcode dma_stm32_id_to_stream(uint32_t id) {
 	static const uint32_t stream_nr[] = {
 		LL_DMA_STREAM_0,
 		LL_DMA_STREAM_1,
@@ -55,7 +55,7 @@ uint32_t dma_stm32_slot_to_channel(uint32_t slot) {
 }
 #endif
 
-void dma_stm32_clear_ht(DMA_TypeDef *DMAx, uint32_t id) {
+void __fastcode dma_stm32_clear_ht(DMA_TypeDef *DMAx, uint32_t id) {
 	static const dma_stm32_clear_flag_func func[] = {
 		LL_DMA_ClearFlag_HT0,
 		LL_DMA_ClearFlag_HT1,
@@ -70,7 +70,7 @@ void dma_stm32_clear_ht(DMA_TypeDef *DMAx, uint32_t id) {
 	func[id](DMAx);
 }
 
-void dma_stm32_clear_tc(DMA_TypeDef *DMAx, uint32_t id) {
+void __fastcode dma_stm32_clear_tc(DMA_TypeDef *DMAx, uint32_t id) {
 	static const dma_stm32_clear_flag_func func[] = {
 		LL_DMA_ClearFlag_TC0,
 		LL_DMA_ClearFlag_TC1,
@@ -85,7 +85,7 @@ void dma_stm32_clear_tc(DMA_TypeDef *DMAx, uint32_t id) {
 	func[id](DMAx);
 }
 
-bool dma_stm32_is_ht_active(DMA_TypeDef *DMAx, uint32_t id) {
+bool __fastcode dma_stm32_is_ht_active(DMA_TypeDef *DMAx, uint32_t id) {
 	static const dma_stm32_check_flag_func func[] = {
 		LL_DMA_IsActiveFlag_HT0,
 		LL_DMA_IsActiveFlag_HT1,
@@ -100,7 +100,7 @@ bool dma_stm32_is_ht_active(DMA_TypeDef *DMAx, uint32_t id) {
 	return func[id](DMAx);
 }
 
-bool dma_stm32_is_tc_active(DMA_TypeDef *DMAx, uint32_t id) {
+bool __fastcode dma_stm32_is_tc_active(DMA_TypeDef *DMAx, uint32_t id) {
 	static const dma_stm32_check_flag_func func[] = {
 		LL_DMA_IsActiveFlag_TC0,
 		LL_DMA_IsActiveFlag_TC1,
@@ -115,7 +115,7 @@ bool dma_stm32_is_tc_active(DMA_TypeDef *DMAx, uint32_t id) {
 	return func[id](DMAx);
 }
 
-void dma_stm32_clear_te(DMA_TypeDef *DMAx, uint32_t id) {
+void __fastcode dma_stm32_clear_te(DMA_TypeDef *DMAx, uint32_t id) {
 	static const dma_stm32_clear_flag_func func[] = {
 		LL_DMA_ClearFlag_TE0,
 		LL_DMA_ClearFlag_TE1,
@@ -130,7 +130,7 @@ void dma_stm32_clear_te(DMA_TypeDef *DMAx, uint32_t id) {
 	func[id](DMAx);
 }
 
-void dma_stm32_clear_dme(DMA_TypeDef *DMAx, uint32_t id) {
+void __fastcode dma_stm32_clear_dme(DMA_TypeDef *DMAx, uint32_t id) {
 	static const dma_stm32_clear_flag_func func[] = {
 		LL_DMA_ClearFlag_DME0,
 		LL_DMA_ClearFlag_DME1,
@@ -145,7 +145,7 @@ void dma_stm32_clear_dme(DMA_TypeDef *DMAx, uint32_t id) {
 	func[id](DMAx);
 }
 
-void dma_stm32_clear_fe(DMA_TypeDef *DMAx, uint32_t id) {
+void __fastcode dma_stm32_clear_fe(DMA_TypeDef *DMAx, uint32_t id) {
 	static const dma_stm32_clear_flag_func func[] = {
 		LL_DMA_ClearFlag_FE0,
 		LL_DMA_ClearFlag_FE1,
@@ -160,7 +160,7 @@ void dma_stm32_clear_fe(DMA_TypeDef *DMAx, uint32_t id) {
 	func[id](DMAx);
 }
 
-bool dma_stm32_is_te_active(DMA_TypeDef *DMAx, uint32_t id) {
+bool __fastcode dma_stm32_is_te_active(DMA_TypeDef *DMAx, uint32_t id) {
 	static const dma_stm32_check_flag_func func[] = {
 		LL_DMA_IsActiveFlag_TE0,
 		LL_DMA_IsActiveFlag_TE1,
@@ -175,7 +175,7 @@ bool dma_stm32_is_te_active(DMA_TypeDef *DMAx, uint32_t id) {
 	return func[id](DMAx);
 }
 
-bool dma_stm32_is_dme_active(DMA_TypeDef *DMAx, uint32_t id) {
+bool __fastcode dma_stm32_is_dme_active(DMA_TypeDef *DMAx, uint32_t id) {
 	static const dma_stm32_check_flag_func func[] = {
 		LL_DMA_IsActiveFlag_DME0,
 		LL_DMA_IsActiveFlag_DME1,
@@ -190,7 +190,7 @@ bool dma_stm32_is_dme_active(DMA_TypeDef *DMAx, uint32_t id) {
 	return func[id](DMAx);
 }
 
-bool dma_stm32_is_fe_active(DMA_TypeDef *DMAx, uint32_t id) {
+bool __fastcode dma_stm32_is_fe_active(DMA_TypeDef *DMAx, uint32_t id) {
 	static const dma_stm32_check_flag_func func[] = {
 		LL_DMA_IsActiveFlag_FE0,
 		LL_DMA_IsActiveFlag_FE1,
@@ -253,7 +253,7 @@ void stm32_dma_clear_stream_irq(DMA_TypeDef *dma, uint32_t id) {
 	dma_stm32_clear_fe(dma, id);
 }
 
-bool stm32_dma_is_irq_happened(DMA_TypeDef *dma, uint32_t id) {
+bool __fastcode stm32_dma_is_irq_happened(DMA_TypeDef *dma, uint32_t id) {
 	if (LL_DMA_IsEnabledIT_FE(dma, dma_stm32_id_to_stream(id)) &&
 	    dma_stm32_is_fe_active(dma, id)) {
 		return true;
@@ -272,7 +272,7 @@ bool stm32_dma_is_unexpected_irq_happened(DMA_TypeDef *dma, uint32_t id) {
 	return false;
 }
 
-void stm32_dma_enable_stream(DMA_TypeDef *dma, uint32_t id) {
+void __fastcode stm32_dma_enable_stream(DMA_TypeDef *dma, uint32_t id) {
 	LL_DMA_EnableStream(dma, dma_stm32_id_to_stream(id));
 }
 

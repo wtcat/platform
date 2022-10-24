@@ -11,6 +11,7 @@
 #include "ofw/ofw_extension.h"
 #endif
 #include "base/compiler.h"
+#include "base/sections.h"
 #include "base/minmax.h"
 
 #ifdef __cplusplus

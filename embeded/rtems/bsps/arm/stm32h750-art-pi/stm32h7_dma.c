@@ -65,14 +65,14 @@ static void _stm32_dma_dump_stream_irq(struct drvmgr_dev *dev, uint32_t id) {
 	stm32_dma_dump_stream_irq(priv->dma, id);
 }
 
-static void _stm32_dma_clear_stream_irq(struct drvmgr_dev *dev, uint32_t id) {
+static void __fastcode _stm32_dma_clear_stream_irq(struct drvmgr_dev *dev, uint32_t id) {
 	struct stm32_dma *priv = dev->priv;
 	dma_stm32_clear_tc(priv->dma, id);
 	dma_stm32_clear_ht(priv->dma, id);
 	stm32_dma_clear_stream_irq(priv->dma, id);
 }
 
-static void stm32_dma_irq_handler(struct drvmgr_dev *dev, uint32_t id) {
+static void __fastcode stm32_dma_irq_handler(struct drvmgr_dev *dev, uint32_t id) {
 	struct stm32_dma *priv = dev->priv;
 	DMA_TypeDef *dma = priv->dma;
 	struct dma_stm32_stream *stream;
@@ -195,7 +195,8 @@ static int stm32_dma_get_periph_increment(enum dma_addr_adj increment,
 	return 0;
 }
 
-DMA_STM32_EXPORT_API int stm32_dma_disable_stream(DMA_TypeDef *dma, uint32_t id) {
+DMA_STM32_EXPORT_API int __fastcode stm32_dma_disable_stream(DMA_TypeDef *dma, 
+	uint32_t id) {
 	int count = 0;
 	while (true) {
 		if (_stm32_dma_disable_stream(dma, id) == 0)
@@ -440,8 +441,8 @@ DMA_STM32_EXPORT_API int dma_stm32_configure(struct drvmgr_dev *dev, uint32_t id
 	return ret;
 }
 
-DMA_STM32_EXPORT_API int dma_stm32_reload(struct drvmgr_dev *dev, uint32_t id,
-	dma_addr_t src, dma_addr_t dst, size_t size) {
+DMA_STM32_EXPORT_API int __fastcode dma_stm32_reload(struct drvmgr_dev *dev, 
+	uint32_t id, dma_addr_t src, dma_addr_t dst, size_t size) {
     struct stm32_dma *priv = dev->priv;
 	DMA_TypeDef *dma = priv->dma;
 	struct dma_stm32_stream *stream;
@@ -485,7 +486,8 @@ DMA_STM32_EXPORT_API int dma_stm32_reload(struct drvmgr_dev *dev, uint32_t id,
 	return 0;
 }
 
-DMA_STM32_EXPORT_API int dma_stm32_start(struct drvmgr_dev *dev, uint32_t id) {
+DMA_STM32_EXPORT_API int __fastcode dma_stm32_start(struct drvmgr_dev *dev, 
+	uint32_t id) {
     struct stm32_dma *priv = dev->priv;
 	DMA_TypeDef *dma = priv->dma;
 
@@ -501,7 +503,8 @@ DMA_STM32_EXPORT_API int dma_stm32_start(struct drvmgr_dev *dev, uint32_t id) {
 	return 0;
 }
 
-DMA_STM32_EXPORT_API int dma_stm32_stop(struct drvmgr_dev *dev, uint32_t id) {
+DMA_STM32_EXPORT_API int __fastcode dma_stm32_stop(struct drvmgr_dev *dev, 
+	uint32_t id) {
 	struct stm32_dma *priv = dev->priv;
 	struct dma_stm32_stream *stream = &priv->streams[id - STREAM_OFFSET];
 	DMA_TypeDef *dma = priv->dma;
@@ -528,7 +531,7 @@ DMA_STM32_EXPORT_API int dma_stm32_stop(struct drvmgr_dev *dev, uint32_t id) {
 	return 0;
 }
 
-DMA_STM32_EXPORT_API int dma_stm32_get_status(struct drvmgr_dev *dev,
+DMA_STM32_EXPORT_API int __fastcode dma_stm32_get_status(struct drvmgr_dev *dev,
 	uint32_t id, struct dma_status *stat) {
 	struct stm32_dma *priv = dev->priv;
 	DMA_TypeDef *dma = priv->dma;
@@ -556,35 +559,35 @@ static const struct dma_operations stm32_dma_ops = {
 	.get_status	 = dma_stm32_get_status,
 };
 
-static void stm32_dma_stream0_isr(void *arg) {
+static void __fastcode stm32_dma_stream0_isr(void *arg) {
 	stm32_dma_irq_handler(arg, 0);
 }
 
-static void stm32_dma_stream1_isr(void *arg) {
+static void __fastcode stm32_dma_stream1_isr(void *arg) {
 	stm32_dma_irq_handler(arg, 1);
 }
 
-static void stm32_dma_stream2_isr(void *arg) {
+static void __fastcode stm32_dma_stream2_isr(void *arg) {
 	stm32_dma_irq_handler(arg, 2);
 }
 
-static void stm32_dma_stream3_isr(void *arg) {
+static void __fastcode stm32_dma_stream3_isr(void *arg) {
 	stm32_dma_irq_handler(arg, 3);
 }
 
-static void stm32_dma_stream4_isr(void *arg) {
+static void __fastcode stm32_dma_stream4_isr(void *arg) {
 	stm32_dma_irq_handler(arg, 4);
 }
 
-static void stm32_dma_stream5_isr(void *arg) {
+static void __fastcode stm32_dma_stream5_isr(void *arg) {
 	stm32_dma_irq_handler(arg, 5);
 }
 
-static void stm32_dma_stream6_isr(void *arg) {
+static void __fastcode stm32_dma_stream6_isr(void *arg) {
 	stm32_dma_irq_handler(arg, 6);
 }
 
-static void stm32_dma_stream7_isr(void *arg) {
+static void __fastcode stm32_dma_stream7_isr(void *arg) {
 	stm32_dma_irq_handler(arg, 7);
 }
 

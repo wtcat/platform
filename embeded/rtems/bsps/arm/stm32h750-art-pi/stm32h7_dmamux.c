@@ -97,7 +97,7 @@ static int dmamux_stm32_configure(struct drvmgr_dev *dev, uint32_t id,
 	return 0;
 }
 
-static int dmamux_stm32_start(struct drvmgr_dev *dev, uint32_t id) {
+static int __fastcode dmamux_stm32_start(struct drvmgr_dev *dev, uint32_t id) {
 	struct stm32h7_dmamux *priv = dev->priv;
 
 	/* check if this channel is valid */
@@ -114,7 +114,7 @@ static int dmamux_stm32_start(struct drvmgr_dev *dev, uint32_t id) {
 	return 0;
 }
 
-int dmamux_stm32_stop(struct drvmgr_dev *dev, uint32_t id) {
+static int __fastcode dmamux_stm32_stop(struct drvmgr_dev *dev, uint32_t id) {
 	struct stm32h7_dmamux *priv = dev->priv;
 
 	/* check if this channel is valid */
@@ -132,7 +132,7 @@ int dmamux_stm32_stop(struct drvmgr_dev *dev, uint32_t id) {
 	return 0;
 }
 
-int dmamux_stm32_reload(struct drvmgr_dev *dev, uint32_t id,
+static int __fastcode dmamux_stm32_reload(struct drvmgr_dev *dev, uint32_t id,
     dma_addr_t src, dma_addr_t dst, size_t size) {
 	struct stm32h7_dmamux *priv = dev->priv;
 
@@ -151,7 +151,7 @@ int dmamux_stm32_reload(struct drvmgr_dev *dev, uint32_t id,
 	return 0;
 }
 
-int dmamux_stm32_get_status(struct drvmgr_dev *dev, uint32_t id,
+static int __fastcode dmamux_stm32_get_status(struct drvmgr_dev *dev, uint32_t id,
     struct dma_status *stat) {
 	struct stm32h7_dmamux *priv = dev->priv;
 

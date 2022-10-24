@@ -24,9 +24,9 @@ int RTEMS_WEAK rtems_main(void) {
 }
 
 static void rootfs_init(void) {
-  extern const unsigned char __rootfs_image[];
-  extern const size_t __rootfs_image_size;
-  int err = Untar_FromMemory((char*)__rootfs_image, __rootfs_image_size);
+  extern char __rootfs_image[];
+  extern char __rootfs_size[];
+  int err = Untar_FromMemory(__rootfs_image, (size_t)__rootfs_size);
   if (err)
     rtems_panic("make rootfs failed(%d)\n", err);
 }

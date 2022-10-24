@@ -46,7 +46,7 @@ struct stm32h7_gpio {
     int port;
 };
 
-static struct stm32h7_exti exti_controller;
+static struct stm32h7_exti exti_controller __fastdata;
 static const IRQn_Type exti_irq_table[] = {
 	EXTI0_IRQn, EXTI1_IRQn, EXTI2_IRQn, EXTI3_IRQn,
 	EXTI4_IRQn, EXTI9_5_IRQn, EXTI9_5_IRQn, EXTI9_5_IRQn,
@@ -354,7 +354,8 @@ static int stm32_configure_gpio_intr(struct drvmgr_dev *dev,
 	return 0;
 }
 
-static void __stm32_exti_isr(int min, int max, struct stm32h7_exti *data) {
+static void __fastcode __stm32_exti_isr(int min, int max, 
+	struct stm32h7_exti *data) {
 	for (int line = min; line < max; line++) {
 		if (stm32_exti_is_pending(line)) {
 			stm32_exti_clear_pending(line);
@@ -363,32 +364,32 @@ static void __stm32_exti_isr(int min, int max, struct stm32h7_exti *data) {
 	}
 }
 
-static inline void __stm32_exti_isr_0(void *arg) {
+static inline void __fastcode __stm32_exti_isr_0(void *arg) {
 	__stm32_exti_isr(0, 1, arg);
 }
 
-static inline void __stm32_exti_isr_1(void *arg) {
+static inline void __fastcode __stm32_exti_isr_1(void *arg) {
 	__stm32_exti_isr(1, 2, arg);
 }
 
-static inline void __stm32_exti_isr_2(void *arg)
+static inline void __fastcode __stm32_exti_isr_2(void *arg)
 {
 	__stm32_exti_isr(2, 3, arg);
 }
 
-static inline void __stm32_exti_isr_3(void *arg) {
+static inline void __fastcode __stm32_exti_isr_3(void *arg) {
 	__stm32_exti_isr(3, 4, arg);
 }
 
-static inline void __stm32_exti_isr_4(void *arg) {
+static inline void __fastcode __stm32_exti_isr_4(void *arg) {
 	__stm32_exti_isr(4, 5, arg);
 }
 
-static inline void __stm32_exti_isr_9_5(void *arg) {
+static inline void __fastcode __stm32_exti_isr_9_5(void *arg) {
 	__stm32_exti_isr(5, 10, arg);
 }
 
-static inline void __stm32_exti_isr_15_10(void *arg) {
+static inline void __fastcode __stm32_exti_isr_15_10(void *arg) {
 	__stm32_exti_isr(10, 16, arg);
 }
 

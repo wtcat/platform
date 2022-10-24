@@ -99,33 +99,12 @@ void __notrace bsp_start_hook_0(void) {
     stm32h7_sdram_init();
     printk("** BSP SDRAM setup OK**\n");
   }
-  // if ((RCC->AHB3ENR & RCC_AHB3ENR_FMCEN) == 0) {
-  //   /*
-  //    * Only perform the low-level initialization if necessary.  An initialized
-  //    * FMC indicates that a boot loader already performed the low-level
-  //    * initialization.
-  //    */
-  //   SystemInit();
-  //   stm32h7_init_power();
-  //   stm32h7_init_oscillator();
-  //   stm32h7_init_clocks();
-  //   stm32h7_init_peripheral_clocks();
-  //   HAL_RCC_MCOConfig(RCC_MCO1, RCC_MCO1SOURCE_HSI, RCC_MCODIV_1);
-  //   HAL_Init();
-  //   SystemInit_ExtMemCtl();
-  // }
 
   if ((SCB->CCR & SCB_CCR_IC_Msk) == 0) 
     SCB_EnableICache();
   if ((SCB->CCR & SCB_CCR_DC_Msk) == 0) 
     SCB_EnableDCache();
   _ARMV7M_MPU_Setup(stm32h7_mpu_map, RTEMS_ARRAY_SIZE(stm32h7_mpu_map));
-    // volatile int *ptest = (volatile int *)0xC0000000;
-    // *ptest = 0xDEADBEEF;
-    // if (*ptest != 0xDEADBEEF)
-    //   printk("** SDRAM TEST FAILED! **\n");
-    extern char __bsp_dtb_size[];
-    printk("%x", (uintptr_t)__bsp_dtb_size);
 }
 
 void __notrace bsp_start_hook_1(void) {
