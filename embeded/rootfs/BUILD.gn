@@ -7,7 +7,7 @@ action("preprocess") {
   script = "//gn/utils/shell.py"
   outputs = ["${root_out_dir}/rootfs.tar"]
   args = [
-    "cp -Rv ${base_path}/${target_cpu}/${target_board}/rootfs ${outpath}",
+    "cp -Rp ${base_path}/${target_cpu}/${target_board}/rootfs ${outpath}",
     "tar -cf ${outpath}/rootfs.tar -C ${outpath}/rootfs  ."
   ]
 }
