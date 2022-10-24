@@ -1,8 +1,9 @@
 /*
  * Copyright 2022 wtcat
  */
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <ctype.h>
 
 #include <rtems/console.h>
@@ -16,19 +17,24 @@
 #include "drivers/clock.h"
 #include "drivers/dma.h"
 #include "drivers/ofw_platform_bus.h"
+#include "stm32/stm32_queue.h"
 
 #undef B0
 #include "stm32h7xx_ll_usart.h"
 
 #define UART_FIFO_SIZE 8
+#define UART_INPUT_BUFSZ 1200
+#define UART_OUTPUT_BUSSZ 64
 
 struct stm32h7_uart {
     rtems_termios_device_context base;
+    struct drvmgr_dev *dev;
     rtems_termios_tty *tty;
     struct drvmgr_dev *clk;
     USART_TypeDef *reg;
     uint32_t bdr;
     uint32_t cflag;
+    uint32_t intmsk;
     int clkid;
     int irqno;
     const char *buf;
@@ -36,15 +42,11 @@ struct stm32h7_uart {
     size_t length;
     struct dma_chan *tx;
     struct dma_chan *rx;
-    char *rxbuf;
-    size_t rxbuf_size;
+    struct dma_circle_queue *rxq;
 };
 
 #define stm32h7_uart_context(_base) \
     RTEMS_CONTAINER_OF((_base), struct stm32h7_uart, base);
-
-//void LL_USART_EnableDMAReq_TX(USART_TypeDef *USARTx)
-//void LL_USART_DisableDMAReq_RX(USART_TypeDef *USARTx)
 
 static struct drvmgr_dev *stdout_device;
 static int stdout_baudrate = 115200;
@@ -57,7 +59,6 @@ static size_t stm32h7_uart_fifo_write(USART_TypeDef *reg, const char *buf,
     size_t idx = 0;
     size_t bytes = min_t(size_t, size, UART_FIFO_SIZE);
     while (idx < bytes) {
-        //if (reg->ISR & USART_ISR_TXE_TXFNF)
         reg->TDR = buf[idx];
         idx++;
     }
@@ -65,43 +66,94 @@ static size_t stm32h7_uart_fifo_write(USART_TypeDef *reg, const char *buf,
 }
 
 static int stm32h7_uart_dma_transmit(struct stm32h7_uart *uart, 
-    const void *buffer, size_t size) {
-    struct dma_chan *tx = uart->tx;
-    struct dma_block_config blk;
-
+    const char *buffer, size_t size) {
     _Assert(size < 65536);
-    blk.block_size = size;
-    blk.dest_address = (dma_addr_t)&uart->reg->TDR;
-    blk.dest_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
-    blk.source_address = (dma_addr_t)buffer;
-    blk.source_addr_adj = DMA_ADDR_ADJ_INCREMENT;
-    tx->config.head_block = &blk;
-    tx->config.block_count = 1;
-    int ret = dma_configure(tx->dev, tx->channel, &tx->config);
-    if (!ret)
-        ret = dma_start(tx->dev, tx->channel);
-    return 0;
+    struct dma_chan *tx = uart->tx;
+    uart->buf = buffer;
+    uart->length = size;
+    return dma_reload(tx->dev, tx->channel, (dma_addr_t)buffer, 
+    (dma_addr_t)&uart->reg->TDR, size);   
 }
 
-static int stm32h7_uart_dma_receive(struct stm32h7_uart *uart) {
-    struct dma_chan *rx = uart->rx;
-    struct dma_block_config blk;
-
-    blk.block_size = uart->rxbuf_size;
-    blk.source_address = (dma_addr_t)&uart->reg->RDR;
-    blk.source_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
-    blk.dest_address = (dma_addr_t)uart->rxbuf;
-    blk.dest_addr_adj = DMA_ADDR_ADJ_INCREMENT;
-    blk.source_reload_en = true;
-    rx->config.head_block = &blk;
-    rx->config.block_count = 1;
-    int ret = dma_configure(rx->dev, rx->channel, &rx->config);
-    if (!ret)
-        ret = dma_start(rx->dev, rx->channel);
-    return 0;
+static void stm32h7_uart_fifo_transmit(struct stm32h7_uart *uart, const char *buf, 
+    size_t len) {
+    if (len > 0) {
+        uart->buf = buf;
+        uart->length = len;
+        uart->transmited = stm32h7_uart_fifo_write(uart->reg, buf, len);
+        LL_USART_EnableIT_TXFE(uart->reg);
+    } else {
+        LL_USART_DisableIT_TXFE(uart->reg);
+    }
 }
 
-static bool uart_options_parse(const char *s, int *baudrate, uint32_t *cflags) {
+static void stm32h7_uart_dma_open(struct stm32h7_uart *uart) {
+    int ret;
+    if (uart->tx) {
+        struct dma_config *config = &uart->tx->config;
+        struct dma_chan *tx = uart->tx;
+        struct dma_block_config txblk = {0};
+
+        config->channel_direction = MEMORY_TO_PERIPHERAL;
+        config->dest_data_size = 1;
+        config->dest_burst_length = 1;
+        config->source_burst_length = 1;
+        config->source_data_size = 1;
+        config->complete_callback_en = 1;
+        config->channel_priority = 1;
+        config->head_block = &txblk;
+        config->block_count = 1;
+        txblk.dest_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
+        txblk.source_addr_adj = DMA_ADDR_ADJ_INCREMENT;
+        ret = dma_configure(tx->dev, tx->channel, &tx->config);
+        if (ret) {
+            printk("Configure UART(%s) DMA-TX failed: %d\n", uart->dev->name, ret);
+            dma_release_channel(tx->dev, tx->channel);
+            uart->tx = NULL;
+        }
+    }
+    if (uart->rx) {
+        struct dma_config *config = &uart->rx->config;
+        struct dma_chan *rx = uart->rx;
+        struct dma_block_config rxblk = {0};
+
+        config->channel_direction = PERIPHERAL_TO_MEMORY;
+        config->dest_data_size = 1;
+        config->dest_burst_length = 1;
+        config->source_burst_length = 1;
+        config->source_data_size = 1;
+        config->complete_callback_en = 1;
+        config->channel_priority = 1;
+        config->head_block = &rxblk;
+        config->block_count = 1;
+        rxblk.block_size = uart->rxq->size;
+        rxblk.source_address = (dma_addr_t)&uart->reg->RDR;
+        rxblk.source_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
+        rxblk.dest_address = (dma_addr_t)uart->rxq->buffer;
+        rxblk.dest_addr_adj = DMA_ADDR_ADJ_INCREMENT;
+        rxblk.source_reload_en = 1;
+        rxblk.dest_reload_en = 1;
+        ret = dma_configure(rx->dev, rx->channel, &rx->config);
+        ret |= dma_start(rx->dev, rx->channel);
+        if (ret) {
+            printk("Configure UART(%s) DMA-RX failed: %d\n", uart->dev->name, ret);
+            dma_stop(rx->dev, rx->channel);
+            dma_release_channel(rx->dev, rx->channel);
+            dma_circle_queue_delete(uart->rxq);
+            uart->rx = NULL;
+        }
+    }
+}
+
+static void stm32h7_uart_dma_close(struct stm32h7_uart *uart) {
+    if (uart->rx)
+        dma_stop(uart->rx->dev, uart->rx->channel);
+    if (uart->tx)
+        dma_stop(uart->tx->dev, uart->tx->channel);
+}
+
+static bool uart_options_parse(const char *s, int *baudrate, 
+    uint32_t *cflags) {
     uint32_t cc = 0;
     int bdr = 0;
 
@@ -141,27 +193,9 @@ static bool uart_options_parse(const char *s, int *baudrate, uint32_t *cflags) {
     return true;
 }
 
-static void stm32h7_uart_dmarx_isr(struct drvmgr_dev *dev, void *arg, 
-    uint32_t channel, int status) {
-    struct stm32h7_uart *uart = (struct stm32h7_uart *)arg;
-    struct dma_status stat;
-    size_t rxbytes;
-    (void) channel;
-    (void) dev;
-
-    dma_get_status(dev, channel, &stat);
-    rxbytes = uart->rxbuf_size - stat.pending_length;
-    rtems_cache_invalidate_multiple_data_lines(uart->rxbuf, rxbytes);
-    rtems_termios_enqueue_raw_characters(uart->tty, uart->rxbuf, rxbytes);
-}
-
-static void stm32h7_uart_isr(void *arg) {
-    struct stm32h7_uart *uart = (struct stm32h7_uart *)arg;
-    USART_TypeDef *reg = uart->reg;
-    uint32_t status = reg->ISR;
-
-    reg->ICR = USART_ICR_IDLECF | USART_ICR_TXFECF;
-    if (status & (USART_ISR_IDLE | USART_ISR_RXFF)) {
+static inline void stm32h7_uart_rx_isr_process(struct stm32h7_uart *uart, 
+    USART_TypeDef *reg) {
+    if (!uart->rx) {
         char rxfifo[32];
         int i = 0;
         while (reg->ISR & USART_ISR_RXNE_RXFNE) {
@@ -169,8 +203,37 @@ static void stm32h7_uart_isr(void *arg) {
             i++;
         }
         rtems_termios_enqueue_raw_characters(uart->tty, rxfifo, i);
+        return;
     }
-    if ((status & USART_ISR_TXFE) && uart->length > 0) {
+    struct dma_circle_queue *rxq = uart->rxq;
+    if (!dma_circle_queue_update(rxq, uart->rx)) {
+        rtems_cache_invalidate_multiple_data_lines(rxq->buffer, rxq->size);
+        uint16_t newout = rxq->out + rxq->count;
+        if (newout > rxq->size) {
+            size_t bytes = rxq->size - rxq->out;
+            rtems_termios_enqueue_raw_characters(uart->tty, &rxq->buffer[rxq->out], 
+            bytes);
+            rtems_termios_enqueue_raw_characters(uart->tty, &rxq->buffer[0], 
+            rxq->count - bytes);
+        } else {
+            rtems_termios_enqueue_raw_characters(uart->tty, &rxq->buffer[rxq->out], 
+            rxq->count);
+        }
+        rxq->count = 0;
+        rxq->out = newout % rxq->size;
+    } else {
+        dma_circle_queue_reset(rxq);
+    }
+}
+
+static inline void stm32h7_uart_tx_isr_process(struct stm32h7_uart *uart,
+    USART_TypeDef *reg) {
+    if (uart->length > 0) {
+        if (uart->tx) {
+            rtems_termios_dequeue_characters(uart->tty, uart->length);
+            uart->length = 0;
+            return;
+        }
         size_t transmited = uart->transmited;
         size_t remain = uart->length - transmited;
         if (remain > 0) {
@@ -184,6 +247,67 @@ static void stm32h7_uart_isr(void *arg) {
     }
 }
 
+static void stm32h7_uart_isr(void *arg) {
+    struct stm32h7_uart *uart = (struct stm32h7_uart *)arg;
+    USART_TypeDef *reg = uart->reg;
+    uint32_t status = reg->ISR & uart->intmsk;
+
+    reg->ICR = status;
+    if (status & (USART_ISR_IDLE | USART_ISR_RXFF)) 
+        stm32h7_uart_rx_isr_process(uart, reg);
+    
+    if (status & (USART_ISR_TXFE | USART_ISR_TC)) 
+        stm32h7_uart_tx_isr_process(uart, reg);
+}
+
+// static void stm32h7_uart_isr(void *arg) {
+//     struct stm32h7_uart *uart = (struct stm32h7_uart *)arg;
+//     USART_TypeDef *reg = uart->reg;
+//     uint32_t status = reg->ISR;
+
+//     reg->ICR = USART_ICR_IDLECF | USART_ICR_TXFECF;
+//     if (status & (USART_ISR_IDLE | USART_ISR_RXFF)) {
+//         char rxfifo[32];
+//         int i = 0;
+//         while (reg->ISR & USART_ISR_RXNE_RXFNE) {
+//             rxfifo[i] = (char)reg->RDR;
+//             i++;
+//         }
+//         rtems_termios_enqueue_raw_characters(uart->tty, rxfifo, i);
+//     }
+//     if ((status & USART_ISR_TXFE) && uart->length > 0) {
+//         size_t transmited = uart->transmited;
+//         size_t remain = uart->length - transmited;
+//         if (remain > 0) {
+//             transmited = stm32h7_uart_fifo_write(reg, &uart->buf[transmited], remain);
+//             uart->transmited += transmited;
+//         } else {
+//             uart->length = 0;
+//             uart->transmited = 0;
+//             rtems_termios_dequeue_characters(uart->tty, transmited);
+//         }
+//     }
+// }
+
+static void stm32h7_uart_intr_enable(struct stm32h7_uart *uart) {
+    uint32_t mask = 0, cr1 = 0;
+    if (uart->tx) {
+        LL_USART_EnableDMAReq_TX(uart->reg);
+        cr1 |= USART_CR1_TCIE;
+        mask |= USART_ISR_TC;
+    } else {
+        mask |= USART_ISR_TXFE;
+    }
+    if (uart->rx) {
+        LL_USART_EnableDMAReq_RX(uart->reg);
+    } else {
+        cr1 |= USART_CR1_RXFFIE;
+        mask |= USART_ISR_RXFF;
+    }
+    uart->intmsk = mask | USART_ISR_IDLE;
+    uart->reg->CR1 |= cr1 | USART_CR1_IDLEIE;
+}
+
 static bool stm32h7_uart_open(struct rtems_termios_tty *tty,
     rtems_termios_device_context *base,
     struct termios *term,
@@ -194,10 +318,11 @@ static bool stm32h7_uart_open(struct rtems_termios_tty *tty,
     if (clk_enable(uart->clk, &uart->clkid))
         return false;
     uart->tty = tty;
-    tty->termios.c_ispeed = stdout_baudrate;
-    tty->termios.c_ospeed = stdout_baudrate;
 
     // rtems_termios_set_initial_baud(tty, stdout_baudrate);
+    tty->termios.c_ispeed = stdout_baudrate;
+    tty->termios.c_ospeed = stdout_baudrate;
+    stm32h7_uart_dma_open(uart);
     return stm32h7_uart_set_termios(base, term);
 }
 
@@ -211,13 +336,7 @@ static void stm32h7_uart_close(struct rtems_termios_tty *tty,
     uart->reg->CR3 = 0;
     uart->tty = NULL;
     clk_disable(uart->clk, &uart->clkid);
-    if (uart->rx) {
-        dma_stop(uart->rx->dev, uart->rx->channel);
-        rtems_cache_coherent_free(uart->rxbuf);
-        uart->rxbuf = NULL;
-    }
-    if (uart->tx)
-        dma_stop(uart->tx->dev, uart->tx->channel);
+    stm32h7_uart_dma_close(uart);
 }
 
 static bool stm32h7_uart_set_termios(rtems_termios_device_context *base, 
@@ -281,13 +400,8 @@ static bool stm32h7_uart_set_termios(rtems_termios_device_context *base,
         LL_USART_Init(uart->reg, &ll_struct);
         LL_USART_ConfigFIFOsThreshold(uart->reg, LL_USART_FIFOTHRESHOLD_1_8, 
             LL_USART_FIFOTHRESHOLD_8_8);
-        if (uart->tx)
-            LL_USART_EnableDMAReq_TX(uart->reg);
-        if (uart->rx)
-            LL_USART_EnableDMAReq_RX(uart->reg);
-        else
-            uart->reg->CR1 |= USART_CR1_RXFFIE;
-        uart->reg->CR1 |=  USART_CR1_IDLEIE | USART_CR1_FIFOEN | USART_CR1_UE;
+        stm32h7_uart_intr_enable(uart);
+        uart->reg->CR1 |= USART_CR1_FIFOEN | USART_CR1_UE;
     }
     rtems_termios_device_lock_release(base, &ctx);
     return true;
@@ -296,14 +410,11 @@ static bool stm32h7_uart_set_termios(rtems_termios_device_context *base,
 static void stm32h7_uart_write(rtems_termios_device_context *base,
     const char *buf, size_t len) {
     struct stm32h7_uart *uart = stm32h7_uart_context(base);
-    if (len > 0) {
-        uart->buf = buf;
-        uart->length = len;
-        uart->transmited = stm32h7_uart_fifo_write(uart->reg, buf, len);
-        LL_USART_EnableIT_TXFE(uart->reg);
-    } else {
-        LL_USART_DisableIT_TXFE(uart->reg);
+    if (uart->tx) {
+        stm32h7_uart_dma_transmit(uart, buf, len);
+        return;
     }
+    stm32h7_uart_fifo_transmit(uart, buf, len);
 }
 
 static void stm32h7_uart_polled_putchar(USART_TypeDef *reg, char ch) {
@@ -347,6 +458,7 @@ static int stm32h7_uart_preprobe(struct drvmgr_dev *dev) {
     }
     uart->reg = (void *)reg.start;
     uart->irqno = (int)irq;
+    uart->dev = dev;
     dev->priv = uart;
     rtems_termios_device_context_initialize(&uart->base, dev->name);
     sc = rtems_termios_device_install(dev->name, &stm32h7_uart_ops, 
@@ -398,37 +510,21 @@ static int stm32h7_uart_extprobe(struct drvmgr_dev *dev) {
 
     uart->tx = ofw_dma_chan_request(devp->np, "tx", 
         specs, sizeof(specs));
-    if (uart->tx) {
-        struct dma_config *config = &uart->tx->config;
-        config->dma_slot = specs[0];
-        config->channel_direction = MEMORY_TO_PERIPHERAL;
-        config->dest_data_size = 1;
-        config->dest_burst_length = 1;
-        config->source_burst_length = 1;
-        config->source_data_size = 1;
-    }
+    if (uart->tx) 
+        uart->tx->config.dma_slot = specs[0];
 
     uart->rx = ofw_dma_chan_request(devp->np, "rx", 
         specs, sizeof(specs));
     if (uart->rx) {
-        uart->rxbuf_size = 1200;
-        uart->rxbuf = rtems_cache_coherent_allocate(uart->rxbuf_size, 4, 0);
-        if (!uart->rxbuf) {
+        uart->rx->config.dma_slot = specs[0];
+        uart->rxq = dma_circle_queue_create(UART_INPUT_BUFSZ);
+        if (!uart->rxq) {
             dma_release_channel(uart->rx->dev, uart->rx->channel);
-            return -ENOMEM;
+            uart->rx = NULL;
         }
-        struct dma_config *config = &uart->rx->config;
-        config->dma_slot = specs[0];
-        config->channel_direction = PERIPHERAL_TO_MEMORY;
-        config->dest_data_size = 1;
-        config->dest_burst_length = 1;
-        config->source_burst_length = 1;
-        config->source_data_size = 1;
-        config->complete_callback_en = 1;
-        config->dma_callback = stm32h7_uart_dmarx_isr;
-        config->user_data = uart;
     }
-    
+    rtems_termios_bufsize(UART_INPUT_BUFSZ, UART_INPUT_BUFSZ, 
+    UART_OUTPUT_BUSSZ);
     return 0;
 }
 
@@ -477,7 +573,7 @@ static struct drvmgr_drv_ops uart_driver_ops = {
         stm32h7_uart_probe,
         stm32h7_uart_extprobe,
         stm32h7_uart_postprobe
-	},
+	}
 };
 
 static const struct dev_id id_table[] = {

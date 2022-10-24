@@ -17,6 +17,7 @@ component("board") {
     "stm32h7_dmamux.c",
     "stm32h7_uart.c"
   ]
+  sources += ["stm32_queue.c"]
 
   deps = [
     "//embeded/rtems/bsps/arm/shared",
