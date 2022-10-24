@@ -6,7 +6,7 @@
 #define DRIVER_I2C_H_
 
 #include <dev/i2c/i2c.h>
-#include "drivers/platform_bus.h"
+#include "drivers/devbase.h"
 
 #ifdef __cplusplus
 extern "C"{

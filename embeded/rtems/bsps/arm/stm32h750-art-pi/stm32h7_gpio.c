@@ -468,8 +468,10 @@ static int stm32_gpio_preprobe(struct drvmgr_dev *dev) {
     }
 	ret = rtems_ofw_get_enc_prop(rtems_ofw_parent(devp->np), "ranges", 
 		prop, sizeof(prop));
-	if (ret < 0)
+	if (ret < 0) {
+		free(priv);
 		return -EFAULT;
+	}
     priv->port = bank_name[4] - 'A';
     priv->gpio = (GPIO_TypeDef *)(reg.start + prop[1]);
     priv->exti = &exti_controller;

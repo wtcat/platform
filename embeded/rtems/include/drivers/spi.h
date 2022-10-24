@@ -8,7 +8,7 @@
 #include <rtems/thread.h>
 #include <dev/spi/spi.h>
 
-#include "drivers/platform_bus.h"
+#include "drivers/devbase.h"
 
 #ifdef __cplusplus
 extern "C"{
