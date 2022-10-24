@@ -32,7 +32,7 @@
 #define STREAM_OFFSET 1
 #define STM32_DMA_HAL_OVERRIDE      0x7F
 
-#define LOG_ERR(fmt, ...) printk(fmt, ##__VA_ARGS__)
+#define LOG_ERR(fmt, ...) printk(fmt"\n", ##__VA_ARGS__)
 #define LOG_WRN LOG_ERR
 
 struct stm32_dma {
@@ -642,8 +642,10 @@ static int stm32_dma_probe(struct drvmgr_dev *dev) {
 	for (uint32_t i = 0; i < DMA_STREAM_COUNT; i++) {
 		ret = drvmgr_interrupt_register(dev, IRQF_HARD(irqs[i]), 
 			dev->name, isrs[i], dev);
-		if (ret)
+		if (ret) {
+			printk("%s: %s install interrupt failed: %d\n", __func__, dev->name, ret);
 			goto _failed;
+		}
 		priv->streams[i].busy = false;
 #ifdef CONFIG_DMAMUX_STM32
 		/* each further stream->mux_channel is fixed here */

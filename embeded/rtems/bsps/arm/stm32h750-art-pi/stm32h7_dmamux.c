@@ -82,7 +82,7 @@ static int dmamux_stm32_configure(struct drvmgr_dev *dev, uint32_t id,
 	 * This dmamux channel 'id' is now used for this peripheral request
 	 * It gives this mux request ID to the dma through the config.dma_slot
 	 */
-	dma_dbg("** dmamux_stm32_configure: %s stream(%d) channel(%d) request_id(%d)\n", 
+	dma_dbg("dmamux_stm32_configure: %s stream(%d) channel(%d) request_id(%d)\n", 
 			priv->mux_channels[id].dev_dma->name, 
 			priv->mux_channels[id].dma_id,
 			id, request_id);

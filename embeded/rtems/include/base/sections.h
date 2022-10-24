@@ -8,8 +8,8 @@
 extern "C"{
 #endif
 
-#define __fastcode    __attribute__((section(".bsp_fast_text")))
-#define __fastdata    __attribute__((section(".bsp_fast_data")))
+#define __fastcode    //__attribute__((section(".bsp_fast_text")))
+#define __fastdata    //__attribute__((section(".bsp_fast_data")))
 #define __nocache     __attribute__((section(".bsp_nocache")))
 #define __noinit      __attribute__((section(".noinit")))
 #define __rtemsstack  __attribute__((section(".rtemsstack")))

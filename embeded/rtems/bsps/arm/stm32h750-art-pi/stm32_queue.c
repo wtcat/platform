@@ -50,7 +50,7 @@ int dma_circle_queue_update(struct dma_circle_queue *cq, struct dma_chan *chan) 
     else
         rxbytes = cq->ndtr + cq->size - remain;
     cq->ndtr = remain;
-    cq->count += remain;
+    cq->count += rxbytes;
     if (cq->count <= cq->size)
         cq->in = (cq->in + rxbytes) % cq->size;
     else

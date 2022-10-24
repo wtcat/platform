@@ -260,35 +260,6 @@ static void __fastcode stm32h7_uart_isr(void *arg) {
         stm32h7_uart_tx_isr_process(uart, reg);
 }
 
-// static void stm32h7_uart_isr(void *arg) {
-//     struct stm32h7_uart *uart = (struct stm32h7_uart *)arg;
-//     USART_TypeDef *reg = uart->reg;
-//     uint32_t status = reg->ISR;
-
-//     reg->ICR = USART_ICR_IDLECF | USART_ICR_TXFECF;
-//     if (status & (USART_ISR_IDLE | USART_ISR_RXFF)) {
-//         char rxfifo[32];
-//         int i = 0;
-//         while (reg->ISR & USART_ISR_RXNE_RXFNE) {
-//             rxfifo[i] = (char)reg->RDR;
-//             i++;
-//         }
-//         rtems_termios_enqueue_raw_characters(uart->tty, rxfifo, i);
-//     }
-//     if ((status & USART_ISR_TXFE) && uart->length > 0) {
-//         size_t transmited = uart->transmited;
-//         size_t remain = uart->length - transmited;
-//         if (remain > 0) {
-//             transmited = stm32h7_uart_fifo_write(reg, &uart->buf[transmited], remain);
-//             uart->transmited += transmited;
-//         } else {
-//             uart->length = 0;
-//             uart->transmited = 0;
-//             rtems_termios_dequeue_characters(uart->tty, transmited);
-//         }
-//     }
-// }
-
 static void stm32h7_uart_intr_enable(struct stm32h7_uart *uart) {
     uint32_t mask = 0, cr1 = 0;
     if (uart->tx) {
