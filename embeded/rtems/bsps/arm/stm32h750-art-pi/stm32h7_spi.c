@@ -13,6 +13,7 @@
 
 #include "stm32/stm32_com.h"
 #include "stm32h7xx_ll_spi.h"
+#include "stm32h7xx_ll_rcc.h"
 
 struct cs_gpio {
     struct gpio_pin *pin;
@@ -36,6 +37,7 @@ struct stm32h7_spi {
     struct drvmgr_dev *clk;
     int clkid;
     int irq;
+    int clksrc;
 };
 
 static inline void stm32h7_spi_set_cs(struct cs_gpio *cs) {
@@ -44,6 +46,11 @@ static inline void stm32h7_spi_set_cs(struct cs_gpio *cs) {
 
 static inline void stm32h7_spi_clr_cs(struct cs_gpio *cs) {
     gpiod_set_pin(cs->pin, !cs->polarity);
+}
+
+static uint32_t stm32h7_spi_calc_clkdiv(struct stm32h7_spi *spi, uint32_t speed_hz) {
+    uint32_t clkfreq = LL_RCC_GetSPIClockFreq(spi->clksrc);
+    
 }
 
 static void stm32h7_spi_transfer_complete(struct stm32h7_spi *priv) {
@@ -227,6 +234,8 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
     spi->bus.lsb_first = false;
     spi->bus.bits_per_word = 8;
     spi->bus.mode = SPI_MODE_0;
+    spi->bus.max_speed_hz = LL_RCC_GetSPIClockFreq(spi->clksrc) / 2;
+    spi->bus.speed_hz = 1000000;
 	ret = spi_bus_register(&spi->bus, dev->name);
 	if (ret) {
 		drvmgr_interrupt_unregister(dev, IRQF_HARD(spi->irq), 
@@ -264,7 +273,7 @@ static int stm32h7_spi_extprobe(struct drvmgr_dev *dev) {
         specs, sizeof(specs));
     if (spi->rx) 
         spi->rx->config.dma_slot = specs[0];
-        
+
     return 0;
 }
 
