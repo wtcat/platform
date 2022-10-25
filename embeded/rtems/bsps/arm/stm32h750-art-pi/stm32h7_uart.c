@@ -90,6 +90,7 @@ static void stm32h7_uart_fifo_transmit(struct stm32h7_uart *uart, const char *bu
 static void stm32h7_uart_dma_open(struct stm32h7_uart *uart) {
     int ret;
     if (uart->tx) {
+        static int _tx_dummy;
         struct dma_config *config = &uart->tx->config;
         struct dma_chan *tx = uart->tx;
         struct dma_block_config txblk = {0};
@@ -103,8 +104,11 @@ static void stm32h7_uart_dma_open(struct stm32h7_uart *uart) {
         config->channel_priority = 1;
         config->head_block = &txblk;
         config->block_count = 1;
-        txblk.dest_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
+        txblk.block_size = 1;
+        txblk.source_address = (dma_addr_t)&_tx_dummy;
         txblk.source_addr_adj = DMA_ADDR_ADJ_INCREMENT;
+        txblk.dest_address = (dma_addr_t)&uart->reg->TDR;
+        txblk.dest_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
         ret = dma_configure(tx->dev, tx->channel, &tx->config);
         if (ret) {
             printk("Configure UART(%s) DMA-TX failed: %d\n", uart->dev->name, ret);

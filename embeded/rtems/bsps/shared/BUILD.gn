@@ -1,20 +1,21 @@
 import ("//gn/toolchain/rtems/rtems.gni")
 
 component("shared") {
-    defines = []
-    sources = []
-    if (use_ofw_bus) {
-        sources += [
-            "ofw_root_bus.c",
-            "ofw_platform_bus.c",
-            "ofw_extension.c"
-        ]
-    } else {
-        sources += ["platform_bus.c"]
-    }
-    sources += [
+    sources = [
         "vdma.c",
         "dma.c",
         "mdma.c"
     ]
+    if (use_ofw_bus) {
+        sources += [
+            "ofw_root_bus.c",
+            "ofw_platform_bus.c",
+            "ofw_extension.c",
+            "ofw_clock.c",
+            "ofw_dma.c",
+            "ofw_gpios.c"
+        ]
+    } else {
+        sources += ["platform_bus.c"]
+    }
 }

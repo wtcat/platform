@@ -152,8 +152,6 @@ open_termios(void) {
     t->c_oflag = 0;
     t->c_cflag = CS8 | CREAD | CLOCAL;
     t->c_lflag = 0;
-    t->c_ispeed = B115200;
-    t->c_ospeed = B115200;
     t->c_cc[VMIN] = 0;
     t->c_cc[VTIME] = xyzModem_CHAR_TIMEOUT;
     tcsetattr(fd, TCSANOW, t);

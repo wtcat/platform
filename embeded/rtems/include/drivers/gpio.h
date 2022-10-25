@@ -31,6 +31,11 @@ extern "C"{
 #define GPIO_OUTPUT_INIT_HIGH (0x20u << 8)
 #define GPIO_OUTPUT_INIT_LOW  (0x40u << 8)
 
+struct gpio_pin {
+    struct drvmgr_dev *dev;
+    int pin;
+};
+
 struct gpio_operations {
 	int (*configure)(struct drvmgr_dev *dev, int pin, uint32_t mode);
     int (*set_port)(struct drvmgr_dev *dev, uint32_t mask, uint32_t value);
@@ -87,6 +92,19 @@ static inline int gpiod_toggle(struct drvmgr_dev *dev, int pin) {
     const struct gpio_operations *ops = gpiod_get_ops(dev);
     return ops->toggle_pin(dev, pin);
 }
+
+static inline int gpiod_set_pin(struct gpio_pin *pin, int val) {
+    return gpiod_setpin(pin->dev, pin->pin, val);
+}
+
+static inline int gpiod_get_pin(struct gpio_pin *pin) {
+    return gpiod_getpin(pin->dev, pin->pin);
+}
+
+#ifdef CONFIG_OFW
+struct gpio_pin *ofw_cs_gpio_pin_request(phandle_t np, uint32_t flags, int *pol);
+struct drvmgr_dev *ofw_cs_gpio_request(phandle_t np, uint32_t flags, int *pin, int *pol);
+#endif
 
 #ifdef __cplusplus
 }

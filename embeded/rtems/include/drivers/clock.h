@@ -129,8 +129,12 @@ static inline int clk_get_rate(struct drvmgr_dev *dev, void *clk,
 	return api->get_rate(dev, clk, rate);
 }
 
+#ifdef CONFIG_OFW
+struct drvmgr_dev *ofw_clock_request(phandle_t np, const char *name, 
+    pcell_t *pcell, size_t maxsize);
+#endif /* CONFIG_OFW */
+
 #ifdef __cplusplus
 }
 #endif
-
 #endif /* DRIVERS_CLOCK_H_ */

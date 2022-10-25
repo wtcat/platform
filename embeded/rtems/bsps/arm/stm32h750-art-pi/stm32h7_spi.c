@@ -3,15 +3,21 @@
  */
 #include <stdlib.h>
 #include <rtems/malloc.h>
+#include <sys/errno.h>
 
-#include "drivers/devbase.h"
 #include "drivers/clock.h"
 #include "drivers/dma.h"
 #include "drivers/spi.h"
+#include "drivers/gpio.h"
 #include "drivers/ofw_platform_bus.h"
 
 #include "stm32/stm32_com.h"
 #include "stm32h7xx_ll_spi.h"
+
+struct cs_gpio {
+    struct gpio_pin *pin;
+    int polarity;
+};
 
 struct stm32h7_spi {
     spi_bus bus;
@@ -24,6 +30,7 @@ struct stm32h7_spi {
     uint8_t *rxbuf;
     const uint8_t *txbuf;
     SPI_TypeDef *reg;
+    struct cs_gpio cs_gpios;
     struct dma_chan *tx;
     struct dma_chan *rx;
     struct drvmgr_dev *clk;
@@ -31,22 +38,75 @@ struct stm32h7_spi {
     int irq;
 };
 
+static inline void stm32h7_spi_set_cs(struct cs_gpio *cs) {
+    gpiod_set_pin(cs->pin, cs->polarity);
+}
 
-static void stm32h7_spi_done(struct stm32h7_spi *priv) {
-    writel_relaxed(0, priv->base + AM335X_SPI_IRQENABLE);
+static inline void stm32h7_spi_clr_cs(struct cs_gpio *cs) {
+    gpiod_set_pin(cs->pin, !cs->polarity);
+}
+
+static void stm32h7_spi_transfer_complete(struct stm32h7_spi *priv) {
+    LL_SPI_DisableIT_EOT(priv->reg);
     rtems_event_transient_send(priv->thread);
 }
 
-static int stm32h7_spi_setup(struct stm32h7_spi *priv,
-    uint32_t speed_hz, uint32_t mode, uint8_t cs) {
-    (void) mode;
-    (void) cs;
-    uint32_t div = priv->bus.max_speed_hz / speed_hz;
+static int stm32h7_spi_configure(struct stm32h7_spi *spi,
+    uint32_t speed_hz, uint32_t mode, uint8_t cs, uint8_t wordbits) {
+    LL_SPI_InitTypeDef ll_struct;
+    uint32_t div;
+
+    LL_SPI_StructInit(&ll_struct);
+    switch (mode & SPI_MODE_3) {
+    case SPI_MODE_0:
+        ll_struct.ClockPolarity = LL_SPI_POLARITY_LOW;
+        ll_struct.ClockPhase = LL_SPI_PHASE_1EDGE;
+        break;
+    case SPI_MODE_1:
+        ll_struct.ClockPolarity = LL_SPI_POLARITY_LOW;
+        ll_struct.ClockPhase = LL_SPI_PHASE_2EDGE;
+        break;
+    case SPI_MODE_2:
+        ll_struct.ClockPolarity = LL_SPI_POLARITY_HIGH;
+        ll_struct.ClockPhase = LL_SPI_PHASE_1EDGE;
+        break;
+    case SPI_MODE_3:
+        ll_struct.ClockPolarity = LL_SPI_POLARITY_HIGH;
+        ll_struct.ClockPhase = LL_SPI_PHASE_2EDGE;
+        break;
+    default:
+        return -EINVAL;
+    }
+    if (wordbits == 16)
+        ll_struct.DataWidth = LL_SPI_DATAWIDTH_16BIT;
+    else if (wordbits == 32)
+         ll_struct.DataWidth = LL_SPI_DATAWIDTH_16BIT;
+    ll_struct.Mode = LL_SPI_MODE_MASTER;
+    ll_struct.NSS = LL_SPI_NSS_SOFT;
+    if (mode & SPI_LSB_FIRST)
+        ll_struct.BitOrder = LL_SPI_LSB_FIRST;
+    LL_SPI_Init(spi->reg, &ll_struct);
+
+    div = spi->bus.max_speed_hz / speed_hz;
     if (div && (div & (div - 1)) == 0) {
+
 
         return 0;
     }
     return -EINVAL;
+}
+
+static int stm32h7_spi_setup(spi_bus *bus) {
+    struct stm32h7_spi *spi = (struct stm32h7_spi *)bus;
+
+    if (bus->max_speed_hz < bus->speed_hz)
+        return -EINVAL;
+    if (bus->bits_per_word < 4 || bus->bits_per_word > 32)
+        return -EINVAL;
+
+    
+    return stm32h7_spi_configure(spi, bus->max_speed_hz, 
+    bus->mode, bus->cs);
 }
 
 static void stm32h7_spi_next_message(struct stm32h7_spi *spi) {
@@ -55,8 +115,9 @@ static void stm32h7_spi_next_message(struct stm32h7_spi *spi) {
         spi_bus *bus = &spi->bus;
         if (msg->speed_hz != bus->speed_hz || 
             msg->mode != bus->mode || 
-            msg->cs != bus->cs) {
-            stm32h7_spi_setup(spi, msg->speed_hz, msg->mode, msg->cs);
+            msg->cs != bus->cs ||
+            msg->bits_per_word != bus->bits_per_word) {
+            stm32h7_spi_configure(spi, msg->speed_hz, msg->mode, msg->cs);
         }
         spi->todo = msg->len;
         spi->txbuf = msg->tx_buf;
@@ -64,22 +125,21 @@ static void stm32h7_spi_next_message(struct stm32h7_spi *spi) {
 
         /* xxxxxxxxxxxx */
     } else {
-        stm32h7_spi_done(spi);
+        stm32h7_spi_transfer_complete(spi);
     }
 }
 
 static void stm32h7_spi_isr(void *arg) {
-    struct stm32h7_spi *spi = arg;
+    struct stm32h7_spi *spi = (struct stm32h7_spi *)arg;
 
     if (spi->todo > 0) {
-        am437x_spi_push(priv);
+
     } else if (spi->in_transfer > 0) {
-        writel_relaxed(AM335X_SPI_IRQENABLE_RX0_FULL, 
-            priv->base + AM335X_SPI_IRQENABLE);
+
     } else {
         spi->msg_todo--;
         spi->msg++;
-        stm32h7_spi_next_message(priv);
+        stm32h7_spi_next_message(spi);
     }
 }
 
@@ -92,6 +152,10 @@ static int stm32h7_spi_transfer(spi_bus *bus, const spi_ioc_transfer *msgs,
     stm32h7_spi_next_message(spi);
     rtems_event_transient_receive(RTEMS_WAIT, RTEMS_NO_TIMEOUT);
     return 0;
+}
+
+static void stm32h7_spi_destroy(spi_bus *bus) {
+	spi_bus_destroy_and_free(bus);
 }
 
 static int stm32_spi_bus_unite(struct drvmgr_drv *drv, struct drvmgr_dev *dev) {
@@ -124,6 +188,7 @@ static int stm32_spi_preprobe(struct drvmgr_dev *dev) {
     spi->reg = (void *)reg.start;
     spi->irq = (int)irq;
     spi->dev = dev;
+    devp->devops = &spi->bus;
     dev->priv = spi;
     return ofw_platform_bus_device_register(dev, &stm32h7_spi_bus, 
     DRVMGR_BUS_TYPE_SPI);
@@ -132,14 +197,57 @@ static int stm32_spi_preprobe(struct drvmgr_dev *dev) {
 static int stm32_spi_probe(struct drvmgr_dev *dev) {
     struct dev_private *devp = device_get_private(dev);
     struct stm32h7_spi *spi = dev->priv;
-    int ret;
+    int ret = -EINVAL;
 
-    ret = stm32_ofw_get_clkdev(devp->np, &spi->clk, &spi->clkid);
-    if (ret)
-        return ret;
+    //TODO: Allocate muli-gpios
+    spi->cs_gpios.pin = ofw_cs_gpio_pin_request(devp->np, 0, &spi->cs_gpios.polarity);
+    if (!spi->cs_gpios.pin) 
+        return -ENOSTR;
+    spi->clk = ofw_clock_request(devp->np, NULL, (pcell_t *)&spi->clkid, 
+        sizeof(spi->clkid));
+    if (!spi->clk) {
+        ret = -ENODEV;
+        goto _free_cs;
+    }
+    ret = drvmgr_interrupt_register(dev, IRQF_HARD(spi->irq), dev->name, 
+		stm32h7_spi_isr, spi);
+    if (ret) {
+        printk("%s register IRQ(%d) failed\n", dev->name, spi->irq);
+        goto _free;
+    }
+    ret = stm32_pinctrl_set(dev);
+    if (ret) {
+        printk("%s configure pins failed: %d\n", dev->name, ret);
+        goto _free_cs;
+    }
+    spi_bus_init(&spi->bus);
+	spi->bus.transfer = stm32h7_spi_transfer;
+    spi->bus.setup = stm32h7_spi_setup;
+    spi->bus.destroy = stm32h7_spi_destroy;
+    spi->bus.lsb_first = false;
+    spi->bus.bits_per_word = 8;
+    spi->bus.mode = SPI_MODE_0;
+	ret = spi_bus_register(&spi->bus, dev->name);
+	if (ret) {
+		drvmgr_interrupt_unregister(dev, IRQF_HARD(spi->irq), 
+            stm32h7_spi_isr, spi);
+        goto _free_cs;
+    }
 
+    /* Enable clock */
     clk_enable(spi->clk, &spi->clkid);
-    return 0;
+
+    /* Reset SPI */
+    LL_SPI_DeInit(spi->reg);
+
+    /* */
+	return 0;
+
+_free_cs:
+    free(spi->cs_gpios.pin);
+_free:
+    free(spi);
+    return ret;
 }
 
 static int stm32h7_spi_extprobe(struct drvmgr_dev *dev) {
@@ -154,11 +262,9 @@ static int stm32h7_spi_extprobe(struct drvmgr_dev *dev) {
 
     spi->rx = ofw_dma_chan_request(devp->np, "rx", 
         specs, sizeof(specs));
-    if (spi->rx) {
+    if (spi->rx) 
         spi->rx->config.dma_slot = specs[0];
-
-    }
-
+        
     return 0;
 }
 
@@ -170,11 +276,17 @@ static struct drvmgr_drv_ops stm32h7_spi_driver = {
 	},
 };
 
+static const struct dev_id id_table[] = {
+    {.compatible = "st,stm32h7-spi", NULL},
+    {NULL, NULL}
+};
+
 OFW_PLATFORM_DRIVER(stm32h7_spi) = {
 	.drv = {
 		.drv_id   = DRIVER_SPI_ID,
 		.name     = "spi",
 		.bus_type = DRVMGR_BUS_TYPE_PLATFORM,
 		.ops      = &stm32h7_spi_driver
-	}
+	},
+    .ids = id_table
 };
