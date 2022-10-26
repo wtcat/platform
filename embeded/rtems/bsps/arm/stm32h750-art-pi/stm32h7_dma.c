@@ -96,7 +96,8 @@ static void __fastcode stm32_dma_irq_handler(struct drvmgr_dev *dev, uint32_t id
 		if (!stream->hal_override) {
 			dma_stm32_clear_ht(dma, id);
 		}
-		stream->dma_callback(dev, stream->user_data, callback_arg, 0);
+		if (stream->dma_callback)
+			stream->dma_callback(dev, stream->user_data, callback_arg, 0);
 	} else if (stm32_dma_is_tc_irq_active(dma, id)) {
 #ifdef CONFIG_DMAMUX_STM32
 		stream->busy = false;
@@ -105,17 +106,20 @@ static void __fastcode stm32_dma_irq_handler(struct drvmgr_dev *dev, uint32_t id
 		if (!stream->hal_override) {
 			dma_stm32_clear_tc(dma, id);
 		}
-		stream->dma_callback(dev, stream->user_data, callback_arg, 0);
+		if (stream->dma_callback)
+			stream->dma_callback(dev, stream->user_data, callback_arg, 0);
 	} else if (stm32_dma_is_unexpected_irq_happened(dma, id)) {
 		LOG_ERR("Unexpected irq happened.");
-		stream->dma_callback(dev, stream->user_data,
-				     callback_arg, -EIO);
+		if (stream->dma_callback)
+			stream->dma_callback(dev, stream->user_data,
+						callback_arg, -EIO);
 	} else {
 		LOG_ERR("Transfer Error.");
 		_stm32_dma_dump_stream_irq(dev, id);
 		_stm32_dma_clear_stream_irq(dev, id);
-		stream->dma_callback(dev, stream->user_data,
-				     callback_arg, -EIO);
+		if (stream->dma_callback)
+			stream->dma_callback(dev, stream->user_data,
+						callback_arg, -EIO);
 	}
 }
 
