@@ -2,6 +2,7 @@
  * Copyright 2022 wtcat
  */
 #include <stdlib.h>
+#include <string.h>
 #include <rtems/malloc.h>
 #include <sys/errno.h>
 
@@ -41,15 +42,35 @@ struct stm32h7_spi {
 };
 
 
-static const uint32_t spi_clksrc[] = {
-    0,
-    LL_RCC_SPI123_CLKSOURCE,
-    LL_RCC_SPI123_CLKSOURCE,
-    LL_RCC_SPI123_CLKSOURCE,
-    LL_RCC_SPI45_CLKSOURCE,
-    LL_RCC_SPI45_CLKSOURCE,
-    LL_RCC_SPI6_CLKSOURCE
+static int stm32h7_spi_get_clksrc(const char *devname, uint32_t *clksrc) {
+    if (devname == NULL || clksrc == NULL)
+        return -EINVAL;
+    if (strncmp("/dev/spi", devname, 8))
+        return -EINVAL;
+    int id = devname[8] - '0';
+    switch(id) {
+    case 1 ... 3:
+        return LL_RCC_SPI123_CLKSOURCE;
+    case 4 ... 5:
+        return LL_RCC_SPI45_CLKSOURCE;
+    case 6:
+        return LL_RCC_SPI6_CLKSOURCE;
+    default:
+        return -EINVAL;
+    }
 }
+
+static const uint32_t div_table[] = {
+    0xFFFFFFFF,
+    LL_SPI_BAUDRATEPRESCALER_DIV2,
+    LL_SPI_BAUDRATEPRESCALER_DIV4,
+    LL_SPI_BAUDRATEPRESCALER_DIV8,
+    LL_SPI_BAUDRATEPRESCALER_DIV16,
+    LL_SPI_BAUDRATEPRESCALER_DIV32,
+    LL_SPI_BAUDRATEPRESCALER_DIV64,
+    LL_SPI_BAUDRATEPRESCALER_DIV128,
+    LL_SPI_BAUDRATEPRESCALER_DIV256
+};
 
 static inline void stm32h7_spi_set_cs(struct cs_gpio *cs) {
     gpiod_set_pin(cs->pin, cs->polarity);
@@ -93,25 +114,39 @@ static int stm32h7_spi_configure(struct stm32h7_spi *spi,
         ll_struct.ClockPhase = LL_SPI_PHASE_2EDGE;
         break;
     default:
+        printk("%s: Invalid clock phase\n", __func__);
         return -EINVAL;
     }
-    if (wordbits == 16)
+
+    switch (wordbits) {
+    case 8:
+        ll_struct.DataWidth = LL_SPI_DATAWIDTH_8BIT;
+        break;
+    case 16:
         ll_struct.DataWidth = LL_SPI_DATAWIDTH_16BIT;
-    else if (wordbits == 32)
-         ll_struct.DataWidth = LL_SPI_DATAWIDTH_16BIT;
+        break;
+    case 32:
+        ll_struct.DataWidth = LL_SPI_DATAWIDTH_32BIT;
+        break;
+    default:
+        printk("%s: Invalid databit width (%d)\n", __func__, wordbits);
+        return -EINVAL;
+    }
+
     ll_struct.Mode = LL_SPI_MODE_MASTER;
     ll_struct.NSS = LL_SPI_NSS_SOFT;
     if (mode & SPI_LSB_FIRST)
         ll_struct.BitOrder = LL_SPI_LSB_FIRST;
-    LL_SPI_Init(spi->reg, &ll_struct);
-
     div = spi->bus.max_speed_hz / speed_hz;
-    if (div && (div & (div - 1)) == 0) {
+    if (!div || (div & (div - 1))) {
+        ll_struct.BaudRate = LL_SPI_BAUDRATEPRESCALER_DIV2;
+        printk("%s: Invalid SPI bus frequency(%d) and use default\n",
+            __func__, speed_hz);
+    } else 
+        ll_struct.BaudRate = div_table[div];
 
-
-        return 0;
-    }
-    return -EINVAL;
+    LL_SPI_Init(spi->reg, &ll_struct);
+    return 0;
 }
 
 static int stm32h7_spi_setup(spi_bus *bus) {
