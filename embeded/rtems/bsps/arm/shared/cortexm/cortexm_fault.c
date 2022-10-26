@@ -278,9 +278,12 @@ static uint32_t fault_handle(const rtems_exception_frame *frame, int fault) {
 void bsp_cortexm_fault(const rtems_exception_frame *frame) {
 	const struct cortexm_cpu_exception *cce = (void *)frame;
     int fault = SCB->ICSR & SCB_ICSR_VECTACTIVE_Msk;
+	uint32_t sp;
 
     fault_handle(frame, fault);
-	cm_backtrace_fault(cce->exec_return, frame->register_sp);
+	printk("** exec_return: 0x%x msp = 0x%x, psp = 0x%x\n", cce->exec_return, cce->msp, cce->psp);
+	sp = (cce->exec_return & 0x4)? cce->msp: cce->psp;
+	cm_backtrace_fault(cce->exec_return, sp);
 }
 
 void __attribute__((naked)) _cortexm_exception_default(void) {
@@ -303,6 +306,7 @@ void __attribute__((naked)) _cortexm_exception_default(void) {
     "stm sp, {r0-r12}\n"
 	"add r3, sp, %[cpumsp]\n" 
 	"mrs r4, msp\n"
+	"add r4, %[cpufsz]\n"
 	"mrs r5, psp\n"
 	"mov r6, lr\n"
 	"stm r3, {r4-r6}\n"     /* Save msp, psp, exec_return */

@@ -5,17 +5,18 @@
 #include <bsp/start.h>
 #include <bsp/linker-symbols.h>
 #include <bsp/irq-generic.h>
+#include <bsp/irq.h>
 
 #include <rtems/bspIo.h>
 #include <rtems/sysinit.h>
 #include <rtems/score/armv7m.h>
 
 #include "base/compiler.h"
+#include "base/sections.h"
 
 #include "stm32/stm32_sdram.h"
 #include "stm32h7xx_ll_rcc.h"
 #include "stm32h7xx_ll_usart.h"
-
 
 
 extern char stm32h7_memory_null_begin[];
@@ -30,7 +31,7 @@ extern char stm32h7_memory_sdram_1_end[];
 extern char stm32h7_memory_sdram_2_begin[];
 extern char stm32h7_memory_sdram_2_end[];
 
-
+extern void  _cortexm_exception_default(void);
 #define EARLY_UART UART4
 
 static const ARMV7M_MPU_Region_config stm32h7_mpu_map[] = {
@@ -87,8 +88,36 @@ static void __notrace stm32h7_early_uart_putc(char c) {
     EARLY_UART->TDR = c;
 }
 
+static void __fastcode cortexm_interrupt_dispatch(void) {
+  rtems_vector_number vector =
+    ARMV7M_SCB_ICSR_VECTACTIVE_GET(_ARMV7M_SCB->icsr);
+
+  _ARMV7M_Interrupt_service_enter();
+  bsp_interrupt_handler_dispatch(ARMV7M_IRQ_OF_VECTOR(vector));
+  _ARMV7M_Interrupt_service_leave();
+}
+
+static void __notrace bsp_vector_setup(void) {
+  _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_HARD_FAULT, 
+    _cortexm_exception_default);
+  _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_MEM_MANAGE, 
+    _cortexm_exception_default);
+  _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_BUS_FAULT , 
+    _cortexm_exception_default);
+  _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_USAGE_FAULT, 
+    _cortexm_exception_default);
+  _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_DEBUG_MONITOR, 
+    _cortexm_exception_default);
+
+  for (int i = 0; i < BSP_INTERRUPT_VECTOR_COUNT; i++) {
+    _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_IRQ(i), 
+      cortexm_interrupt_dispatch);
+  }
+}
+
 void __notrace bsp_start(void) {
     bsp_interrupt_initialize();
+    bsp_vector_setup();
     rtems_cache_coherent_add_area(bsp_section_nocacheheap_begin,
         (uintptr_t)bsp_section_nocacheheap_size);
 }

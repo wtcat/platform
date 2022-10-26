@@ -96,7 +96,7 @@ links:
 - role: build-dependency
   uid: ../grp
 - role: build-dependency
-  uid: start
+  uid: ../start
 - role: build-dependency
   uid: linkcmdsflash
 - role: build-dependency
