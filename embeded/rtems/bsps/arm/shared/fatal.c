@@ -13,6 +13,9 @@
 #include <bsp/linker-symbols.h>
 #include <sys/cdefs.h>
 
+#ifdef ARM_MULTILIB_ARCH_V7M
+#include "asm/cortexm_trace.h"
+#endif
 #include "base/compiler.h"
 
 #ifdef CONFIGURE_BACKTRACE
@@ -24,31 +27,13 @@
 #endif
 
 #ifdef ARM_MULTILIB_ARCH_V7M
-
-static __always_inline uint32_t *_armv7m_get_sp(void) {
-    uint32_t *sptr = NULL;
+static __always_inline uint32_t _armv7m_get_sp(void) {
+    uint32_t sptr;
     __asm__ volatile (
         "mov %[sptr], sp\n"
         : [sptr] "=r" (sptr)
         ::);
     return sptr;
-}
-
-static void armv7m_dump_callpath(const uint32_t *sptr, int depth) {
-    if (sptr != NULL) {
-        printk("*** CallStack dump ***\n");
-        printk("addr2line -e rtems.elf -f -a ");
-        for (int i = 0, j = 0; i < 128; i++) {
-            if (sptr[i] >= (uint32_t)bsp_section_start_begin &&
-                sptr[i] < (uint32_t)bsp_section_text_end &&
-                (sptr[i] & 0x1)) {
-                printk("0x%08x ", sptr[i]);
-                if (++j >= depth) 
-                    break;
-            }
-        }
-        printk("\n\n");
-    }
 }
 #endif /* ARM_MULTILIB_ARCH_V7M */
 
@@ -75,9 +60,17 @@ void bsp_fatal_extension(rtems_fatal_source source, bool unused,
     if (source == RTEMS_FATAL_SOURCE_EXCEPTION ||
         source == INTERNAL_ERROR_CORE ) {
         const rtems_exception_frame *frame = (const rtems_exception_frame *)code;
+        rtems_exception_frame_print(frame);
+        
+    #ifdef ARM_MULTILIB_ARCH_V7M
+    extern void bsp_cortexm_fault(const rtems_exception_frame *frame);
+        bsp_cortexm_fault(frame);
+    #endif /* ARM_MULTILIB_ARCH_V7M */
+
     #if defined(CONFIGURE_BACKTRACE) || defined(CONFIGURE_FNTRACE)
         rtems_printer printer;
     #endif
+
     #ifdef CONFIGURE_BACKTRACE
         rtems_print_printer_printk(&printer);
         if (source == RTEMS_FATAL_SOURCE_EXCEPTION)
@@ -85,14 +78,11 @@ void bsp_fatal_extension(rtems_fatal_source source, bool unused,
         else
             __stack_backtrace(&printer, NULL, NULL);
     #endif
+
     #ifdef CONFIGURE_FNTRACE
         rtems_print_printer_printk(&printer);
         callpath_print_current(&printer);
     #endif
-        rtems_exception_frame_print(frame);
-    #ifdef ARM_MULTILIB_ARCH_V7M
-        armv7m_dump_callpath((void *)frame->register_sp, 20);
-    #endif /* ARM_MULTILIB_ARCH_V7M */
     }
 #endif
 #if BSP_VERBOSE_FATAL_EXTENSION
@@ -139,8 +129,8 @@ void bsp_fatal_extension(rtems_fatal_source source, bool unused,
     if (source != RTEMS_FATAL_SOURCE_EXCEPTION &&
         source != INTERNAL_ERROR_CORE ) {
 #ifdef ARM_MULTILIB_ARCH_V7M
-        uint32_t *_sp = _armv7m_get_sp();
-        armv7m_dump_callpath(_sp, 20);
+        uint32_t sp = _armv7m_get_sp();
+        cm_backtrace_assert(sp);
 #endif
     }
     printk("RTEMS version: %s\nRTEMS tools: %s\n", rtems_version(), __VERSION__);

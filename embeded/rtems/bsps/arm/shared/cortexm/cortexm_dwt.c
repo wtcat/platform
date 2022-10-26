@@ -4,13 +4,15 @@
  */
 #include <stddef.h>
 #include <rtems/rtems/intr.h>
+#include <rtems/sysinit.h>
 
-#include "stm32h7xx.h"
+#include "asm/cmsis_cortexm.h"
+#include "asm/cortexm_dwt.h"
 
-
-#define _CPU_MUTEX_LOCK(_lock) rtems_interrupt_enable(_lock)
-#define _CPU_MUTEX_UNLOCK(_lock) rtems_interrupt_disable(_lock)
-    
+struct breakpoint_info {
+	const char *file;
+	int line;
+};
 
 #if defined(CORE_CM3) || defined(CORE_CM4) || defined(CORE_CM7)
 struct watchpoint_regs {
@@ -32,7 +34,8 @@ struct watchpoint_regs {
 #error "Unknown CPU architecture"
 #endif /* CORE_CM_ */
 
-
+#define _CPU_MUTEX_LOCK(_lock)   rtems_interrupt_enable(_lock)
+#define _CPU_MUTEX_UNLOCK(_lock) rtems_interrupt_disable(_lock)
 
 #define WATCHPOINT_REGADDR(member) \
 	(struct watchpoint_regs *)(DWT_BASE + offsetof(DWT_Type, member));
@@ -44,6 +47,13 @@ static int _watchpoint_nums;
 static struct breakpoint_info _breakpoint[MAX_BREAKPOINT_NR];
 
 #if defined(CORE_CM7)
+#ifndef DWT_LSR_Present_Msk
+#define DWT_LSR_Present_Msk ITM_LSR_Present_Msk
+#endif
+#ifndef DWT_LSR_Access_Msk
+#define DWT_LSR_Access_Msk ITM_LSR_Access_Msk
+#endif
+
 static void __core_debug_access(int ena) {
 	uint32_t lsr = DWT->LSR;
 	if ((lsr & DWT_LSR_Present_Msk) != 0) {
@@ -127,11 +137,31 @@ int _core_debug_watchpoint_busy(int nr) {
 	return func != 0;
 }
 
-int cortexm_dwt_setup(void) {
+
+int _core_debug_init_cycle_counter(void) {
+	DWT->CYCCNT = 0;
+	DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+	return (DWT->CTRL & DWT_CTRL_NOCYCCNT_Msk) != 0;
+}
+
+uint32_t _core_debug_get_cycles(void) {
+	return DWT->CYCCNT;
+}
+
+void _core_debug_cycle_count_start(void) {
+	DWT->CYCCNT = 0;
+	DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}
+
+static void cortexm_dwt_setup(void) {
 	_watchpoint_nums = WATCHPOINT_MAX_NR;
 	cortexm_dwt_debug_init();
 	for (int i = 0; i < _watchpoint_nums; i++)
 		cortexm_dwt_watchpoint_disable(i);
-	return cortexm_dwt_debug_enable();
+	cortexm_dwt_debug_enable();
 }
 
+RTEMS_SYSINIT_ITEM(cortexm_dwt_setup,
+	RTEMS_SYSINIT_BSP_START,
+	RTEMS_SYSINIT_ORDER_LAST
+);

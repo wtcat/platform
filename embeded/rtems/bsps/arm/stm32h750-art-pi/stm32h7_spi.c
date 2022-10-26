@@ -40,6 +40,17 @@ struct stm32h7_spi {
     int clksrc;
 };
 
+
+static const uint32_t spi_clksrc[] = {
+    0,
+    LL_RCC_SPI123_CLKSOURCE,
+    LL_RCC_SPI123_CLKSOURCE,
+    LL_RCC_SPI123_CLKSOURCE,
+    LL_RCC_SPI45_CLKSOURCE,
+    LL_RCC_SPI45_CLKSOURCE,
+    LL_RCC_SPI6_CLKSOURCE
+}
+
 static inline void stm32h7_spi_set_cs(struct cs_gpio *cs) {
     gpiod_set_pin(cs->pin, cs->polarity);
 }

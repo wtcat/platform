@@ -122,7 +122,8 @@ static int stm32_gpio_getport(struct drvmgr_dev *dev, uint32_t mask, uint32_t *v
     rtems_interrupt_lock_acquire(&priv->lock, &lock_context);
     uint32_t pv = LL_GPIO_ReadInputPort(gpio);
     rtems_interrupt_lock_release(&priv->lock, &lock_context);
-	return pv & mask;
+	*value = pv & mask;
+	return 0;
 }
 
 static int stm32_gpio_setport(struct drvmgr_dev *dev, uint32_t mask, uint32_t value) {
@@ -130,8 +131,7 @@ static int stm32_gpio_setport(struct drvmgr_dev *dev, uint32_t mask, uint32_t va
 	GPIO_TypeDef *gpio = priv->gpio;
     rtems_interrupt_lock_context lock_context;
     rtems_interrupt_lock_acquire(&priv->lock, &lock_context);
-	uint32_t pv = LL_GPIO_ReadOutputPort(gpio);
-	LL_GPIO_WriteOutputPort(gpio, mask & pv);
+	LL_GPIO_WriteOutputPort(gpio, mask & value);
     rtems_interrupt_lock_release(&priv->lock, &lock_context);
 	return 0;
 }

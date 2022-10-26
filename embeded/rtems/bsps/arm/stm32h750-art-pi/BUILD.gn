@@ -21,7 +21,8 @@ component("board") {
 
   deps = [
     "//embeded/rtems/bsps/arm/shared",
-    "//embeded/rtems/bsps/arm/shared/hal_stm32:stm32h7"
+    "//embeded/rtems/bsps/arm/shared/hal_stm32:stm32h7",
+    "//embeded/rtems/bsps/arm/shared/cortexm:cortexm_shared"
   ]
   configs = [
     "//embeded/rtems/bsps/arm/shared/hal_stm32:stm32h7_config"

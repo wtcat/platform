@@ -305,6 +305,7 @@ static void stm32h7_uart_close(struct rtems_termios_tty *tty,
     rtems_termios_device_context *base,
     rtems_libio_open_close_args_t *args) {
     (void) args;
+    (void) tty;
     struct stm32h7_uart *uart = stm32h7_uart_context(base);
     uart->reg->CR1 = 0;
     uart->reg->CR2 = 0;
@@ -398,6 +399,7 @@ static void stm32h7_uart_polled_putchar(USART_TypeDef *reg, char ch) {
 }
 
 static int stm32h7_uart_polled_getchar(USART_TypeDef *reg) {
+    (void) reg;
     return -1;
 }
 
@@ -504,6 +506,7 @@ static int stm32h7_uart_extprobe(struct drvmgr_dev *dev) {
 }
 
 static int stm32h7_uart_postprobe(struct drvmgr_dev *dev) {
+    (void) dev;
     phandle_t chosen, aliase;
     char *path = NULL;
     char *prop = NULL;
@@ -512,10 +515,10 @@ static int stm32h7_uart_postprobe(struct drvmgr_dev *dev) {
     if (stdout_device)
         return 0;
     chosen = rtems_ofw_find_device("/chosen");
-    if (chosen < 0)
+    if ((int)chosen < 0)
         goto _out;
     aliase = rtems_ofw_find_device("/aliases"); 
-    if (aliase < 0)
+    if ((int)aliase < 0)
         goto _out;
     if (rtems_ofw_get_prop_alloc(chosen, "stdout-path", (void **)&prop) < 0)
         goto _out;
@@ -525,7 +528,6 @@ static int stm32h7_uart_postprobe(struct drvmgr_dev *dev) {
             break;
         }
     }
-
     if (rtems_ofw_get_prop_alloc(aliase, prop, (void **)&path) < 0)
         goto _out;  
     uart_options_parse(next, &stdout_baudrate, NULL);   

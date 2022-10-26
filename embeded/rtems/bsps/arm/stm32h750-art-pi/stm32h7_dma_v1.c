@@ -376,6 +376,7 @@ bool stm32_dma_check_fifo_mburst(LL_DMA_InitTypeDef *DMAx) {
 				return false;
 			}
 		}
+		return false;
 	case LL_DMA_MDATAALIGN_HALFWORD:
 		switch (mburst) {
 		case LL_DMA_MBURST_INC4:
@@ -394,6 +395,7 @@ bool stm32_dma_check_fifo_mburst(LL_DMA_InitTypeDef *DMAx) {
 		case LL_DMA_MBURST_INC16:
 			return false;
 		}
+		return false;
 	case LL_DMA_MDATAALIGN_WORD:
 		if (mburst == LL_DMA_MBURST_INC4 &&
 		    fifo_level == LL_DMA_FIFOTHRESHOLD_FULL) {
