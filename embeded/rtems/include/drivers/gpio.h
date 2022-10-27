@@ -33,6 +33,7 @@ extern "C"{
 
 struct gpio_pin {
     struct drvmgr_dev *dev;
+    int polarity;
     int pin;
 };
 
@@ -93,8 +94,12 @@ static inline int gpiod_toggle(struct drvmgr_dev *dev, int pin) {
     return ops->toggle_pin(dev, pin);
 }
 
-static inline int gpiod_set_pin(struct gpio_pin *pin, int val) {
-    return gpiod_setpin(pin->dev, pin->pin, val);
+static inline int gpiod_pin_assert(struct gpio_pin *pin) {
+    return gpiod_setpin(pin->dev, pin->pin, pin->polarity);
+}
+
+static inline int gpiod_pin_deassert(struct gpio_pin *pin) {
+    return gpiod_setpin(pin->dev, pin->pin, !pin->polarity);
 }
 
 static inline int gpiod_get_pin(struct gpio_pin *pin) {
@@ -102,8 +107,8 @@ static inline int gpiod_get_pin(struct gpio_pin *pin) {
 }
 
 #ifdef CONFIG_OFW
-struct gpio_pin *ofw_cs_gpio_pin_request(phandle_t np, uint32_t flags, int *pol);
-struct drvmgr_dev *ofw_cs_gpio_request(phandle_t np, uint32_t flags, int *pin, int *pol);
+struct gpio_pin *ofw_cs_gpios_request(phandle_t np, uint32_t flags, int *ngroups);
+struct gpio_pin *ofw_gpios_request(phandle_t np, uint32_t flags, int *ngroups);
 #endif
 
 #ifdef __cplusplus

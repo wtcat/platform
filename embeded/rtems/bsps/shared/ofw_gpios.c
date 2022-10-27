@@ -9,43 +9,70 @@
 #include "drivers/gpio.h"
 #include "drivers/ofw_platform_bus.h"
 
-struct gpio_pin *ofw_cs_gpio_pin_request(phandle_t np, uint32_t flags, int *pol) {
-    struct gpio_pin *gp = rtems_malloc(sizeof(*gp));
-    if (gp) {
-        gp->dev = ofw_cs_gpio_request(np, flags, &gp->pin, pol);
-        if (!gp->dev) {
-            free(gp);
-            gp = NULL;
-        }
-    }
-    return gp;
-}
 
-struct drvmgr_dev *ofw_cs_gpio_request(phandle_t np, uint32_t flags, int *pin, int *pol) {
-    struct drvmgr_dev *dev = NULL;
-    pcell_t args[32];
+static struct gpio_pin *__ofw_gpios_request(phandle_t np, const char *prop, 
+    uint32_t flags, int *groups) {
+    struct gpio_pin *pin_group;
+    int len, unit;
+    pcell_t *args;
+    int ngpios;
 
-    if (rtems_ofw_get_enc_prop(np, "cs-gpios", args, sizeof(args)) < 0) {
+    len = rtems_ofw_get_enc_prop_alloc(np, prop, (void **)&args);
+    if (len < 0) {
         errno = -ENOSTR;
         return NULL;
     }
-    dev = ofw_device_get_by_phandle(args[0]);
-    if (!dev) {
-        errno = -ENODEV;
-        return NULL;
+    
+    unit = 3 * sizeof(pcell_t);
+    if (len % unit) {
+        errno = -EINVAL;
+        goto _free_args;
     }
-    if (args[2])
-        flags |= GPIO_OUTPUT_INIT_HIGH;
-    else
-        flags |= GPIO_OUTPUT_INIT_LOW;
-    if (gpiod_configure(dev, args[1], flags|GPIO_OUTPUT)) {
-        errno = -ENXIO;
-        return NULL;
-    }
-    if (pin)
-        *pin = args[1];
-    if (*pol)
-        *pol = args[2];
 
-    return dev;
+    ngpios = len / unit;
+    pin_group = rtems_malloc(ngpios * sizeof(struct gpio_pin));
+    if (!pin_group) {
+        errno = -ENOMEM;
+        goto _free_args;
+    }
+    for (int i = 0; i < ngpios; i++) {
+        pin_group[i].pin = args[i*3 + 1];
+        pin_group[i].polarity = args[i*3 + 2];
+        pin_group[i].dev = ofw_device_get_by_phandle(args[i*3]);
+        if (!pin_group[i].dev) {
+            errno = -ENODEV;
+            goto _free_pins;
+        }
+        if (flags & GPIO_OUTPUT) {
+            if (pin_group[i].polarity)
+                flags |= GPIO_OUTPUT_INIT_HIGH;
+            else
+                flags |= GPIO_OUTPUT_INIT_LOW;
+        }
+        if (gpiod_configure(pin_group[i].dev, pin_group[i].pin, flags)) {
+            errno = -EIO;
+            goto _free_pins;
+        }
+    }
+
+    if (groups)
+        *groups = ngpios;
+    free(args);
+    return pin_group;
+
+_free_pins:
+    free(pin_group);
+_free_args:
+    free(args);
+    return NULL;
+}
+
+struct gpio_pin *ofw_cs_gpios_request(phandle_t np, uint32_t flags, int *ngroups) {
+    return __ofw_gpios_request(np, "cs-gpios", 
+    flags | GPIO_OUTPUT, ngroups);
+}
+
+struct gpio_pin *ofw_gpios_request(phandle_t np, uint32_t flags, int *ngroups) {
+    return __ofw_gpios_request(np, "gpios", 
+    flags | GPIO_OUTPUT, ngroups);
 }

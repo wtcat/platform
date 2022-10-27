@@ -16,11 +16,6 @@
 #include "stm32h7xx_ll_spi.h"
 #include "stm32h7xx_ll_rcc.h"
 
-struct cs_gpio {
-    struct gpio_pin *pin;
-    int polarity;
-};
-
 struct stm32h7_spi {
     spi_bus bus;
     rtems_id thread;
@@ -32,15 +27,26 @@ struct stm32h7_spi {
     uint8_t *rxbuf;
     const uint8_t *txbuf;
     SPI_TypeDef *reg;
-    struct cs_gpio cs_gpios;
+    int cs_num;
+    struct gpio_pin *cs_gpios;
     struct dma_chan *tx;
     struct dma_chan *rx;
     struct drvmgr_dev *clk;
     int clkid;
     int irq;
-    int clksrc;
 };
 
+static const uint32_t div_table[] = {
+    0xFFFFFFFF,
+    LL_SPI_BAUDRATEPRESCALER_DIV2,
+    LL_SPI_BAUDRATEPRESCALER_DIV4,
+    LL_SPI_BAUDRATEPRESCALER_DIV8,
+    LL_SPI_BAUDRATEPRESCALER_DIV16,
+    LL_SPI_BAUDRATEPRESCALER_DIV32,
+    LL_SPI_BAUDRATEPRESCALER_DIV64,
+    LL_SPI_BAUDRATEPRESCALER_DIV128,
+    LL_SPI_BAUDRATEPRESCALER_DIV256
+};
 
 static int stm32h7_spi_get_clksrc(const char *devname, uint32_t *clksrc) {
     if (devname == NULL || clksrc == NULL)
@@ -60,29 +66,12 @@ static int stm32h7_spi_get_clksrc(const char *devname, uint32_t *clksrc) {
     }
 }
 
-static const uint32_t div_table[] = {
-    0xFFFFFFFF,
-    LL_SPI_BAUDRATEPRESCALER_DIV2,
-    LL_SPI_BAUDRATEPRESCALER_DIV4,
-    LL_SPI_BAUDRATEPRESCALER_DIV8,
-    LL_SPI_BAUDRATEPRESCALER_DIV16,
-    LL_SPI_BAUDRATEPRESCALER_DIV32,
-    LL_SPI_BAUDRATEPRESCALER_DIV64,
-    LL_SPI_BAUDRATEPRESCALER_DIV128,
-    LL_SPI_BAUDRATEPRESCALER_DIV256
-};
-
-static inline void stm32h7_spi_set_cs(struct cs_gpio *cs) {
-    gpiod_set_pin(cs->pin, cs->polarity);
+static inline void stm32h7_spi_set_cs(struct gpio_pin *cs_gpios, int cs) {
+    gpiod_pin_assert(&cs_gpios[cs]);
 }
 
-static inline void stm32h7_spi_clr_cs(struct cs_gpio *cs) {
-    gpiod_set_pin(cs->pin, !cs->polarity);
-}
-
-static uint32_t stm32h7_spi_calc_clkdiv(struct stm32h7_spi *spi, uint32_t speed_hz) {
-    uint32_t clkfreq = LL_RCC_GetSPIClockFreq(spi->clksrc);
-    
+static inline void stm32h7_spi_clr_cs(struct gpio_pin *cs_gpios, int cs) {
+    gpiod_pin_deassert(&cs_gpios[cs]);
 }
 
 static void stm32h7_spi_transfer_complete(struct stm32h7_spi *priv) {
@@ -91,7 +80,7 @@ static void stm32h7_spi_transfer_complete(struct stm32h7_spi *priv) {
 }
 
 static int stm32h7_spi_configure(struct stm32h7_spi *spi,
-    uint32_t speed_hz, uint32_t mode, uint8_t cs, uint8_t wordbits) {
+    uint32_t speed_hz, uint32_t mode, uint8_t wordbits) {
     LL_SPI_InitTypeDef ll_struct;
     uint32_t div;
 
@@ -151,15 +140,13 @@ static int stm32h7_spi_configure(struct stm32h7_spi *spi,
 
 static int stm32h7_spi_setup(spi_bus *bus) {
     struct stm32h7_spi *spi = (struct stm32h7_spi *)bus;
-
     if (bus->max_speed_hz < bus->speed_hz)
         return -EINVAL;
-    if (bus->bits_per_word < 4 || bus->bits_per_word > 32)
+    if (bus->bits_per_word % 8)
         return -EINVAL;
 
-    
     return stm32h7_spi_configure(spi, bus->max_speed_hz, 
-    bus->mode, bus->cs);
+    bus->mode, bus->bits_per_word);
 }
 
 static void stm32h7_spi_next_message(struct stm32h7_spi *spi) {
@@ -168,14 +155,15 @@ static void stm32h7_spi_next_message(struct stm32h7_spi *spi) {
         spi_bus *bus = &spi->bus;
         if (msg->speed_hz != bus->speed_hz || 
             msg->mode != bus->mode || 
-            msg->cs != bus->cs ||
             msg->bits_per_word != bus->bits_per_word) {
-            stm32h7_spi_configure(spi, msg->speed_hz, msg->mode, msg->cs);
+            stm32h7_spi_configure(spi, msg->speed_hz, msg->mode, 
+            msg->bits_per_word);
         }
         spi->todo = msg->len;
         spi->txbuf = msg->tx_buf;
         spi->rxbuf = msg->rx_buf;
 
+        stm32h7_spi_set_cs(spi->cs_gpios, msg->cs);
         /* xxxxxxxxxxxx */
     } else {
         stm32h7_spi_transfer_complete(spi);
@@ -190,6 +178,8 @@ static void stm32h7_spi_isr(void *arg) {
     } else if (spi->in_transfer > 0) {
 
     } else {
+        if (spi->msg->cs_change)
+            stm32h7_spi_clr_cs(spi->cs_gpios, spi->msg->cs);
         spi->msg_todo--;
         spi->msg++;
         stm32h7_spi_next_message(spi);
@@ -250,11 +240,16 @@ static int stm32_spi_preprobe(struct drvmgr_dev *dev) {
 static int stm32_spi_probe(struct drvmgr_dev *dev) {
     struct dev_private *devp = device_get_private(dev);
     struct stm32h7_spi *spi = dev->priv;
+    uint32_t clksrc;
     int ret = -EINVAL;
 
+    if (stm32h7_spi_get_clksrc(dev->name, &clksrc)) {
+        printk("%s: Invalid device name (%s)\n", __func__, dev->name);
+        return -EINVAL;
+    }
     //TODO: Allocate muli-gpios
-    spi->cs_gpios.pin = ofw_cs_gpio_pin_request(devp->np, 0, &spi->cs_gpios.polarity);
-    if (!spi->cs_gpios.pin) 
+    spi->cs_gpios = ofw_cs_gpios_request(devp->np, 0, &spi->cs_num);
+    if (!spi->cs_gpios) 
         return -ENOSTR;
     spi->clk = ofw_clock_request(devp->np, NULL, (pcell_t *)&spi->clkid, 
         sizeof(spi->clkid));
@@ -273,6 +268,7 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
         printk("%s configure pins failed: %d\n", dev->name, ret);
         goto _free_cs;
     }
+
     spi_bus_init(&spi->bus);
 	spi->bus.transfer = stm32h7_spi_transfer;
     spi->bus.setup = stm32h7_spi_setup;
@@ -280,7 +276,7 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
     spi->bus.lsb_first = false;
     spi->bus.bits_per_word = 8;
     spi->bus.mode = SPI_MODE_0;
-    spi->bus.max_speed_hz = LL_RCC_GetSPIClockFreq(spi->clksrc) / 2;
+    spi->bus.max_speed_hz = LL_RCC_GetSPIClockFreq(clksrc) / 2;
     spi->bus.speed_hz = 1000000;
 	ret = spi_bus_register(&spi->bus, dev->name);
 	if (ret) {
@@ -299,7 +295,7 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
 	return 0;
 
 _free_cs:
-    free(spi->cs_gpios.pin);
+    free(spi->cs_gpios);
 _free:
     free(spi);
     return ret;
