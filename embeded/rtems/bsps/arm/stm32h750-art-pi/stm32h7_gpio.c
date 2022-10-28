@@ -169,6 +169,7 @@ static int stm32_gpio_toggle_pin(struct drvmgr_dev *dev, int pin) {
 
 static int stm32_gpio_configure(struct drvmgr_dev *dev, int pin, uint32_t flags) {
 	int pincfg = 0, err = 0;
+
 	err = stm32_flags_to_conf(flags, &pincfg);
 	if (err != 0) 
 		goto exit;
@@ -450,7 +451,6 @@ static int stm32_gpio_preprobe(struct drvmgr_dev *dev) {
     struct dev_private *devp = device_get_private(dev);
     rtems_ofw_memory_area reg;
     struct stm32h7_gpio *priv;
-	pcell_t prop[3];
     char bank_name[16];
     int ret;
 
@@ -466,14 +466,8 @@ static int stm32_gpio_preprobe(struct drvmgr_dev *dev) {
         free(priv);
         ret = -ENOSTR;
     }
-	ret = rtems_ofw_get_enc_prop(rtems_ofw_parent(devp->np), "ranges", 
-		prop, sizeof(prop));
-	if (ret < 0) {
-		free(priv);
-		return -EFAULT;
-	}
     priv->port = bank_name[4] - 'A';
-    priv->gpio = (GPIO_TypeDef *)(reg.start + prop[1]);
+    priv->gpio = (GPIO_TypeDef *)reg.start;
     priv->exti = &exti_controller;
     dev->priv = priv;
     devp->devops = &stm32_gpio_ops;
@@ -486,8 +480,10 @@ static int stm32_gpio_probe(struct drvmgr_dev *dev) {
     struct stm32h7_gpio *priv = dev->priv;
     int ret;
     ret = stm32_ofw_get_clkdev(devp->np, &priv->clk, &priv->clkid);
-    if (ret)
+    if (ret) {
+		printk("%s: request clock failed(%d)\n", __func__, ret);
         return ret;
+	}
     /* Enable GPIO clock */
     clk_enable(priv->clk, &priv->clkid);
     return 0;

@@ -44,6 +44,7 @@
 
 	leds {
 		compatible = "gpio-leds";
+		rtems,path = "/dev/leds";
 		led-red {
 			gpios = <&gpioi 8 0>;
 		};

@@ -212,6 +212,9 @@ static inline int led_off(struct drvmgr_dev *dev, uint32_t led) {
 	return ops->off(dev, led);
 }
 
+/* Devfs register */
+int led_devfs_register(struct drvmgr_dev *dev);
+
 #ifdef __cplusplus
 }
 #endif

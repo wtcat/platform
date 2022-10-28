@@ -6,9 +6,16 @@
 #include <string.h>
 
 #include <rtems/malloc.h>
+#include <rtems/bspIo.h>
 #include "drivers/gpio.h"
 #include "drivers/ofw_platform_bus.h"
 
+
+#ifdef OFW_GPIO_DEBUG
+#define devdbg(fmt, ...) printk(fmt, ##__VA_ARGS__)
+#else
+#define devdbg(...)
+#endif /* OFW_GPIO_DEBUG */
 
 static struct gpio_pin *__ofw_gpios_request(phandle_t np, const char *prop, 
     uint32_t flags, int *groups) {
@@ -45,10 +52,14 @@ static struct gpio_pin *__ofw_gpios_request(phandle_t np, const char *prop,
         }
         if (flags & GPIO_OUTPUT) {
             if (pin_group[i].polarity)
-                flags |= GPIO_OUTPUT_INIT_HIGH;
-            else
                 flags |= GPIO_OUTPUT_INIT_LOW;
+            else
+                flags |= GPIO_OUTPUT_INIT_HIGH;
         }
+        devdbg("%s: %s pin(%d) polarity(%d) **\n", __func__,
+            pin_group[i].dev->name,
+            pin_group[i].pin,
+            pin_group[i].polarity);
         if (gpiod_configure(pin_group[i].dev, pin_group[i].pin, flags)) {
             errno = -EIO;
             goto _free_pins;

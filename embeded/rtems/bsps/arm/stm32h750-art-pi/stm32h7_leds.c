@@ -10,6 +10,7 @@
 #include "drivers/ofw_platform_bus.h"
 #include "drivers/gpio.h"
 #include "drivers/led.h"
+#include "rtems/rtems/status.h"
 
 
 struct led_group {
@@ -24,6 +25,12 @@ struct leds_private {
     struct led_group grp[];
 };
 
+#ifdef LED_DEBUG
+#define devdbg(fmt, ...) printk(fmt, ##__VA_ARGS__)
+#else
+#define devdbg(...)
+#endif
+
 
 static void led_blink_timer_cb(rtems_id timer, void *arg) {
     struct led_group *grp = arg;
@@ -33,34 +40,35 @@ static void led_blink_timer_cb(rtems_id timer, void *arg) {
     if (!grp->on) {
         grp->on = true;
         delay = grp->delay_on;
-        gpiod_setpin(pin->dev, pin->pin, pin->polarity);
+        gpiod_pin_assert(pin);
     } else {
         grp->on = false;
         delay = grp->delay_off;
-        gpiod_setpin(pin->dev, pin->pin, !pin->polarity);
+        gpiod_pin_deassert(pin);
     }
-    rtems_timer_server_fire_after(timer, delay, led_blink_timer_cb, arg);
+    rtems_timer_server_fire_after(timer, delay, led_blink_timer_cb, 
+        arg);
 }
 
 static int gpio_led_on(struct drvmgr_dev *dev, uint32_t led) {
     struct leds_private *priv = dev->priv;
     struct gpio_pin *pin;
-    if ((int)led > priv->ngrp)
+    if ((int)led >= priv->ngrp)
         return -EINVAL;
     pin = priv->grp[led].leds;
-    return gpiod_setpin(pin->dev, pin->pin, pin->polarity);
+    return gpiod_pin_assert(pin);
 }
 
 static int gpio_led_off(struct drvmgr_dev *dev, uint32_t led) {
     struct leds_private *priv = dev->priv;
     struct led_group *grp;
     struct gpio_pin *pin;
-    if ((int)led > priv->ngrp)
+    if ((int)led >= priv->ngrp)
         return -EINVAL;
     grp = &priv->grp[led];
     pin = grp->leds;
     rtems_timer_delete(grp->timer);
-    return gpiod_setpin(pin->dev, pin->pin, !pin->polarity);
+    return gpiod_pin_deassert(pin);
 }
 
 static int gpio_led_blink(struct drvmgr_dev *dev, uint32_t led, 
@@ -69,23 +77,29 @@ static int gpio_led_blink(struct drvmgr_dev *dev, uint32_t led,
     struct led_group *grp;
     rtems_status_code sc;
  
-    if ((int)led > priv->ngrp)
+    if ((int)led >= priv->ngrp)
         return -EINVAL;
 
     grp = &priv->grp[led];
     rtems_timer_delete(grp->timer);
     sc = rtems_timer_create(rtems_build_name('L', 'E', 'D', 'x'), &grp->timer);
-    if (sc != RTEMS_SUCCESSFUL)
+    if (sc != RTEMS_SUCCESSFUL) {
+        printk("%s: create timer failed! (%s)\n", __func__, 
+            rtems_status_text(sc));
         goto _exit;
-    
+    }
+ 
     grp->delay_on = RTEMS_MILLISECONDS_TO_TICKS(delay_on);
     grp->delay_off = RTEMS_MILLISECONDS_TO_TICKS(delay_off);
     grp->on = false;
-    gpio_led_off(dev, led);
+    gpiod_pin_deassert(grp->leds);
     sc = rtems_timer_server_fire_after(grp->timer, grp->delay_off,
         led_blink_timer_cb, grp);
-    if (sc != RTEMS_SUCCESSFUL)
+    if (sc != RTEMS_SUCCESSFUL) {
+        printk("%s: start timer failed! (%s)\n", __func__,
+            rtems_status_text(sc));
         rtems_timer_delete(grp->timer);
+    }
 _exit:
     return -rtems_status_code_to_errno(sc);
 }
@@ -126,8 +140,13 @@ static int stm32h7_leds_probe(struct drvmgr_dev *dev) {
         priv->grp[i].leds = ofw_gpios_request(child, GPIO_OUTPUT, NULL);
         if (!priv->grp[i].leds)
             goto _freem;
+
+        devdbg("%s: gpios: <%s %d %d>\n", __func__, priv->grp[i].leds->dev->name, 
+            priv->grp[i].leds->pin, priv->grp[i].leds->polarity);
+        i++;
     }
     devp->devops = &led_ops;
+    led_devfs_register(dev);
     return 0;
 
 _freem:
@@ -143,6 +162,7 @@ static const struct dev_id id_table[] = {
 static struct drvmgr_drv_ops stm32h7_leds_driver = {
 	.init = {
 		stm32h7_leds_preprobe,
+        NULL,
         stm32h7_leds_probe
 	},
 };

@@ -18,4 +18,7 @@ component("shared") {
     } else {
         sources += ["platform_bus.c"]
     }
+    sources += [
+        "devfs/dev_led.c"
+    ]
 }
