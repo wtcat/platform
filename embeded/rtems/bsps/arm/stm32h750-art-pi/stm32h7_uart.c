@@ -71,7 +71,7 @@ static size_t stm32h7_uart_fifo_write(USART_TypeDef *reg, const char *buf,
 static int stm32h7_uart_dma_transmit(struct stm32h7_uart *uart, 
     const char *buffer, size_t size) {
     _Assert(size < 65536);
-    const char *sndbuf;
+    char *sndbuf;
     int err;
 
     /* Stop transmit */
@@ -79,11 +79,7 @@ static int stm32h7_uart_dma_transmit(struct stm32h7_uart *uart,
         LL_USART_DisableDMAReq_TX(uart->reg);
         return 0;
     }
-    /* DMA address aligned */
-    if ((uintptr_t)buffer & 0x3)
-        sndbuf = memcpy(uart->txbuf, buffer, size);
-    else
-        sndbuf = buffer;
+    sndbuf = memcpy(uart->txbuf, buffer, size);
     uart->length = size;
     rtems_cache_invalidate_multiple_data_lines(sndbuf, size);
     err = dma_reload(uart->tx->dev, uart->tx->channel, (dma_addr_t)sndbuf, 
@@ -108,12 +104,11 @@ static void stm32h7_uart_fifo_transmit(struct stm32h7_uart *uart, const char *bu
 static void __isr stm32h7_txdma_isr(struct drvmgr_dev *dev, void *arg, 
 	uint32_t channel, int status) {
     struct stm32h7_uart *uart = (struct stm32h7_uart *)arg;
-    if (!status) {
-        rtems_termios_dequeue_characters(uart->tty, uart->length);
-        uart->length = 0;
-    } else {
+    if (status) {
         uart->transmit_err++;
+        return;
     }
+    rtems_termios_dequeue_characters(uart->tty, uart->length);
     (void) dev;
     (void) channel;
 }
