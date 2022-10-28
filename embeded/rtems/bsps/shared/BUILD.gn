@@ -19,6 +19,6 @@ component("shared") {
         sources += ["platform_bus.c"]
     }
     sources += [
-        "devfs/dev_led.c"
+        "devfs/devfs_led.c"
     ]
 }

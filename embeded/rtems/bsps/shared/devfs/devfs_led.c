@@ -165,6 +165,8 @@ static const IMFS_node_control led_node_control = IMFS_GENERIC_INITIALIZER(
 
 int led_devfs_register(struct drvmgr_dev *dev) {
     struct led_file *led;
+    int err;
+
     if (dev == NULL)
         return -EINVAL;
     led = rtems_malloc(sizeof(*led));
@@ -172,7 +174,12 @@ int led_devfs_register(struct drvmgr_dev *dev) {
         return -ENOMEM;
     led->dev = dev;
     rtems_mutex_init(&led->lock, "ledfs");
-    return IMFS_make_generic_node(dev->name,
+    err = IMFS_make_generic_node(dev->name,
         S_IFCHR | S_IRWXU | S_IRWXG | S_IRWXO,
         &led_node_control, led);
+    if (err) {
+        printk("%s: register device node failed!\n", __func__);
+        free(led);
+    }
+    return err;
 }
