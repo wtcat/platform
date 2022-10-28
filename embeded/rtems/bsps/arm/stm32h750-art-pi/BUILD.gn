@@ -15,7 +15,8 @@ component("board") {
     "stm32h7_dma.c",
     "stm32h7_dma_v1.c",
     "stm32h7_dmamux.c",
-    "stm32h7_uart.c"
+    "stm32h7_uart.c",
+    "stm32h7_leds.c"
   ]
   sources += ["stm32_queue.c"]
 

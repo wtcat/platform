@@ -27,7 +27,7 @@ static int ofw_pinctrl_bus_filter(phandle_t np, char *devname, size_t max) {
 static int stm32h7_setup_pinctrl(struct drvmgr_dev *pinctrl, phandle_t np) {
 extern void stm32_gpio_setup(struct drvmgr_dev *dev, int pin, int conf, int altf);
     struct stm32h7_pinctrl *priv = pinctrl->priv;
-    pcell_t parent, child;
+    phandle_t parent, child;
     pcell_t ospeed = 0;
     pcell_t pins[32];
     int conf = 0;
