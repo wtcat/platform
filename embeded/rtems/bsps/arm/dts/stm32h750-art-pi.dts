@@ -54,6 +54,17 @@
 		};
 	};
 
+    gpio-keys {
+        compatible = "gpio-keys";
+		rtems,path = "/dev/gpio-keys";
+        autorepeat;
+        up {
+            label = "user-button";
+            rtems,code = <10>;
+            gpios = <&gpioh 4 0>;
+        };
+    };
+
 	v3v3: regulator-v3v3 {
 		compatible = "regulator-fixed";
 		regulator-name = "v3v3";

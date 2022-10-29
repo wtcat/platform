@@ -10,7 +10,6 @@
 #include "drivers/ofw_platform_bus.h"
 #include "drivers/gpio.h"
 #include "drivers/led.h"
-#include "rtems/rtems/status.h"
 
 
 struct led_group {

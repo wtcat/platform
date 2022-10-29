@@ -152,9 +152,9 @@ static int stm32_gpio_getpin(struct drvmgr_dev *dev, int pin) {
 	GPIO_TypeDef *gpio = priv->gpio;
     rtems_interrupt_lock_context lock_context;
     rtems_interrupt_lock_acquire(&priv->lock, &lock_context);
-    int val = gpio->ODR & BIT(pin);
+    int val = LL_GPIO_ReadInputPort(gpio) & BIT(pin);
     rtems_interrupt_lock_release(&priv->lock, &lock_context);
-	return !val;
+	return !!val;
 }
 
 static int stm32_gpio_toggle_pin(struct drvmgr_dev *dev, int pin) {
@@ -254,10 +254,12 @@ static int stm32_gpio_bus_intr_register(struct drvmgr_dev *dev, int index,
 	const char *info, drvmgr_isr isr, void *arg) {
 	(void) info;
     rtems_interrupt_lock_context lock_context;
-    struct stm32h7_gpio *priv = device_get_parent_priv(dev);
+    struct stm32h7_gpio *priv = dev->priv;
 	struct stm32h7_exti *exti = priv->exti;
-	if (index >= EXTI_NUMS || exti_irq_table[index] == 0xFF)
+	if (index >= EXTI_NUMS || exti_irq_table[index] == 0xFF) {
+		printk("%s: gpio interrupt register failed: index(%d)\n", __func__, index);
 		return -DRVMGR_EINVAL;
+	}
 	rtems_interrupt_lock_acquire(&exti->lock, &lock_context);
 	exti->cb[index].cb = isr;
 	exti->cb[index].arg = arg;
@@ -272,7 +274,7 @@ static int stm32_gpio_bus_intr_unregister(struct drvmgr_dev *dev, int index,
 	(void) isr;
 	(void) arg;
     rtems_interrupt_lock_context lock_context;
-    struct stm32h7_gpio *priv = device_get_parent_priv(dev);
+    struct stm32h7_gpio *priv = dev->priv;
 	struct stm32h7_exti *exti = priv->exti;
 	if (index >= EXTI_NUMS || exti_irq_table[index] == 0xFF)
 		return -DRVMGR_EINVAL;

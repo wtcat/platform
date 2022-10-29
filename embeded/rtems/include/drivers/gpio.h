@@ -48,6 +48,37 @@ struct gpio_operations {
 
 #define gpiod_get_ops(_dev) (const struct gpio_operations *)device_get_operations(_dev)
 
+/*
+ * GPIO bus interrupt requst interface
+ */
+static inline int gpiod_irq_request(struct drvmgr_dev *dev, int pin, 
+    const char *info, drvmgr_isr isr, void *arg) {
+    if (!dev || !dev->bus || !dev->bus->ops->int_register)
+        return -1;
+    return dev->bus->ops->int_register(dev, pin, info, isr, arg);
+}
+
+static inline int gpiod_irq_remove(struct drvmgr_dev *dev, int pin, 
+    drvmgr_isr isr, void *arg) {
+    if (!dev || !dev->bus || !dev->bus->ops->int_unregister)
+        return -1;
+    return dev->bus->ops->int_unregister(dev, pin, isr, arg);
+}
+
+static inline int gpiod_pin_irq_request(struct gpio_pin *pin, const char *info, 
+    drvmgr_isr isr, void *arg) {
+    return gpiod_irq_request(pin->dev, pin->pin, info, isr, arg);
+}
+
+static inline int gpiod_pin_irq_remove(struct gpio_pin *pin, drvmgr_isr isr, 
+    void *arg) {
+    return gpiod_irq_remove(pin->dev, pin->pin, isr, arg);
+}
+
+
+/*
+ * GPIO generic interface
+ */
 static inline int gpiod_configure(struct drvmgr_dev *dev, int pin, 
 	unsigned int mode) {
     _Assert(dev != NULL);
@@ -104,6 +135,11 @@ static inline int gpiod_pin_deassert(struct gpio_pin *pin) {
 
 static inline int gpiod_get_pin(struct gpio_pin *pin) {
     return gpiod_getpin(pin->dev, pin->pin);
+}
+
+static inline bool gpiod_is_active(struct gpio_pin *pin) {
+    int val = gpiod_getpin(pin->dev, pin->pin);
+    return val == pin->polarity;
 }
 
 #ifdef CONFIG_OFW
