@@ -2576,7 +2576,7 @@
  * This is an advanced configuration option.  Use it only if you know exactly
  * what you are doing.
  */
-#define CONFIGURE_EXECUTIVE_RAM_SIZE (128 * 1024)
+#define CONFIGURE_EXECUTIVE_RAM_SIZE (64 * 1024)
 
 /* Generated from spec:/acfg/if/extra-task-stacks */
 
@@ -3017,7 +3017,7 @@
  * used to define the default value of #CONFIGURE_INTERRUPT_STACK_SIZE.
  * @endparblock
  */
-#define CONFIGURE_MINIMUM_TASK_STACK_SIZE 1024
+#define CONFIGURE_MINIMUM_TASK_STACK_SIZE 512
 
 /* Generated from spec:/acfg/if/stack-checker-enabled */
 
@@ -4822,6 +4822,7 @@
 #define CONFIGURE_SHELL_COMMAND_RAP
 #define CONFIGURE_SHELL_COMMAND_RTL
 #define CONFIGURE_SHELL_COMMAND_DISK
+#define CONFIGURE_SHELL_COMMAND_XECHO
 
 #ifdef CONFIGURE_SHELL_COMMANDS_MEM
 #define CONFIGURE_SHELL_NO_COMMAND_MDUMP

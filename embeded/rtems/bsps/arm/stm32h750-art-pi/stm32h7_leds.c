@@ -51,10 +51,13 @@ static void led_blink_timer_cb(rtems_id timer, void *arg) {
 
 static int gpio_led_on(struct drvmgr_dev *dev, uint32_t led) {
     struct leds_private *priv = dev->priv;
+    struct led_group *grp;
     struct gpio_pin *pin;
     if ((int)led >= priv->ngrp)
         return -EINVAL;
-    pin = priv->grp[led].leds;
+    grp = &priv->grp[led];
+    pin = grp->leds;
+    rtems_timer_delete(grp->timer);
     return gpiod_pin_assert(pin);
 }
 
