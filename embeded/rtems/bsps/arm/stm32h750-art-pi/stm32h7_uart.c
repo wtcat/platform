@@ -14,13 +14,16 @@
 
 #include <bsp/irq-generic.h>
 
-#include "drivers/clock.h"
-#include "drivers/dma.h"
-#include "drivers/ofw_platform_bus.h"
-#include "stm32/stm32_queue.h"
-
 #undef B0
 #include "stm32h7xx_ll_usart.h"
+#undef GPIO_PULLDOWN
+#undef GPIO_PULLUP
+
+#include "drivers/clock.h"
+#include "drivers/dma.h"
+#include "drivers/gpio.h"
+#include "drivers/ofw_platform_bus.h"
+#include "stm32/stm32_queue.h"
 
 #define UART_FIFO_SIZE 8
 #define UART_INPUT_BUFSZ 1200
@@ -46,6 +49,7 @@ struct stm32h7_uart {
     struct dma_chan *tx;
     struct dma_chan *rx;
     struct dma_circle_queue *rxq;
+    struct gpio_pin *rs485;
 };
 
 #define stm32h7_uart_context(_base) \
@@ -284,10 +288,17 @@ static void __isr stm32h7_uart_isr(void *arg) {
         stm32h7_uart_rx_isr_process(uart, reg);
     if (status & USART_ISR_TXFE) 
         stm32h7_uart_tx_isr_process(uart, reg);
+    if (status & USART_ISR_TC) {
+        _Assert(uart->rs485 != NULL);
+        gpiod_pin_deassert(uart->rs485);
+    }
 }
 
 static void stm32h7_uart_intr_enable(struct stm32h7_uart *uart) {
     uint32_t mask = 0, cr1 = 0;
+
+    if (uart->rs485)
+        mask |= USART_ISR_TC;
     if (!uart->tx)
         mask |= USART_ISR_TXFE;
     if (uart->rx) {
@@ -403,6 +414,12 @@ static bool stm32h7_uart_set_termios(rtems_termios_device_context *base,
 static void stm32h7_uart_write(rtems_termios_device_context *base,
     const char *buf, size_t len) {
     struct stm32h7_uart *uart = stm32h7_uart_context(base);
+
+    if (uart->rs485) {
+        gpiod_pin_assert(uart->rs485);
+        uart->reg->ICR = USART_ISR_TC;
+        uart->reg->CR1 |= USART_CR1_TCIE;
+    }
     if (uart->tx) 
         stm32h7_uart_dma_transmit(uart, buf, len);
     else
@@ -525,6 +542,8 @@ static int stm32h7_uart_extprobe(struct drvmgr_dev *dev) {
             uart->rx = NULL;
         }
     }
+
+    uart->rs485 = __ofw_gpios_request(devp->np, "rs485-dir", GPIO_OUTPUT, NULL);
     rtems_termios_bufsize(UART_INPUT_BUFSZ, UART_INPUT_BUFSZ, 
     UART_OUTPUT_BUSSZ);
     return 0;

@@ -143,6 +143,8 @@ static inline bool gpiod_is_active(struct gpio_pin *pin) {
 }
 
 #ifdef CONFIG_OFW
+struct gpio_pin *__ofw_gpios_request(phandle_t np, const char *prop, 
+    uint32_t flags, int *groups);
 struct gpio_pin *ofw_cs_gpios_request(phandle_t np, uint32_t flags, int *ngroups);
 struct gpio_pin *ofw_gpios_request(phandle_t np, uint32_t flags, int *ngroups);
 #endif

@@ -6,7 +6,6 @@
 #include <rtems/bspIo.h>
 #include <rtems/sysinit.h>
 #include <bsp/irq-generic.h>
-#include <sys/errno.h>
 
 #include "stm32h7xx_ll_gpio.h"
 #include "stm32h7xx_ll_exti.h"

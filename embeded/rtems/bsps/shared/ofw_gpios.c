@@ -17,7 +17,7 @@
 #define devdbg(...)
 #endif /* OFW_GPIO_DEBUG */
 
-static struct gpio_pin *__ofw_gpios_request(phandle_t np, const char *prop, 
+struct gpio_pin *__ofw_gpios_request(phandle_t np, const char *prop, 
     uint32_t flags, int *groups) {
     struct gpio_pin *pin_group;
     int len, unit;
