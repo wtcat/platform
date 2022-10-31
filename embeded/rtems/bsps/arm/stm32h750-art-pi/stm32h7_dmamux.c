@@ -194,13 +194,14 @@ static struct dma_mem_descriptor *dmamux_memcpy_prepare(struct drvmgr_dev *dev, 
     blk->dest_addr_adj = DMA_ADDR_ADJ_INCREMENT;
     blk->source_address = (dma_addr_t)src;
     blk->source_addr_adj = DMA_ADDR_ADJ_INCREMENT;
+	blk->fifo_mode_control = 3;
 	
     cfg = &desc->head;
     cfg->channel_direction = MEMORY_TO_MEMORY;
     cfg->dma_slot = 0; /* m2m */
     cfg->dest_data_size = 1;
-    cfg->dest_burst_length = 1;
-    cfg->source_burst_length = 1;
+    cfg->dest_burst_length = 4;
+    cfg->source_burst_length = 4;
     cfg->source_data_size = 1;
     cfg->block_count = 1;
     cfg->head_block = blk;

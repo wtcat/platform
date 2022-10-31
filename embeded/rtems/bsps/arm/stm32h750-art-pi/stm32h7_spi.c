@@ -1,10 +1,12 @@
 /*
  * Copyright 2022 wtcat
  */
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <rtems.h>
 #include <rtems/malloc.h>
-#include <sys/errno.h>
 
 #include "drivers/clock.h"
 #include "drivers/dma.h"
@@ -16,25 +18,40 @@
 #include "stm32h7xx_ll_spi.h"
 #include "stm32h7xx_ll_rcc.h"
 
+#define SPI_DEBUG
+
 struct stm32h7_spi {
     spi_bus bus;
     rtems_id thread;
     const spi_ioc_transfer *msg;
     struct drvmgr_dev *dev;
-    size_t msg_todo;
-    size_t todo;
-    int in_transfer;
-    uint8_t *rxbuf;
-    const uint8_t *txbuf;
+    uint8_t *rx_buf;
+    const uint8_t *tx_buf;
+    size_t tx_len;
+    size_t rx_len;
+    size_t cur_xferlen;
     SPI_TypeDef *reg;
-    int cs_num;
     struct gpio_pin *cs_gpios;
     struct dma_chan *tx;
     struct dma_chan *rx;
     struct drvmgr_dev *clk;
     int clkid;
     int irq;
+    int error;
+    int cs_num;
+    bool cur_usedma;
 };
+
+#define STM32_SPI_TX_COMPLETE RTEMS_EVENT_25
+#define STM32_SPI_RX_COMPLETE RTEMS_EVENT_26 
+
+#define STM32H7_FIFO_SIZE 16
+
+#ifdef SPI_DEBUG
+#define devdbg(fmt, ...) printk(fmt, ##__VA_ARGS__)
+#else
+#define devdbg(...)
+#endif
 
 static const uint32_t div_table[] = {
     0xFFFFFFFF,
@@ -74,9 +91,295 @@ static inline void stm32h7_spi_clr_cs(struct gpio_pin *cs_gpios, int cs) {
     gpiod_pin_deassert(&cs_gpios[cs]);
 }
 
-static void stm32h7_spi_transfer_complete(struct stm32h7_spi *priv) {
-    LL_SPI_DisableIT_EOT(priv->reg);
-    rtems_event_transient_send(priv->thread);
+static inline bool stm32h7_spi_can_dma(const spi_ioc_transfer *msg) {
+	return msg->len > STM32H7_FIFO_SIZE;
+}
+
+static void stm32h7_spi_write_txfifo(struct stm32h7_spi *spi, SPI_TypeDef *reg) {
+	while (spi->tx_len > 0 && (reg->SR & SPI_SR_TXP)) {
+		uint32_t offs = spi->cur_xferlen - spi->tx_len;
+
+		if (spi->tx_len >= sizeof(uint32_t)) {
+            reg->TXDR = *(const uint32_t *)(spi->tx_buf + offs);
+			spi->tx_len -= sizeof(uint32_t);
+		} else if (spi->tx_len >= sizeof(uint16_t)) {
+            reg->TXDR = *(const uint16_t *)(spi->tx_buf + offs);
+			spi->tx_len -= sizeof(uint16_t);
+		} else {
+            reg->TXDR = *(const uint8_t *)(spi->tx_buf + offs);
+			spi->tx_len -= sizeof(uint8_t);
+		}
+	}
+	devdbg("%s: %d bytes left\n", __func__, spi->tx_len);
+}
+
+static void stm32h7_spi_read_rxfifo(struct stm32h7_spi *spi, SPI_TypeDef *reg, bool flush) {
+    uint32_t sr = reg->SR;
+    uint32_t rxplvl = (sr & SPI_SR_RXPLVL_Msk) >> SPI_SR_RXPLVL_Pos;
+    int bpw = spi->bus.bits_per_word;
+    
+	while (spi->rx_len > 0 && 
+        ((sr & SPI_SR_RXP) || (flush && ((sr & SPI_SR_RXWNE) || rxplvl > 0)))) {
+		uint32_t offs = spi->cur_xferlen - spi->rx_len;
+
+		if ((spi->rx_len >= sizeof(uint32_t)) ||
+            (flush && (sr & SPI_SR_RXWNE))) {
+			uint32_t *rx_buf32 = (uint32_t *)(spi->rx_buf + offs);
+			*rx_buf32 = reg->RXDR;
+			spi->rx_len -= sizeof(uint32_t);
+
+		} else if (spi->rx_len >= sizeof(uint16_t) ||
+            (flush && (rxplvl >= 2 || bpw > 8))) {
+			uint16_t *rx_buf16 = (uint16_t *)(spi->rx_buf + offs);
+			*rx_buf16 = (uint16_t)reg->RXDR;
+			spi->rx_len -= sizeof(uint16_t);
+
+		} else {
+			uint8_t *rx_buf8 = (uint8_t *)(spi->rx_buf + offs);
+			*rx_buf8 = (uint8_t)reg->RXDR;
+			spi->rx_len -= sizeof(uint8_t);
+		}
+        sr = reg->SR;
+        rxplvl = (sr & SPI_SR_RXPLVL_Msk) >> SPI_SR_RXPLVL_Pos;
+	}
+
+	devdbg("%s: %d bytes left\n", __func__, spi->rx_len);
+}
+
+static void stm32h7_spi_disable(struct stm32h7_spi *spi, SPI_TypeDef *reg) {
+    if (!spi->cur_usedma) {
+        if (spi->rx_buf && spi->rx_len > 0)
+            stm32h7_spi_read_rxfifo(spi, reg, true);
+    } else {
+        if (spi->tx)
+            dma_chan_stop(spi->tx);
+        if (spi->rx)
+            dma_chan_stop(spi->rx);
+    }
+    reg->CR1 &= ~SPI_CR1_SPE;
+    reg->CFG1 &= ~(SPI_CFG1_RXDMAEN | SPI_CFG1_TXDMAEN);
+
+    /* Disable interrupts and clear status flags */
+    reg->IER = 0;
+    reg->IFCR |= SPI_IER_RXPIE | SPI_IER_TXPIE | SPI_IER_DXPIE | 
+                SPI_IER_EOTIE | SPI_IER_TXTFIE | SPI_IER_UDRIE |
+                SPI_IER_OVRIE | SPI_IER_CRCEIE | SPI_IER_TIFREIE |
+                SPI_IER_MODFIE | SPI_IER_TSERFIE;
+    (void) spi;
+}
+
+static void __isr stm32h7_spi_isr(void *arg) {
+    struct stm32h7_spi *spi = (struct stm32h7_spi *)arg;
+    SPI_TypeDef *reg = spi->reg;
+    uint32_t ier = reg->IER;
+    uint32_t sr = ier & reg->SR;
+
+    /* SPI bus error */
+    if (sr & (SPI_SR_MODF | SPI_SR_OVR | SPI_SR_TIFRE | SPI_SR_UDR)) {
+        stm32h7_spi_stop(spi, reg);
+        spi->todo = 0;
+        printk("%s: SPI bus error\n", __func__);
+        return;
+    }
+    if (sr & SPI_SR_DXP) {
+
+    }
+    if (sr & SPI_SR_RXP) {
+
+    }
+    if (sr & SPI_SR_TXP) {
+
+    }
+    if (sr & SPI_SR_EOT) {
+        reg->IFCR = SPI_IFCR_EOTC | SPI_IFCR_TXTFC | SPI_IFCR_SUSPC;
+        reg->IER &= ~SPI_IER_EOTIE;
+    }
+}
+
+static void __isr stm32h7_spi_dmatx_isr(struct drvmgr_dev *dev, void *arg, 
+	uint32_t channel, int status) {
+    struct stm32h7_spi *spi = (struct stm32h7_spi *)arg;
+    spi->error |= status;
+    rtems_event_system_send(spi->thread, STM32_SPI_TX_COMPLETE);
+    (void) dev;
+    (void) channel;
+}
+
+static void __isr stm32h7_spi_dmarx_isr(struct drvmgr_dev *dev, void *arg, 
+	uint32_t channel, int status) {
+    struct stm32h7_spi *spi = (struct stm32h7_spi *)arg;
+    spi->error |= status;
+    rtems_event_system_send(spi->thread, STM32_SPI_RX_COMPLETE);
+    (void) dev;
+    (void) channel;
+}
+
+static int stm32h7_spi_dma_configure(struct stm32h7_spi *spi, int bits_per_word) {
+    int ret;
+    if (spi->tx) {
+        struct dma_config *config = &spi->tx->config;
+        struct dma_chan *tx = spi->tx;
+        struct dma_block_config txblk = {0};
+
+        config->channel_direction = MEMORY_TO_PERIPHERAL;
+        config->dest_data_size = bits_per_word >> 3;
+        config->dest_burst_length = 4;
+        config->source_data_size = bits_per_word >> 3;
+        config->source_burst_length = 4;
+        config->channel_priority = 0;
+        config->dma_callback = stm32h7_spi_dmatx_isr;
+        config->user_data = spi;
+        config->head_block = &txblk;
+        config->block_count = 1;
+
+        txblk.block_size = 1;
+        txblk.source_address = (dma_addr_t)0;
+        txblk.source_addr_adj = DMA_ADDR_ADJ_INCREMENT;
+        txblk.dest_address = (dma_addr_t)&spi->reg->TXDR;
+        txblk.dest_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
+        txblk.fifo_mode_control = 1;
+        ret = dma_configure(tx->dev, tx->channel, &tx->config);
+        if (ret) {
+            printk("Configure UART(%s) DMA-TX failed: %d\n", spi->dev->name, ret);
+            goto _free_chan;
+        }
+    }
+    if (spi->rx) {
+        struct dma_config *config = &spi->rx->config;
+        struct dma_chan *rx = spi->rx;
+        struct dma_block_config rxblk = {0};
+
+        config->channel_direction = PERIPHERAL_TO_MEMORY;
+        config->dest_data_size = bits_per_word >> 3;
+        config->dest_burst_length = 4;
+        config->source_data_size = bits_per_word >> 3;
+        config->source_burst_length = 4;
+        config->complete_callback_en = 1;
+        config->channel_priority = 1;
+        config->dma_callback = stm32h7_spi_dmarx_isr;
+        config->user_data = spi;
+        config->head_block = &rxblk;
+        config->block_count = 1;
+
+        rxblk.block_size = 0;
+        rxblk.source_address = (dma_addr_t)&spi->reg->RXDR;
+        rxblk.source_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
+        rxblk.dest_address = (dma_addr_t)0;
+        rxblk.dest_addr_adj = DMA_ADDR_ADJ_INCREMENT;
+        rxblk.fifo_mode_control = 1;
+        ret = dma_configure(rx->dev, rx->channel, &rx->config);
+        if (ret) {
+            printk("Configure UART(%s) DMA-RX failed: %d\n", spi->dev->name, ret);
+            goto _free_chan;
+        }
+    }
+    return 0;
+
+_free_chan:
+    if (spi->rx) {
+        dma_release_channel(spi->rx->dev, spi->rx->channel);
+        spi->rx = NULL;
+    }
+    if (spi->tx) {
+        dma_release_channel(spi->tx->dev, spi->tx->channel);
+        spi->tx = NULL;
+    }
+    return ret;
+}
+
+static int stm32h7_spi_dma_txrx_start(struct stm32h7_spi *spi, const void *txbuf, 
+    void *rxbuf, size_t size) {
+    size_t xmit_size = min_t(size_t, size, 65535);
+    SPI_TypeDef *reg = spi->reg;
+    int ret;
+    
+    //TODO: Fix size
+    /* Start spi dma-rx */
+    ret = dma_chan_reload(spi->rx, (dma_addr_t)&reg->RXDR, 
+        (dma_addr_t)rxbuf, xmit_size);
+    if (ret) {
+        printk("%s: start rx-dma failed(%d)\n", __func__, ret);
+        return ret;
+    }
+    LL_SPI_EnableDMAReq_RX(reg);
+
+    /* Start spi dma-tx */
+    ret = dma_chan_reload(spi->tx, (dma_addr_t)txbuf, 
+        (dma_addr_t)&reg->TXDR, xmit_size);
+    if (ret) {
+        printk("%s: start tx-dma failed(%d)\n", __func__, ret);
+        return ret;
+    }
+    LL_SPI_SetTransferSize(reg, xmit_size);
+    LL_SPI_EnableDMAReq_TX(reg);
+
+    /* Enable spi error interrupt */
+    reg->IER |= SPI_IER_OVRIE | SPI_IT_UDR | SPI_IER_TIFREIE | SPI_IER_MODFIE;
+
+    /* Enable SPI */
+    LL_SPI_Enable(reg);
+    LL_SPI_StartMasterTransfer(reg);
+    return xmit_size;
+}
+
+static ssize_t stm32h7_spi_dma_tx_start(struct stm32h7_spi *spi, const void *txbuf, 
+    size_t size) {
+    size_t xmit_size = min_t(size_t, size, 65535);
+    SPI_TypeDef *reg = spi->reg;
+    
+
+    //TODO: Fix size
+    /* Start spi dma-tx */
+    int ret = dma_chan_reload(spi->tx, (dma_addr_t)txbuf, 
+        (dma_addr_t)&reg->TXDR, xmit_size);
+    if (ret) {
+        printk("%s: start tx-dma failed(%d)\n", __func__, ret);
+        return ret;
+    }
+    LL_SPI_SetTransferSize(reg, size);
+    LL_SPI_EnableDMAReq_TX(reg);
+
+    /* Enable SPI */
+    LL_SPI_Enable(reg);
+    LL_SPI_StartMasterTransfer(reg);
+    return xmit_size;
+}
+
+static int stm32h7_spi_dma_rx_start(struct stm32h7_spi *spi, void *rxbuf, 
+    size_t size) {
+    size_t xmit_size = min_t(size_t, size, 65535);
+    SPI_TypeDef *reg = spi->reg;
+
+    /* Start spi dma-rx */
+    int ret = dma_chan_reload(spi->rx, (dma_addr_t)&reg->RXDR, 
+        (dma_addr_t)rxbuf, xmit_size);
+    if (ret) {
+        printk("%s: start rx-dma failed(%d)\n", __func__, ret);
+        return ret;
+    }
+    LL_SPI_EnableDMAReq_RX(reg);
+
+    /* Enable SPI */
+    LL_SPI_Enable(reg);
+    LL_SPI_StartMasterTransfer(reg);
+    return xmit_size;
+}
+
+static int stm32h7_spi_txrx_start(struct stm32h7_spi *spi, const void *txbuf, 
+    void *rxbuf, size_t size) {
+
+    spi->dma_txrx = false;
+    return 0;
+}
+
+static int stm32h7_spi_tx_start(struct stm32h7_spi *spi, const void *txbuf, size_t size) {
+    spi->dma_txrx = false;
+    return 0;
+}
+
+static int stm32h7_spi_rx_start(struct stm32h7_spi *spi, void *rxbuf, size_t size) {
+    spi->dma_txrx = false;
+    return 0;
 }
 
 static int stm32h7_spi_configure(struct stm32h7_spi *spi,
@@ -138,6 +441,77 @@ static int stm32h7_spi_configure(struct stm32h7_spi *spi,
     return 0;
 }
 
+static int stm32h7_spi_transmit_one(struct stm32h7_spi *spi, spi_bus *bus, 
+    const spi_ioc_transfer *msg) {
+    rtems_event_set evout, evin;
+    int bytes;
+    int err;
+
+    /* Update SPI-BUS configuration */
+    if (msg->speed_hz != bus->speed_hz || 
+        msg->mode != bus->mode || 
+        msg->bits_per_word != bus->bits_per_word) {
+        err = stm32h7_spi_configure(spi, msg->speed_hz, msg->mode, 
+            msg->bits_per_word);
+        if (err) {
+            printk("%s: configure %s failed(%d)\n", __func__, spi->dev->name, err);
+            return err;
+        }
+
+        bus->speed_hz = msg->speed_hz;
+        bus->mode = msg->mode;
+        bus->bits_per_word = msg->bits_per_word;
+    }
+
+    /* Copy paramters */
+    spi->todo = msg->len;
+    spi->txbuf = msg->tx_buf;
+    spi->rxbuf = msg->rx_buf;
+    spi->in_transfer = 0;
+    stm32h7_spi_set_cs(spi->cs_gpios, msg->cs);
+
+    while (spi->todo > 0) {
+        size_t xmit_size = min_t(size_t, spi->todo, 65535);
+
+        if (spi->txbuf && spi->rxbuf) {
+            if (spi->tx && spi->rx)
+                bytes = stm32h7_spi_dma_txrx_start(spi, spi->txbuf, spi->rxbuf, xmit_size);
+            else
+                bytes = stm32h7_spi_txrx_start(spi, spi->txbuf, spi->rxbuf, xmit_size);
+            evin = STM32_SPI_TX_COMPLETE | STM32_SPI_RX_COMPLETE;
+            spi->rxbuf += bytes;
+            spi->txbuf += bytes;
+        } else if (spi->txbuf) {
+            if (spi->tx)
+                bytes = stm32h7_spi_dma_tx_start(spi, spi->txbuf, xmit_size);
+            else
+                bytes = stm32h7_spi_tx_start(spi, spi->txbuf, xmit_size);
+            evin = STM32_SPI_TX_COMPLETE;
+            spi->txbuf += bytes;
+        } else {
+            if (spi->rx)
+                bytes = stm32h7_spi_dma_rx_start(spi, spi->rxbuf, xmit_size);
+            else
+                bytes = stm32h7_spi_rx_start(spi, spi->rxbuf, xmit_size);
+            evin = STM32_SPI_RX_COMPLETE;
+            spi->rxbuf += bytes;
+        }
+        if (bytes < 0) {
+            printk("%s: spi message transmit failed(%d)\n", __func__, err);
+            break;
+        }
+
+        spi->todo -= bytes;
+        /* Wait transfer complete */
+        rtems_event_system_receive(evin, RTEMS_EVENT_ALL | RTEMS_WAIT, 
+        RTEMS_NO_TIMEOUT, &evout);
+        (void) evout;
+    }
+    stm32h7_spi_clr_cs(spi->cs_gpios, msg->cs);
+
+    return err;
+}
+
 static int stm32h7_spi_setup(spi_bus *bus) {
     struct stm32h7_spi *spi = (struct stm32h7_spi *)bus;
     if (bus->max_speed_hz < bus->speed_hz)
@@ -146,55 +520,24 @@ static int stm32h7_spi_setup(spi_bus *bus) {
         return -EINVAL;
 
     return stm32h7_spi_configure(spi, bus->max_speed_hz, 
-    bus->mode, bus->bits_per_word);
-}
-
-static void stm32h7_spi_next_message(struct stm32h7_spi *spi) {
-    if (spi->msg_todo > 0) {
-        const spi_ioc_transfer *msg = spi->msg;
-        spi_bus *bus = &spi->bus;
-        if (msg->speed_hz != bus->speed_hz || 
-            msg->mode != bus->mode || 
-            msg->bits_per_word != bus->bits_per_word) {
-            stm32h7_spi_configure(spi, msg->speed_hz, msg->mode, 
-            msg->bits_per_word);
-        }
-        spi->todo = msg->len;
-        spi->txbuf = msg->tx_buf;
-        spi->rxbuf = msg->rx_buf;
-
-        stm32h7_spi_set_cs(spi->cs_gpios, msg->cs);
-        /* xxxxxxxxxxxx */
-    } else {
-        stm32h7_spi_transfer_complete(spi);
-    }
-}
-
-static void stm32h7_spi_isr(void *arg) {
-    struct stm32h7_spi *spi = (struct stm32h7_spi *)arg;
-
-    if (spi->todo > 0) {
-
-    } else if (spi->in_transfer > 0) {
-
-    } else {
-        if (spi->msg->cs_change)
-            stm32h7_spi_clr_cs(spi->cs_gpios, spi->msg->cs);
-        spi->msg_todo--;
-        spi->msg++;
-        stm32h7_spi_next_message(spi);
-    }
+        bus->mode, bus->bits_per_word);
 }
 
 static int stm32h7_spi_transfer(spi_bus *bus, const spi_ioc_transfer *msgs, 
     uint32_t n) {
     struct stm32h7_spi *spi = (struct stm32h7_spi *)bus;
-    spi->msg_todo = n;
+    int err = -EINVAL;
+
     spi->msg = &msgs[0];
     spi->thread = rtems_task_self();
-    stm32h7_spi_next_message(spi);
-    rtems_event_transient_receive(RTEMS_WAIT, RTEMS_NO_TIMEOUT);
-    return 0;
+    while (n > 0) {
+        err = stm32h7_spi_transmit_one(spi, bus, spi->msg);
+        if (err)
+            break;
+        spi->msg++;
+        n--;
+    };
+    return err;
 }
 
 static void stm32h7_spi_destroy(spi_bus *bus) {
@@ -278,6 +621,7 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
     spi->bus.mode = SPI_MODE_0;
     spi->bus.max_speed_hz = LL_RCC_GetSPIClockFreq(clksrc) / 2;
     spi->bus.speed_hz = 1000000;
+    spi->bus.cs = UINT8_MAX;
 	ret = spi_bus_register(&spi->bus, dev->name);
 	if (ret) {
 		drvmgr_interrupt_unregister(dev, IRQF_HARD(spi->irq), 

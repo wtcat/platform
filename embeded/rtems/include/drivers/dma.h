@@ -428,6 +428,38 @@ void dma_release_channel(struct drvmgr_dev *dev, uint32_t channel);
  */
 int dma_context_init(struct dma_context *ctx, uint32_t max_channels);
 	
+/*
+ * DMA Channel public interface
+ */
+static inline int dma_chan_configure(struct dma_chan *chan, struct dma_config *config) {
+	return dma_configure(chan->dev, chan->channel, config);
+}
+
+static inline int dma_chan_reload(struct dma_chan *chan, dma_addr_t src, 
+	dma_addr_t dst, size_t size) {
+	return dma_reload(chan->dev, chan->channel, src, dst, size);
+}
+
+static inline int dma_chan_start(struct dma_chan *chan) {
+	return dma_start(chan->dev, chan->channel);
+}
+
+static inline int dma_chan_stop(struct dma_chan *chan) {
+	return dma_stop(chan->dev, chan->channel);
+}
+
+static inline int dma_chan_get_status(struct dma_chan *chan, 
+	struct dma_status *stat) {
+	return dma_get_status(chan->dev, chan->channel, stat);
+}
+
+static inline bool dma_chan_do_filter(struct dma_chan *chan, void *param) {
+	return dma_chan_filter(chan->dev, chan->channel, param);
+}
+
+/*
+ * OFW public inteface
+ */
 #ifdef CONFIG_OFW
 struct dma_chan *ofw_dma_chan_request(phandle_t np, const char *name, 
     pcell_t *pcell, size_t maxsize);
