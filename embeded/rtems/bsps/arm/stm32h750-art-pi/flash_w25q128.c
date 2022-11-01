@@ -52,6 +52,41 @@ static int flash_spi_xfer(struct flash_private *priv, const void *tx_buf,
     return spi_master_transfer(priv->spi_master, &msg, 1);
 }
 
+static int flash_spi_write_and_read(struct flash_private *priv, const void *tx_buf, 
+    size_t tx_len, void *rx_buf, size_t rx_len) {
+    spi_ioc_transfer msgs[] = {
+        {
+            .len = (uint16_t)tx_len,
+            .tx_buf = tx_buf,
+            .rx_buf = NULL,
+            .cs_change = true,
+            .cs = 0,
+            .bits_per_word = 8,
+            .mode = SPI_MODE_0,
+            .speed_hz = priv->max_freq,
+            .delay_usecs = 0
+        },{
+            .len = (uint16_t)rx_len,
+            .tx_buf = NULL,
+            .rx_buf = rx_buf,
+            .cs_change = true,
+            .cs = 0,
+            .bits_per_word = 8,
+            .mode = SPI_MODE_0,
+            .speed_hz = priv->max_freq,
+            .delay_usecs = 0
+        }
+    };
+    return spi_master_transfer(priv->spi_master, msgs, 2);
+}
+
+static uint32_t flash_read_id(struct flash_private *priv) {
+    uint8_t cmd[] = {0x90, 0, 0, 0};
+    uint16_t id = 0;
+
+    flash_spi_write_and_read()
+}
+
 static int flash_read(struct flash_private *priv, rtems_blkdev_request *r) {
     rtems_blkdev_request_done(r, 0);
 }
