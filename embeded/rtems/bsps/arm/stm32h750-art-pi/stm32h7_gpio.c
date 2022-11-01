@@ -81,13 +81,13 @@ static int stm32_flags_to_conf(int flags, int *pincfg) {
 	} else {
 		*pincfg = STM32_MODER_ANALOG_MODE;
 	}
-    *pincfg |= STM32_OSPEEDR_MEDIUM_SPEED;
+    *pincfg |= STM32_OSPEEDR_HIGH_SPEED;
 	return 0;
 }
 
 int stm32_gpio_to_portno(struct drvmgr_dev *dev) {
     struct stm32h7_gpio *priv;
-    if (dev == NULL || dev->priv)
+    if (!dev || !dev->priv)
         return -EINVAL;
     priv = dev->priv;
     return priv->port;
@@ -457,7 +457,8 @@ static int stm32_gpio_preprobe(struct drvmgr_dev *dev) {
 
     if (!rtems_ofw_has_prop(devp->np, "gpio-controller"))
         return -EINVAL;
-    if (rtems_ofw_get_prop(devp->np, "st,bank-name", bank_name, sizeof(bank_name)) < 0)
+    if (rtems_ofw_get_prop(devp->np, "st,bank-name", 
+		bank_name, sizeof(bank_name)) < 0)
         return -ENOSTR;
     priv = rtems_calloc(1, sizeof(struct stm32h7_gpio));
     if (priv == NULL) 
@@ -467,6 +468,7 @@ static int stm32_gpio_preprobe(struct drvmgr_dev *dev) {
         free(priv);
         ret = -ENOSTR;
     }
+
     priv->port = bank_name[4] - 'A';
     priv->gpio = (GPIO_TypeDef *)reg.start;
     priv->exti = &exti_controller;

@@ -16,6 +16,7 @@
 #undef GPIO_PULLUP
 
 #include "drivers/clock.h"
+#include "drivers/pinctrl.h"
 #include "drivers/dma.h"
 #include "drivers/spi.h"
 #include "drivers/gpio.h"
@@ -70,17 +71,22 @@ static int stm32h7_spi_get_clksrc(const char *devname, uint32_t *clksrc) {
         return -EINVAL;
     if (strncmp("/dev/spi", devname, 8))
         return -EINVAL;
+
     int id = devname[8] - '0';
     switch(id) {
     case 1 ... 3:
-        return LL_RCC_SPI123_CLKSOURCE;
+        *clksrc = LL_RCC_SPI123_CLKSOURCE;
+        break;
     case 4 ... 5:
-        return LL_RCC_SPI45_CLKSOURCE;
+        *clksrc = LL_RCC_SPI45_CLKSOURCE;
+        break;
     case 6:
-        return LL_RCC_SPI6_CLKSOURCE;
+        *clksrc = LL_RCC_SPI6_CLKSOURCE;
+        break;
     default:
         return -EINVAL;
     }
+    return 0;
 }
 
 static inline void stm32h7_spi_set_cs(struct gpio_pin *cs_gpios, int cs) {
@@ -562,18 +568,22 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
     struct stm32h7_spi *spi = dev->priv;
     uint32_t clksrc = 0;
     int ret = -EINVAL;
-
+devdbg("%s: \n", __func__);
     if (stm32h7_spi_get_clksrc(dev->name, &clksrc)) {
         printk("%s: Invalid device name (%s)\n", __func__, dev->name);
         return -EINVAL;
     }
     //TODO: Allocate muli-gpios
     spi->cs_gpios = ofw_cs_gpios_request(devp->np, 0, &spi->cs_num);
-    if (!spi->cs_gpios) 
+    if (!spi->cs_gpios) {
+        printk("%s: reqeust gpio_cs failed!\n", __func__);
         return -ENOSTR;
+    }
+
     spi->clk = ofw_clock_request(devp->np, NULL, (pcell_t *)&spi->clkid, 
         sizeof(spi->clkid));
     if (!spi->clk) {
+        printk("%s: reqeust clock failed!\n", __func__);
         ret = -ENODEV;
         goto _free_cs;
     }
@@ -582,11 +592,6 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
     if (ret) {
         printk("%s register IRQ(%d) failed\n", dev->name, spi->irq);
         goto _free;
-    }
-    ret = stm32_pinctrl_set(dev);
-    if (ret) {
-        printk("%s configure pins failed: %d\n", dev->name, ret);
-        goto _free_cs;
     }
 
     spi_bus_init(&spi->bus);
@@ -603,6 +608,7 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
 	if (ret) {
 		drvmgr_interrupt_unregister(dev, IRQF_HARD(spi->irq), 
             stm32h7_spi_isr, spi);
+        printk("%s: install interrupt failed!\n", __func__);
         goto _free_cs;
     }
     /* Enable clock */
@@ -621,6 +627,18 @@ static int stm32h7_spi_extprobe(struct drvmgr_dev *dev) {
     struct dev_private *devp = device_get_private(dev);
     struct stm32h7_spi *spi = dev->priv;
     pcell_t specs[3];
+devdbg("%s: \n", __func__);    
+    int ret = pinctrl_simple_set("/dev/pinctrl", dev);
+    if (ret) {
+        printk("%s: %s configure pins failed: %d\n", __func__, 
+            dev->name, ret);
+		drvmgr_interrupt_unregister(dev, IRQF_HARD(spi->irq), 
+            stm32h7_spi_isr, spi);
+        clk_disable(spi->clk, &spi->clkid);
+        spi_bus_destroy(&spi->bus);
+        free(spi);
+        return ret;
+    }
 
     spi->tx = ofw_dma_chan_request(devp->np, "tx", 
         specs, sizeof(specs));

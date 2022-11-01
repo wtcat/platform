@@ -19,7 +19,7 @@ struct flash_info {
 
 struct flash_private {
     rtems_mutex lock;
-    struct drvmgr_dev *spi_master;
+    struct drvmgr_dev *master;
     uint32_t max_freq;
     const struct flash_info *info;
 };
@@ -49,7 +49,7 @@ static int flash_spi_xfer(struct flash_private *priv, const void *tx_buf,
         .speed_hz = priv->max_freq,
         .delay_usecs = 0
     };
-    return spi_master_transfer(priv->spi_master, &msg, 1);
+    return spi_master_transfer(priv->master, &msg, 1);
 }
 
 static int flash_spi_write_and_read(struct flash_private *priv, const void *tx_buf, 
@@ -77,22 +77,28 @@ static int flash_spi_write_and_read(struct flash_private *priv, const void *tx_b
             .delay_usecs = 0
         }
     };
-    return spi_master_transfer(priv->spi_master, msgs, 2);
+    return spi_master_transfer(priv->master, msgs, 2);
 }
 
 static uint32_t flash_read_id(struct flash_private *priv) {
     uint8_t cmd[] = {0x90, 0, 0, 0};
     uint16_t id = 0;
 
-    flash_spi_write_and_read()
+    if (flash_spi_write_and_read(priv, cmd, sizeof(cmd), &id, 2) > 0)
+        return id;
+    return 0;
 }
 
 static int flash_read(struct flash_private *priv, rtems_blkdev_request *r) {
     rtems_blkdev_request_done(r, 0);
+    (void) priv;
+    return 0;
 }
 
 static int flash_write(struct flash_private *priv, rtems_blkdev_request *r) {
     rtems_blkdev_request_done(r, 0);
+    (void) priv;
+    return 0;
 }
 
 static int flash_ioctl(rtems_disk_device *dd, uint32_t req, void *arg) {
@@ -130,24 +136,27 @@ static int flash_preprobe(struct drvmgr_dev *dev) {
 
     id = ofw_device_match(dev, id_table);
     priv->max_freq = (uint32_t)prop;
-    priv->spi_master = dev->parent->dev;
+    priv->master = dev->parent->dev;
     priv->info = id->data;
     dev->priv = priv;
     return 0;
 }
 
 static int flash_probe(struct drvmgr_dev *dev) {
-    struct flash_private *priv = dev->priv;
-    rtems_status_code sc;
+    // struct flash_private *priv = dev->priv;
+    // rtems_status_code sc;
 
-    sc = rtems_blkdev_create(dev->name, priv->blksize, 
-    priv->phy_size / priv->blksize, flash_ioctl, priv);
-    if (sc != RTEMS_SUCCESSFUL) {
-        printk("%s: create blkdev(%s) failed(%s)\n", __func__, 
-            dev->name, rtems_status_text(sc));
-        return -EFAULT;
-    }
+    // printk("** FLASH ID: %d***\n", flash_read_id(priv));
+    
+    // sc = rtems_blkdev_create(dev->name, priv->blksize, 
+    // priv->phy_size / priv->blksize, flash_ioctl, priv);
+    // if (sc != RTEMS_SUCCESSFUL) {
+    //     printk("%s: create blkdev(%s) failed(%s)\n", __func__, 
+    //         dev->name, rtems_status_text(sc));
+    //     return -EFAULT;
+    // }
 
+    (void) dev;
     return 0;
 }
 

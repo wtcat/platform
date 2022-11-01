@@ -18,9 +18,12 @@ component("board") {
     "stm32h7_uart.c",
     "stm32h7_spi.c",
     "stm32h7_leds.c",
-    "gpio-keys.c"
+    "gpio-keys.c",
+    "flash_w25q128.c"
   ]
-  sources += ["stm32_queue.c"]
+  sources += [
+    "stm32_queue.c"
+  ]
 
   deps = [
     "//embeded/rtems/bsps/arm/shared",

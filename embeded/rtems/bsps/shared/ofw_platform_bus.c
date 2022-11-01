@@ -34,9 +34,9 @@ static struct drvmgr_dev *device_from_private(struct dev_private *priv) {
 
 const struct dev_id *ofw_device_match(struct drvmgr_dev *dev, 
 	const struct dev_id *id_table) {
-	struct dev_private *priv = device_get_private(dev);
+	struct dev_private *devp = device_get_private(dev);
 	while (id_table->compatible) {
-		if (!rtems_ofw_is_node_compatible(priv->np, id_table->compatible))
+		if (rtems_ofw_is_node_compatible(devp->np, id_table->compatible))
 			return id_table;
 		id_table++;
 	}
