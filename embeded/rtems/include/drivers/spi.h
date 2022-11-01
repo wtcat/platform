@@ -21,7 +21,7 @@ static inline ssize_t spi_master_transfer(struct drvmgr_dev *dev,
     rtems_recursive_mutex_lock(&bus->mutex);
     err = bus->transfer(bus, msgs, n);
     rtems_recursive_mutex_unlock(&bus->mutex);
-    return err == 0? msgs->len: -err;
+    return err == 0? (ssize_t)msgs->len: -err;
 }
 
 static inline ssize_t spi_master_write(struct drvmgr_dev *dev, 
