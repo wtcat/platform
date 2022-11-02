@@ -253,6 +253,7 @@ static int flash_read(struct flash_private *priv, rtems_blkdev_request *r) {
     off_t offset;
     int err;
 
+    rtems_mutex_lock(&priv->lock);
     for (uint32_t n = 0; n < r->bufnum; n++) {
         offset = sg->block * priv->info->blksz;
         err = flash_read_data(priv, sg->buffer, sg->length, offset);
@@ -260,6 +261,7 @@ static int flash_read(struct flash_private *priv, rtems_blkdev_request *r) {
             break;
     }
     rtems_blkdev_request_done(r, err);
+    rtems_mutex_unlock(&priv->lock);
     return err;
 }
 
@@ -269,6 +271,7 @@ static int flash_write(struct flash_private *priv, rtems_blkdev_request *r) {
     uint32_t n;
     int err;
 
+    rtems_mutex_lock(&priv->lock);
     for (n = 0, sg = r->bufs; n < r->bufnum; n++) {
         offset = sg->block * priv->info->blksz;
         err = flash_erase_sector(priv, offset);
@@ -279,6 +282,7 @@ static int flash_write(struct flash_private *priv, rtems_blkdev_request *r) {
             break;
     }
     rtems_blkdev_request_done(r, err);
+    rtems_mutex_unlock(&priv->lock);
     return err;
 }
 
@@ -316,6 +320,7 @@ static int flash_preprobe(struct drvmgr_dev *dev) {
     if (!priv)
         return -ENOMEM;
 
+    rtems_mutex_init(&priv->lock, "w25qxx");
     id = ofw_device_match(dev, id_table);
     priv->max_freq = (uint32_t)prop;
     priv->master = dev->parent->dev;

@@ -61,11 +61,6 @@ void bsp_fatal_extension(rtems_fatal_source source, bool unused,
         source == INTERNAL_ERROR_CORE ) {
         const rtems_exception_frame *frame = (const rtems_exception_frame *)code;
         rtems_exception_frame_print(frame);
-        
-    #ifdef ARM_MULTILIB_ARCH_V7M
-    extern void bsp_cortexm_fault(const rtems_exception_frame *frame);
-        bsp_cortexm_fault(frame);
-    #endif /* ARM_MULTILIB_ARCH_V7M */
 
     #if defined(CONFIGURE_BACKTRACE) || defined(CONFIGURE_FNTRACE)
         rtems_printer printer;

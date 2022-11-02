@@ -205,7 +205,7 @@
  *   href="https://en.cppreference.com/w/c/types/integer">UINT32_MAX</a>.
  * @endparblock
  */
-#define CONFIGURE_SWAPOUT_BLOCK_HOLD 5000
+#define CONFIGURE_SWAPOUT_BLOCK_HOLD (30 * 60 * 1000u)
 
 /* Generated from spec:/acfg/if/bdbuf-swapout-swap-period */
 
@@ -229,7 +229,7 @@
  *   href="https://en.cppreference.com/w/c/types/integer">UINT32_MAX</a>.
  * @endparblock
  */
-#define CONFIGURE_SWAPOUT_SWAP_PERIOD 5000
+#define CONFIGURE_SWAPOUT_SWAP_PERIOD (30 * 60 * 1000u)
 
 /* Generated from spec:/acfg/if/bdbuf-swapout-task-priority */
 
@@ -4145,8 +4145,11 @@
  * be compliant with various standards.  These priorities range from 0 to 255.
  * @endparblock
  */
+#if defined(__rtems_bsd__)
 #define CONFIGURE_MAXIMUM_PRIORITY 127
-
+#else
+#define CONFIGURE_MAXIMUM_PRIORITY 31
+#endif
 /* Generated from spec:/acfg/if/scheduler-assignments */
 
 /**
