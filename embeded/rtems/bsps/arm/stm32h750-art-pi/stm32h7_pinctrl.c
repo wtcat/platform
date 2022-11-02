@@ -91,7 +91,7 @@ static int stm32h7_setup_pinctrl(struct drvmgr_dev *pinctrl, phandle_t np) {
             }
             devdbg("%s: configure pinmux(%s) pin(%d) speed(%d) af(%d)\n", 
                 __func__, priv->gpios[port]->name, pin, ospeed, af);
-            stm32_gpio_setup(priv->gpios[port], pin, conf, af);
+            stm32_gpio_setup(priv->gpios[port], pin, conf, af-1);
         }
     }
     return 0;
