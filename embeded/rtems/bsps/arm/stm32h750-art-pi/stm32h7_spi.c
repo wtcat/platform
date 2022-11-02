@@ -38,6 +38,7 @@ struct stm32h7_spi {
     struct dma_chan *tx;
     struct dma_chan *rx;
     struct drvmgr_dev *clk;
+    uint32_t cur_speed;
     int clkid;
     int irq;
     int error;
@@ -55,7 +56,7 @@ struct stm32h7_spi {
 #endif
 
 static const uint32_t div_table[] = {
-    0xFFFFFFFF,
+    LL_SPI_BAUDRATEPRESCALER_DIV2,
     LL_SPI_BAUDRATEPRESCALER_DIV2,
     LL_SPI_BAUDRATEPRESCALER_DIV4,
     LL_SPI_BAUDRATEPRESCALER_DIV8,
@@ -65,6 +66,36 @@ static const uint32_t div_table[] = {
     LL_SPI_BAUDRATEPRESCALER_DIV128,
     LL_SPI_BAUDRATEPRESCALER_DIV256
 };
+
+static int stm32h7_spi_prepare_mbr(struct stm32h7_spi *spi, uint32_t speed_hz,
+    uint32_t min_div, uint32_t max_div) {
+	uint32_t div, mbrdiv;
+
+	/* Ensure spi->clk_rate is even */
+	div = DIV_ROUND_UP(spi->bus.max_speed_hz, speed_hz);
+
+	/*
+	 * SPI framework set xfer->speed_hz to master->max_speed_hz if
+	 * xfer->speed_hz is greater than master->max_speed_hz, and it returns
+	 * an error when xfer->speed_hz is lower than master->min_speed_hz, so
+	 * no need to check it there.
+	 * However, we need to ensure the following calculations.
+	 */
+	if ((div < min_div) || (div > max_div)) {
+        devdbg("%s: invalid spi bus clock-rate\n", __func__);
+		return div_table[2];
+    }
+
+	/* Determine the first power of 2 greater than or equal to div */
+	if (div & (div - 1))
+		mbrdiv = fls(div);
+	else
+		mbrdiv = fls(div) - 1;
+	spi->cur_speed = spi->bus.max_speed_hz / (1 << mbrdiv);
+    devdbg("%s: current clock-rate is %d div(%d)\n", __func__, 
+        spi->cur_speed, mbrdiv);
+	return div_table[mbrdiv];
+}
 
 static int stm32h7_spi_get_clksrc(const char *devname, uint32_t *clksrc) {
     if (devname == NULL || clksrc == NULL)
@@ -192,14 +223,17 @@ static void __isr stm32h7_spi_isr(void *arg) {
         goto _end;
     }
     if (sr & SPI_SR_RXP) {
+        devdbg("%s: SPI_SR_RXP\n", __func__);
 		if (!spi->cur_usedma && (spi->rx_buf && spi->rx_len > 0))
 			stm32h7_spi_read_rxfifo(spi, reg, false);
     }
     if (sr & SPI_SR_TXP) {
+        devdbg("%s: SPI_SR_TXP: (tx_len: %d)\n", __func__, spi->tx_len);
 		if (!spi->cur_usedma && (spi->tx_buf && spi->tx_len > 0))
 			stm32h7_spi_write_txfifo(spi, reg);
     }
     if (sr & SPI_SR_EOT) {
+        devdbg("%s: SPI_SR_EOT: (rx_len: %d)\n", __func__, spi->rx_len);
 		if (!spi->cur_usedma && (spi->rx_buf && spi->rx_len > 0))
 			stm32h7_spi_read_rxfifo(spi, reg, true);
         goto _end;
@@ -311,7 +345,6 @@ static void stm32h7_spi_fthlvsize_update(SPI_TypeDef *reg, int cur_bpw,
 static int stm32h7_spi_configure(struct stm32h7_spi *spi,
     uint32_t speed_hz, uint32_t mode, uint8_t wordbits) {
     LL_SPI_InitTypeDef ll_struct;
-    uint32_t div;
 
     LL_SPI_StructInit(&ll_struct);
     if (mode & SPI_3WIRE) {
@@ -365,14 +398,8 @@ static int stm32h7_spi_configure(struct stm32h7_spi *spi,
     ll_struct.NSS = LL_SPI_NSS_SOFT;
     if (mode & SPI_LSB_FIRST)
         ll_struct.BitOrder = LL_SPI_LSB_FIRST;
-    div = spi->bus.max_speed_hz / speed_hz;
-    if (!div || (div & (div - 1))) {
-        ll_struct.BaudRate = LL_SPI_BAUDRATEPRESCALER_DIV2;
-        printk("%s: Invalid SPI bus frequency(%d) and use default\n",
-            __func__, speed_hz);
-    } else {
-        ll_struct.BaudRate = div_table[div];
-    }
+
+    ll_struct.BaudRate = stm32h7_spi_prepare_mbr(spi, speed_hz, 2, 256);
     LL_SPI_Init(spi->reg, &ll_struct);
     stm32h7_spi_dma_configure(spi, wordbits);
     return 0;
@@ -558,7 +585,7 @@ static int stm32_spi_preprobe(struct drvmgr_dev *dev) {
     spi->dev = dev;
     devp->devops = &spi->bus;
     dev->priv = spi;
-    devdbg("%s: %s reg<%d> irq<%d>\n", __func__, dev->name, reg.start, irq);
+    devdbg("%s: %s reg<0x%x> irq<%d>\n", __func__, dev->name, reg.start, irq);
     return ofw_platform_bus_device_register(dev, &stm32h7_spi_bus, 
     DRVMGR_BUS_TYPE_SPI);
 }

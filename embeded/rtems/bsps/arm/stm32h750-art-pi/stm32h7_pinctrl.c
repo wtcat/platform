@@ -79,6 +79,7 @@ static int stm32h7_setup_pinctrl(struct drvmgr_dev *pinctrl, phandle_t np) {
         if (rtems_ofw_has_prop(child, "drive-push-pull"))
             conf |= STM32_OTYPER_PUSH_PULL;
 
+        n /= sizeof(pcell_t);
         for (int i = 0; i < n; i++) {
             int af = pins[i] & 0xFF;
             int port = (pins[i] >> 12) & 0xF;
@@ -121,7 +122,6 @@ static struct drvmgr_bus_ops stm32h7_pinctrl_bus = {
 	},
     .unite = stm32h7_pinctrl_bus_unite
 };
-
 
 static int stm32h7_pinctrl_preprobe(struct drvmgr_dev *dev) {
     struct dev_private *devp = device_get_private(dev);
