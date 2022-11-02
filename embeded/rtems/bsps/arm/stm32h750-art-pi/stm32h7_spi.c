@@ -121,10 +121,12 @@ static int stm32h7_spi_get_clksrc(const char *devname, uint32_t *clksrc) {
 }
 
 static inline void stm32h7_spi_set_cs(struct gpio_pin *cs_gpios, int cs) {
+    devdbg("%s: spi select chip\n", __func__);
     gpiod_pin_assert(&cs_gpios[cs]);
 }
 
 static inline void stm32h7_spi_clr_cs(struct gpio_pin *cs_gpios, int cs) {
+    devdbg("%s: spi deselect chip\n", __func__);
     gpiod_pin_deassert(&cs_gpios[cs]);
 }
 
@@ -474,7 +476,7 @@ _irq_xmit:
 }
 
 static int stm32h7_spi_transmit_one(struct stm32h7_spi *spi, spi_bus *bus, 
-    const spi_ioc_transfer *msg) {
+    const spi_ioc_transfer *msg, bool last_msg) {
     int err;
 
     /* Copy paramters */
@@ -516,7 +518,8 @@ static int stm32h7_spi_transmit_one(struct stm32h7_spi *spi, spi_bus *bus,
     rtems_event_transient_receive(RTEMS_WAIT|RTEMS_EVENT_ALL, 
     RTEMS_NO_TIMEOUT);
 _out:
-    stm32h7_spi_clr_cs(spi->cs_gpios, msg->cs);
+    if (msg->cs_change || last_msg)
+        stm32h7_spi_clr_cs(spi->cs_gpios, msg->cs);
     return err;
 }
 
@@ -540,7 +543,7 @@ static int stm32h7_spi_transfer(spi_bus *bus, const spi_ioc_transfer *msgs,
     spi->thread = rtems_task_self();
     while (n > 0) {
         _Assert(curr_msg->len < UINT16_MAX);
-        err = stm32h7_spi_transmit_one(spi, bus, curr_msg);
+        err = stm32h7_spi_transmit_one(spi, bus, curr_msg, n == 1);
         if (err)
             break;
         curr_msg++;
