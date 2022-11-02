@@ -5,12 +5,11 @@
 #include <stdlib.h>
 #include <rtems/malloc.h>
 
-#include "drivers/devbase.h"
 #include "drivers/pinctrl.h"
 #include "drivers/ofw_platform_bus.h"
 
 #include "dt-bindings/pinctrl/stm32-pinctrl.h"
-#include "ofw/ofw.h"
+
 
 #define PINCTRL_DEBUG
 
@@ -56,7 +55,6 @@ static int stm32h7_setup_pinctrl(struct drvmgr_dev *pinctrl, phandle_t np) {
     pcell_t pins[32];
     int conf = 0;
 
-printk("*** %s: setup pinctrl\n", __func__);
     if (rtems_ofw_get_enc_prop(np, "pinctrl-0", &parent, sizeof(parent)) < 0) {
         printk("%s: not found \"pinctrl-0\" property!\n", __func__);
         return -ENOSTR;
@@ -76,7 +74,7 @@ printk("*** %s: setup pinctrl\n", __func__);
         }
 
         if (rtems_ofw_get_enc_prop(child, "slew-rate", &ospeed, sizeof(ospeed)) < 0)
-            ospeed = 3;
+            ospeed = 1;
 
         if (rtems_ofw_has_prop(child, "drive-push-pull"))
             conf |= STM32_OTYPER_PUSH_PULL;

@@ -14,17 +14,17 @@
 extern "C"{
 #endif
 
-static inline ssize_t spi_master_transfer(struct drvmgr_dev *dev, 
+static inline int spi_master_transfer(struct drvmgr_dev *dev, 
     spi_ioc_transfer *msgs, uint32_t n) {
     spi_bus *bus = (spi_bus *)device_get_operations(dev);
     int err;
     rtems_recursive_mutex_lock(&bus->mutex);
     err = bus->transfer(bus, msgs, n);
     rtems_recursive_mutex_unlock(&bus->mutex);
-    return err == 0? (ssize_t)msgs->len: -err;
+    return err;
 }
 
-static inline ssize_t spi_master_write(struct drvmgr_dev *dev, 
+static inline int spi_master_write(struct drvmgr_dev *dev, 
     const void *buffer, size_t size) {
     spi_bus *bus = (spi_bus *)device_get_operations(dev);
     spi_ioc_transfer msg = {
@@ -40,7 +40,7 @@ static inline ssize_t spi_master_write(struct drvmgr_dev *dev,
     return spi_master_transfer(dev, &msg, 1);
 }
 
-static inline ssize_t spi_master_read(struct drvmgr_dev *dev, 
+static inline int spi_master_read(struct drvmgr_dev *dev, 
     void *buffer, size_t size) {
     spi_bus *bus = (spi_bus *)device_get_operations(dev);
     spi_ioc_transfer msg = {

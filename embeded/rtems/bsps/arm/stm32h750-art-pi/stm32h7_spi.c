@@ -568,7 +568,7 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
     struct stm32h7_spi *spi = dev->priv;
     uint32_t clksrc = 0;
     int ret = -EINVAL;
-devdbg("%s: \n", __func__);
+
     if (stm32h7_spi_get_clksrc(dev->name, &clksrc)) {
         printk("%s: Invalid device name (%s)\n", __func__, dev->name);
         return -EINVAL;
@@ -627,7 +627,7 @@ static int stm32h7_spi_extprobe(struct drvmgr_dev *dev) {
     struct dev_private *devp = device_get_private(dev);
     struct stm32h7_spi *spi = dev->priv;
     pcell_t specs[3];
-devdbg("%s: \n", __func__);    
+  
     int ret = pinctrl_simple_set("/dev/pinctrl", dev);
     if (ret) {
         printk("%s: %s configure pins failed: %d\n", __func__, 
