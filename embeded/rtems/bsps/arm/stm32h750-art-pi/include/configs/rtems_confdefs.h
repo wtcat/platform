@@ -3169,7 +3169,7 @@
  * You may use this feature to debug system initialization issues.  The
  * printk() function is used to print the information.
  */
-#define CONFIGURE_VERBOSE_SYSTEM_INITIALIZATION
+// #define CONFIGURE_VERBOSE_SYSTEM_INITIALIZATION
 
 /* Generated from spec:/acfg/if/zero-workspace-automatically */
 

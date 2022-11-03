@@ -18,6 +18,9 @@ declare_args() {
   #Enable LVGL graphic libary
   use_gui = false
 
+  #Enable libmodbus 
+  use_libmodbus = false
+
   #Enable unit testcase
   use_testsuite = false
 }
