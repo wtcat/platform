@@ -457,6 +457,10 @@ static inline bool dma_chan_do_filter(struct dma_chan *chan, void *param) {
 	return dma_chan_filter(chan->dev, chan->channel, param);
 }
 
+static inline void dma_chan_release(struct dma_chan *chan) {
+	dma_release_channel(chan->dev, chan->channel);
+}
+
 /*
  * OFW public inteface
  */
