@@ -39,6 +39,7 @@ struct stm32h7_spi {
     struct dma_chan *rx;
     struct drvmgr_dev *clk;
     uint32_t cur_speed;
+    uint32_t cs_bitmap;
     int clkid;
     int irq;
     int error;
@@ -120,14 +121,29 @@ static int stm32h7_spi_get_clksrc(const char *devname, uint32_t *clksrc) {
     return 0;
 }
 
-static inline void stm32h7_spi_set_cs(struct gpio_pin *cs_gpios, int cs) {
-    devdbg("%s: spi select chip\n", __func__);
-    gpiod_pin_assert(&cs_gpios[cs]);
+static inline void stm32h7_spi_set_cs(struct stm32h7_spi *spi, int cs) {
+    if (!(spi->cs_bitmap & BIT(cs))) {
+        devdbg("%s: spi select chip (cs = %d)\n", __func__, cs);
+        spi->cs_bitmap |= BIT(cs);
+        gpiod_pin_assert(&spi->cs_gpios[cs]);
+    }
 }
 
-static inline void stm32h7_spi_clr_cs(struct gpio_pin *cs_gpios, int cs) {
-    devdbg("%s: spi deselect chip\n", __func__);
-    gpiod_pin_deassert(&cs_gpios[cs]);
+static inline void stm32h7_spi_clr_cs(struct stm32h7_spi *spi, int cs) {
+    if (spi->cs_bitmap & BIT(cs)) {
+        devdbg("%s: spi deselect chip (cs = %d)\n", __func__, cs);
+        spi->cs_bitmap &= ~BIT(cs);
+        gpiod_pin_deassert(&spi->cs_gpios[cs]);
+    }
+}
+
+static void stm32h7_spi_clear_all_cs(struct stm32h7_spi *spi) {
+    uint32_t bitmap = spi->cs_bitmap;
+    while (bitmap) {
+        int cs = __ffs(bitmap);
+        bitmap &= ~BIT(cs);
+        gpiod_pin_deassert(&spi->cs_gpios[cs]);
+    }
 }
 
 static inline bool stm32h7_spi_can_dma(struct stm32h7_spi *spi,
@@ -476,7 +492,7 @@ _irq_xmit:
 }
 
 static int stm32h7_spi_transmit_one(struct stm32h7_spi *spi, spi_bus *bus, 
-    const spi_ioc_transfer *msg, bool last_msg) {
+    const spi_ioc_transfer *msg) {
     int err;
 
     /* Copy paramters */
@@ -506,7 +522,7 @@ static int stm32h7_spi_transmit_one(struct stm32h7_spi *spi, spi_bus *bus,
         spi->cur_xferlen);
 
 	devdbg("%s: dma %s\n", __func__, (spi->cur_usedma) ? "enabled" : "disabled");
-    stm32h7_spi_set_cs(spi->cs_gpios, msg->cs);
+    stm32h7_spi_set_cs(spi, msg->cs);
     if (spi->cur_usedma)
         err = stm32h7_spi_transmit_one_dma(spi);
     else
@@ -518,8 +534,8 @@ static int stm32h7_spi_transmit_one(struct stm32h7_spi *spi, spi_bus *bus,
     rtems_event_transient_receive(RTEMS_WAIT|RTEMS_EVENT_ALL, 
     RTEMS_NO_TIMEOUT);
 _out:
-    if (msg->cs_change || last_msg)
-        stm32h7_spi_clr_cs(spi->cs_gpios, msg->cs);
+    if (msg->cs_change)
+        stm32h7_spi_clr_cs(spi, msg->cs);
     return err;
 }
 
@@ -540,20 +556,38 @@ static int stm32h7_spi_transfer(spi_bus *bus, const spi_ioc_transfer *msgs,
     const spi_ioc_transfer *curr_msg = msgs;
     int err = -EINVAL;
 
+    spi->cs_bitmap = 0;
     spi->thread = rtems_task_self();
     while (n > 0) {
         _Assert(curr_msg->len < UINT16_MAX);
-        err = stm32h7_spi_transmit_one(spi, bus, curr_msg, n == 1);
+        err = stm32h7_spi_transmit_one(spi, bus, curr_msg);
         if (err)
             break;
         curr_msg++;
         n--;
     };
+    stm32h7_spi_clear_all_cs(spi);
     return err;
 }
 
 static void stm32h7_spi_destroy(spi_bus *bus) {
-	spi_bus_destroy_and_free(bus);
+    struct stm32h7_spi *spi = (struct stm32h7_spi *)bus;
+    rtems_interrupt_level level;
+
+    rtems_interrupt_local_disable(level);
+    stm32h7_spi_disable(spi, spi->reg);
+    rtems_interrupt_local_enable(level);
+    stm32h7_spi_clear_all_cs(spi);
+    drvmgr_interrupt_unregister(spi->dev, IRQF_HARD(spi->irq), 
+        stm32h7_spi_isr, spi);
+    clk_disable(spi->clk, &spi->clkid);
+    if (spi->tx)
+        dma_chan_release(spi->tx);
+    if (spi->rx)
+        dma_chan_release(spi->rx);
+    spi_bus_destroy(bus);
+    free(spi->cs_gpios);
+    free(spi);
 }
 
 static int stm32_spi_bus_unite(struct drvmgr_drv *drv, struct drvmgr_dev *dev) {
@@ -609,6 +643,7 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
         printk("%s: reqeust gpio_cs failed!\n", __func__);
         return -ENOSTR;
     }
+    _Assert(spi->cs_num < 32);
 
     spi->clk = ofw_clock_request(devp->np, NULL, (pcell_t *)&spi->clkid, 
         sizeof(spi->clkid));
@@ -658,18 +693,10 @@ static int stm32h7_spi_extprobe(struct drvmgr_dev *dev) {
     struct stm32h7_spi *spi = dev->priv;
     pcell_t specs[3];
   
-    int ret = pinctrl_simple_set("/dev/pinctrl", dev);
-    if (ret) {
-        printk("%s: %s configure pins failed: %d\n", __func__, 
-            dev->name, ret);
-		drvmgr_interrupt_unregister(dev, IRQF_HARD(spi->irq), 
-            stm32h7_spi_isr, spi);
-        clk_disable(spi->clk, &spi->clkid);
-        spi_bus_destroy(&spi->bus);
-        free(spi);
-        return ret;
-    }
-
+    if (pinctrl_simple_set("/dev/pinctrl", dev)) 
+        rtems_panic("%s: %s configure pins failed\n", __func__, 
+            dev->name);
+ 
     spi->tx = ofw_dma_chan_request(devp->np, "tx", 
         specs, sizeof(specs));
     if (spi->tx) 

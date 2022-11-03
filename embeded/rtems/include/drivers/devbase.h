@@ -10,6 +10,7 @@
 #include <ofw/ofw.h>
 #include "ofw/ofw_extension.h"
 #endif
+#include "base/bitops.h"
 #include "base/compiler.h"
 #include "base/sections.h"
 #include "base/minmax.h"

@@ -20,6 +20,7 @@
 #undef GPIO_PULLUP
 
 #include "drivers/clock.h"
+#include "drivers/pinctrl.h"
 #include "drivers/dma.h"
 #include "drivers/gpio.h"
 #include "drivers/ofw_platform_bus.h"
@@ -517,6 +518,9 @@ static int stm32h7_uart_extprobe(struct drvmgr_dev *dev) {
     struct dev_private *devp = device_get_private(dev);
     struct stm32h7_uart *uart = dev->priv;
     pcell_t specs[3];
+
+    if (pinctrl_simple_set("/dev/pinctrl", dev))
+        rtems_panic("%s: configure %s pins failed!\n", __func__, dev->name);
 
     uart->tx = ofw_dma_chan_request(devp->np, "tx", 
         specs, sizeof(specs));

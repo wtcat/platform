@@ -114,7 +114,7 @@ static int flash_spi_write_and_read(struct flash_private *priv, const void *tx_b
             .len = (uint16_t)tx_len,
             .tx_buf = tx_buf,
             .rx_buf = NULL,
-            .cs_change = true,
+            .cs_change = false,
             .cs = 0,
             .bits_per_word = 8,
             .mode = SPI_MODE_0,
