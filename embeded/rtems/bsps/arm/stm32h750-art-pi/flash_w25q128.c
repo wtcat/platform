@@ -114,7 +114,7 @@ static int flash_spi_write_and_read(struct flash_private *priv, const void *tx_b
             .len = (uint16_t)tx_len,
             .tx_buf = tx_buf,
             .rx_buf = NULL,
-            .cs_change = true,
+            .cs_change = false,
             .cs = 0,
             .bits_per_word = 8,
             .mode = SPI_MODE_0,
@@ -329,16 +329,17 @@ static int flash_preprobe(struct drvmgr_dev *dev) {
     return 0;
 }
 
+static struct drvmgr_dev *flash_dev;
 static int flash_probe(struct drvmgr_dev *dev) {
     struct flash_private *priv = dev->priv;
     const struct flash_info *info = priv->info;
     rtems_status_code sc;
 
-    uint32_t id = flash_read_id(priv);
-    if (info->devid != id) {
-        printk("%s: invalid flash device id(0x%x)\n", __func__, id);
-        goto _fault; 
-    }
+    // uint32_t id = flash_read_id(priv);
+    // if (info->devid != id) {
+    //     printk("%s: invalid flash device id(0x%x)\n", __func__, id);
+    //     goto _fault; 
+    // }
 
     sc = rtems_blkdev_create(dev->name, info->blksz, 
         info->capacity / info->blksz, flash_ioctl, priv);
@@ -347,9 +348,11 @@ static int flash_probe(struct drvmgr_dev *dev) {
             dev->name, rtems_status_text(sc));
         return -EFAULT;
     }
+    (void) dev;
+    flash_dev = dev;
     return 0;
 
-_fault:
+// _fault:
     free(priv);
     return -EFAULT;
 }
@@ -370,3 +373,9 @@ OFW_PLATFORM_DRIVER(spi_flash) = {
 	},
     .ids = id_table
 };
+
+
+uint32_t _flash_read_id(void) {
+    struct flash_private *priv = flash_dev->priv;
+    return flash_read_id(priv);
+}
