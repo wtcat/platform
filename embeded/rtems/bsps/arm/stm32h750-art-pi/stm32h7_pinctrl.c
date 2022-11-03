@@ -81,7 +81,7 @@ static int stm32h7_setup_pinctrl(struct drvmgr_dev *pinctrl, phandle_t np) {
 
         n /= sizeof(pcell_t);
         for (int i = 0; i < n; i++) {
-            int af = pins[i] & 0xFF;
+            int af = (pins[i] & 0xFF) - 1;
             int port = (pins[i] >> 12) & 0xF;
             int pin = (pins[i] >> 8) & 0xF;       
             conf |= (ospeed << STM32_OTYPER_SHIFT) | STM32_MODER_ALT_MODE;
@@ -89,9 +89,9 @@ static int stm32h7_setup_pinctrl(struct drvmgr_dev *pinctrl, phandle_t np) {
                 printk("Invalid GPIO device port (%d)\n", port);
                 return -EINVAL;
             }
-            devdbg("%s: configure pinmux(%s) pin(%d) speed(%d) af(%d)\n", 
-                __func__, priv->gpios[port]->name, pin, ospeed, af);
-            stm32_gpio_setup(priv->gpios[port], pin, conf, af-1);
+            devdbg("\tconfigure pinmux(%s) pin(%d) speed(%d) af(%d)\n", 
+                priv->gpios[port]->name, pin, ospeed, af);
+            stm32_gpio_setup(priv->gpios[port], pin, conf, af);
         }
     }
     return 0;
@@ -99,6 +99,7 @@ static int stm32h7_setup_pinctrl(struct drvmgr_dev *pinctrl, phandle_t np) {
 
 static int stm32h7_pinctrl_set(struct drvmgr_dev *dev, struct drvmgr_dev *config) {
     struct dev_private *devp = device_get_private(config);
+    devdbg("%s set pinmux:\n", config->name);
     return stm32h7_setup_pinctrl(dev, devp->np);
 }
 
