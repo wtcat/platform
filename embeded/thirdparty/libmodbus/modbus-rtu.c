@@ -709,10 +709,10 @@ static int _modbus_rtu_connect(modbus_t *ctx)
         break;
 #endif
     default:
-        speed = B9600;
+        speed = ctx_rtu->baud;
         if (ctx->debug) {
-            fprintf(stderr,
-                    "WARNING Unknown baud rate %d for %s (B9600 used)\n",
+            fprintf(stdout,
+                    "Custom baudrate %d for %s used\n",
                     ctx_rtu->baud,
                     ctx_rtu->device);
         }
