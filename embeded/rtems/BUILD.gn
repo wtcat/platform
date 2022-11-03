@@ -72,6 +72,10 @@ executable("rtems") {
   if (use_devicetree) {
     defines +=["CONFIGURE_FDT"]
   }
+
+  if (use_libmodbus) {
+    deps += [ "//embeded/thirdparty/libmodbus" ]
+  }
 }
 
 # Binary and uboot image generate

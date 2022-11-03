@@ -1,0 +1,19 @@
+import("//gn/toolchain/rtems/rtems.gni")
+
+component("libmodbus") {
+    include_dirs = [
+        "//embeded/thirdparty/libmodbus"
+    ]
+    cflags = [
+        "-Wno-unused-parameter",
+        "-Wno-implicit-fallthrough"
+    ]
+    sources = [
+        "//embeded/thirdparty/libmodbus/modbus.c",
+        "//embeded/thirdparty/libmodbus/modbus-rtu.c",
+        "//embeded/thirdparty/libmodbus/modbus-data.c"
+    ]
+    if (use_libbsd) {
+        sources += ["//embeded/thirdparty/libmodbus/modbus-tcp.c"]
+    }
+}
