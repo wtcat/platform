@@ -25,6 +25,9 @@
 #include "modbus-private.h"
 #include "modbus.h"
 
+#ifdef __rtems__
+#define HAVE_STRLCPY
+#endif
 /* Internal use */
 #define MSG_LENGTH_UNDEFINED -1
 
