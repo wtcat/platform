@@ -45,6 +45,7 @@ config("rtems_config") {
     defines = []
     include_dirs = [
       "//embeded/rtems/include",
+      "//embeded",
       "${root_out_dir}"
     ]
     
