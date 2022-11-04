@@ -456,10 +456,7 @@ mmc_wakeup(struct mmc_request *req)
 static int
 mmc_wait_for_req(struct mmc_softc *sc, struct mmc_request *req)
 {
-
-#ifdef __rtems__
 	rtems_binary_semaphore_init(&req->req_done, "mmc_req_done");
-#endif /* __rtems__ */
 	req->done = mmc_wakeup;
 	req->done_data = sc;
 	if (__predict_false(mmc_debug > 1)) {
@@ -470,7 +467,7 @@ mmc_wait_for_req(struct mmc_softc *sc, struct mmc_request *req)
 		} else
 			printf("\n");
 	}
-	MMCBR_REQUEST(device_get_parent(sc->dev), sc->dev, req);
+	mmcbr_request(sc, req);
 	rtems_binary_semaphore_wait(&req->req_done);
 	rtems_binary_semaphore_destroy(&req->req_done);
 
@@ -482,14 +479,12 @@ mmc_wait_for_req(struct mmc_softc *sc, struct mmc_request *req)
 }
 
 static int
-mmc_wait_for_request(device_t busdev, device_t dev, struct mmc_request *req)
+mmc_wait_for_request(struct mmc_softc *sc, struct mmc_request *req)
 {
-	struct mmc_softc *sc;
 	struct mmc_ivars *ivar;
 	int err, i;
 	enum mmc_retune_req retune_req;
 
-	sc = device_get_softc(busdev);
 	KASSERT(sc->owner != NULL,
 	    ("%s: Request from %s without bus being acquired.", __func__,
 	    device_get_nameunit(dev)));
@@ -2348,9 +2343,8 @@ mmc_switch_to_hs200(struct mmc_softc *sc, struct mmc_ivars *ivar,
 }
 
 static int
-mmc_retune(device_t busdev, device_t dev, bool reset)
+mmc_retune(struct mmc_softc *sc, bool reset)
 {
-	struct mmc_softc *sc;
 	struct mmc_ivars *ivar;
 	int err;
 	uint32_t clock;
@@ -2359,7 +2353,6 @@ mmc_retune(device_t busdev, device_t dev, bool reset)
 	if (device_get_parent(dev) != busdev)
 		return (MMC_ERR_INVALID);
 
-	sc = device_get_softc(busdev);
 	if (sc->retune_needed != 1 && sc->retune_paused != 0)
 		return (MMC_ERR_INVALID);
 
@@ -2400,11 +2393,8 @@ mmc_retune(device_t busdev, device_t dev, bool reset)
 }
 
 static void
-mmc_retune_pause(device_t busdev, device_t dev, bool retune)
+mmc_retune_pause(struct mmc_softc *sc, bool retune)
 {
-	struct mmc_softc *sc;
-
-	sc = device_get_softc(busdev);
 	KASSERT(device_get_parent(dev) == busdev,
 	    ("%s: %s is not a child of %s", __func__, device_get_nameunit(dev),
 	    device_get_nameunit(busdev)));
@@ -2418,11 +2408,8 @@ mmc_retune_pause(device_t busdev, device_t dev, bool retune)
 }
 
 static void
-mmc_retune_unpause(device_t busdev, device_t dev)
+mmc_retune_unpause(struct mmc_softc *sc)
 {
-	struct mmc_softc *sc;
-
-	sc = device_get_softc(busdev);
 	KASSERT(device_get_parent(dev) == busdev,
 	    ("%s: %s is not a child of %s", __func__, device_get_nameunit(dev),
 	    device_get_nameunit(busdev)));
@@ -2441,13 +2428,13 @@ mmc_scan(struct mmc_softc *sc)
 	device_t dev = sc->dev;
 	int err;
 
-	err = mmc_acquire_bus(dev, dev);
+	err = mmc_acquire_bus(sc);
 	if (err != 0) {
 		device_printf(dev, "Failed to acquire bus for scanning\n");
 		return;
 	}
 	mmc_go_discovery(sc);
-	err = mmc_release_bus(dev, dev);
+	err = mmc_release_bus(sc);
 	if (err != 0) {
 		device_printf(dev, "Failed to release bus after scanning\n");
 		return;

@@ -1,5 +1,3 @@
-#include <machine/rtems-bsd-kernel-space.h>
-
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
@@ -116,12 +114,7 @@ struct mmcsd_part {
 	struct mtx disk_mtx;
 	struct mtx ioctl_mtx;
 	struct mmcsd_softc *sc;
-#ifndef __rtems__
-	struct disk *disk;
-	struct proc *p;
-	struct bio_queue_head bio_queue;
-	daddr_t eblock, eend;	/* Range remaining after the last erase. */
-#endif /* __rtems__ */
+
 	u_int cnt;
 	u_int type;
 	int running;
@@ -132,6 +125,7 @@ struct mmcsd_part {
 };
 
 struct mmcsd_softc {
+	struct mmc_softc *mmc;
 	device_t dev;
 	device_t mmcbus;
 	struct mmcsd_part *part[MMC_PART_MAX];
@@ -156,11 +150,8 @@ struct mmcsd_softc {
 	struct cdev *rpmb_dev;
 };
 
-#ifndef __rtems__
-static const char *errmsg[] =
-#else /* __rtems__ */
+
 static const char * const errmsg[] =
-#endif /* __rtems__ */
 {
 	"None",
 	"Timeout",
@@ -208,30 +199,20 @@ static int mmcsd_set_blockcount(struct mmcsd_softc *sc, u_int count, bool rel);
 static int mmcsd_switch_part(device_t bus, device_t dev, uint16_t rca,
     u_int part);
 
-#define	MMCSD_DISK_LOCK(_part)		mtx_lock(&(_part)->disk_mtx)
-#define	MMCSD_DISK_UNLOCK(_part)	mtx_unlock(&(_part)->disk_mtx)
-#define	MMCSD_DISK_LOCK_INIT(_part)					\
-	mtx_init(&(_part)->disk_mtx, (_part)->name, "mmcsd disk", MTX_DEF)
-#define	MMCSD_DISK_LOCK_DESTROY(_part)	mtx_destroy(&(_part)->disk_mtx);
-#define	MMCSD_DISK_ASSERT_LOCKED(_part)					\
-	mtx_assert(&(_part)->disk_mtx, MA_OWNED);
-#define	MMCSD_DISK_ASSERT_UNLOCKED(_part)				\
-	mtx_assert(&(_part)->disk_mtx, MA_NOTOWNED);
+#define	MMCSD_DISK_LOCK(_part)		rtems_recursive_mutex_lock(&(_part)->disk_mtx)
+#define	MMCSD_DISK_UNLOCK(_part)	rtems_recursive_mutex_unlock(&(_part)->disk_mtx)
+#define	MMCSD_DISK_LOCK_INIT(_part)	rtems_recursive_mutex_init(&(_part)->disk_mtx, "mmcsd disk")
+#define	MMCSD_DISK_LOCK_DESTROY(_part) rtems_recursive_mutex_destroy(&(_part)->disk_mtx);
 
-#define	MMCSD_IOCTL_LOCK(_part)		mtx_lock(&(_part)->ioctl_mtx)
-#define	MMCSD_IOCTL_UNLOCK(_part)	mtx_unlock(&(_part)->ioctl_mtx)
-#define	MMCSD_IOCTL_LOCK_INIT(_part)					\
-	mtx_init(&(_part)->ioctl_mtx, (_part)->name, "mmcsd IOCTL", MTX_DEF)
-#define	MMCSD_IOCTL_LOCK_DESTROY(_part)	mtx_destroy(&(_part)->ioctl_mtx);
-#define	MMCSD_IOCTL_ASSERT_LOCKED(_part)				\
-	mtx_assert(&(_part)->ioctl_mtx, MA_OWNED);
-#define	MMCSD_IOCLT_ASSERT_UNLOCKED(_part)				\
-	mtx_assert(&(_part)->ioctl_mtx, MA_NOTOWNED);
+#define	MMCSD_IOCTL_LOCK(_part)		rtems_recursive_mutex_lock(&(_part)->ioctl_mtx)
+#define	MMCSD_IOCTL_UNLOCK(_part)	rtems_recursive_mutex_unlock(&(_part)->ioctl_mtx)
+#define	MMCSD_IOCTL_LOCK_INIT(_part) rtems_recursive_mutex_init(&(_part)->ioctl_mtx, "mmcsd IOCTL")
+#define	MMCSD_IOCTL_LOCK_DESTROY(_part)	rtems_recursive_mutex_destroy(&(_part)->ioctl_mtx);
+
 
 static int
 mmcsd_probe(device_t dev)
 {
-
 	device_quiet(dev);
 	device_set_desc(dev, "MMC/SD Memory Card");
 	return (0);
@@ -239,7 +220,7 @@ mmcsd_probe(device_t dev)
 
 #ifdef __rtems__
 static rtems_status_code
-mmcsd_set_block_size(device_t dev, uint32_t block_size)
+mmcsd_set_block_size(struct mmc_softc *mmc, uint32_t block_size)
 {
 	rtems_status_code status_code = RTEMS_SUCCESSFUL;
 	struct mmc_command cmd;
@@ -252,8 +233,7 @@ mmcsd_set_block_size(device_t dev, uint32_t block_size)
 	cmd.opcode = MMC_SET_BLOCKLEN;
 	cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
 	cmd.arg = block_size;
-	MMCBUS_WAIT_FOR_REQUEST(device_get_parent(dev), dev,
-	    &req);
+	mmcbus_wait_for_request(mmc, &req);
 	if (req.cmd->error != MMC_ERR_NONE) {
 		status_code = RTEMS_IO_ERROR;
 	}
@@ -329,8 +309,7 @@ mmcsd_disk_read_write(struct mmcsd_part *part, rtems_blkdev_request *blkreq)
 		data.mrq = &req;
 		data.len = transfer_bytes;
 
-		MMCBUS_WAIT_FOR_REQUEST(device_get_parent(dev), dev,
-		    &req);
+		mmcbus_wait_for_request(sc->mmc, &req);
 		if (req.cmd->error != MMC_ERR_NONE) {
 			status_code = RTEMS_IO_ERROR;
 			goto error;
@@ -349,8 +328,7 @@ mmcsd_disk_read_write(struct mmcsd_part *part, rtems_blkdev_request *blkreq)
 			cmd2.arg = rca << 16;
 			cmd2.flags = MMC_RSP_R1 | MMC_CMD_AC;
 
-			MMCBUS_WAIT_FOR_REQUEST(device_get_parent(dev), dev,
-			    &req2);
+			mmcbus_wait_for_request(sc->mmc, &req2);
 			if (req2.cmd->error != MMC_ERR_NONE) {
 				status_code = RTEMS_IO_ERROR;
 				goto error;
@@ -421,7 +399,7 @@ mmcsd_attach_worker(rtems_media_state state, const char *src, char **dest, void 
 		 */
 		MMCBUS_ACQUIRE_BUS(device_get_parent(dev), dev);
 
-		status_code = mmcsd_set_block_size(dev, block_size);
+		status_code = mmcsd_set_block_size(sc->mmc, block_size);
 		if (status_code != RTEMS_SUCCESSFUL) {
 			printf("OOPS: set block size failed\n");
 			goto error;
@@ -1106,7 +1084,7 @@ mmcsd_set_blockcount(struct mmcsd_softc *sc, u_int count, bool reliable)
 	if (reliable)
 		cmd.arg |= 1 << 31;
 	cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
-	MMCBUS_WAIT_FOR_REQUEST(sc->mmcbus, sc->dev, &req);
+	mmcbus_wait_for_request(sc->mmcbus, sc->dev, &req);
 	return (cmd.error);
 }
 

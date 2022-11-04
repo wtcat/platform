@@ -90,23 +90,23 @@ struct mmc_softc {
 };
 
 
-static inline void MMCBUS_RETUNE_PAUSE(struct mmc_softc *sc, bool retune) {
+static inline void mmcbus_retune_pause(struct mmc_softc *sc, bool retune) {
 	sc->ops->retune_pause(sc, retune);
 }
 
-static inline void MMCBUS_RETUNE_UNPAUSE(struct mmc_softc *sc) {
+static inline void mmcbus_retune_unpause(struct mmc_softc *sc) {
 	sc->ops->retune_unpause(sc);
 }
 
-static inline int MMCBUS_WAIT_FOR_REQUEST(struct mmc_softc *sc, struct mmc_request *req) {
+static inline int mmcbus_wait_for_request(struct mmc_softc *sc, struct mmc_request *req) {
 	sc->ops->wait_for_request(sc, req);
 }
 
-static inline int MMCBUS_ACQUIRE_BUS(struct mmc_softc *sc) {
+static inline int mmcbus_acquire_bus(struct mmc_softc *sc) {
 	sc->ops->acquire_bus(sc);
 }
 
-static inline int MMCBUS_RELEASE_BUS(struct mmc_softc *sc) {
+static inline int mmcbus_release_bus(struct mmc_softc *sc) {
 	sc->ops->release_bus(sc);
 }
 
