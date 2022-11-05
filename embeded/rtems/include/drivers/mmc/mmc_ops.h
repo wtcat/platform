@@ -52,62 +52,33 @@
  * $FreeBSD$
  */
 
-#ifndef DEV_MMC_PRIVATE_H
-#define	DEV_MMC_PRIVATE_H
+/*
+ * Copyright 2022 wtcat
+ */
+#ifndef DRIVERS_MMC_MMC_OPS_H_
+#define	DRIVERS_MMC_MMC_OPS_H_
 
-#include <rtems/thread.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <time.h>
+#include <sys/types.h>
+#ifdef __cplusplus
+extern "C"{
+#endif
 
-struct mmc_host;
-struct mmc_softc;
-struct mmc_request;
+struct mmc_command;
+struct drvmgr_dev;
 
-struct mmc_bus_ops {
-	void (*retune_pause)(struct mmc_softc *sc, bool retune);
-	void (*retune_unpause)(struct mmc_softc *sc);
-	int (*wait_for_request)(struct mmc_softc *sc, struct mmc_request *req);
-	int (*acquire_bus)(struct mmc_softc *sc);
-	int (*release_bus)(struct mmc_softc *sc);
-};
+int mmc_send_ext_csd(struct drvmgr_dev *busdev, struct drvmgr_dev *dev, uint8_t *rawextcsd);
+int mmc_send_status(struct drvmgr_dev *busdev, struct drvmgr_dev *dev, uint16_t rca,
+    uint32_t *status);
+int mmc_switch(struct drvmgr_dev *busdev, struct drvmgr_dev *dev, uint16_t rca, uint8_t set,
+    uint8_t index, uint8_t value, u_int timeout, bool send_status);
+int mmc_switch_status(struct drvmgr_dev *busdev, struct drvmgr_dev *dev, uint16_t rca,
+    u_int timeout);
+int mmc_wait_for_app_cmd(struct drvmgr_dev *busdev, struct drvmgr_dev *dev, uint16_t rca,
+    struct mmc_command *cmd, int retries);
+int mmc_wait_for_cmd(struct drvmgr_dev *busdev, struct drvmgr_dev *dev, struct mmc_command *cmd,
+    int retries);
 
-struct mmc_softc {
-	struct mmc_host *host;
-	const struct mmc_bus_ops *ops;
-	rtems_recursive_mutex sc_mtx;
-	struct intr_config_hook config_intrhook;
-	device_t owner;
-	device_t *child_list;
-	int child_count;
-	uint16_t last_rca;
-	uint16_t retune_paused;
-	uint8_t retune_needed;
-	uint8_t retune_ongoing;
-	uint16_t squelched;	/* suppress reporting of (expected) errors */
-	int log_count;
-	struct timeval log_time;
-};
-
-
-static inline void mmcbus_retune_pause(struct mmc_softc *sc, bool retune) {
-	sc->ops->retune_pause(sc, retune);
+#ifdef __cplusplus
 }
-
-static inline void mmcbus_retune_unpause(struct mmc_softc *sc) {
-	sc->ops->retune_unpause(sc);
-}
-
-static inline int mmcbus_wait_for_request(struct mmc_softc *sc, struct mmc_request *req) {
-	sc->ops->wait_for_request(sc, req);
-}
-
-static inline int mmcbus_acquire_bus(struct mmc_softc *sc) {
-	sc->ops->acquire_bus(sc);
-}
-
-static inline int mmcbus_release_bus(struct mmc_softc *sc) {
-	sc->ops->release_bus(sc);
-}
-
-#endif /* DEV_MMC_PRIVATE_H */
+#endif
+#endif /* DRIVERS_MMC_MMC_OPS_H_ */

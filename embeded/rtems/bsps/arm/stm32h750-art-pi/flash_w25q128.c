@@ -137,8 +137,10 @@ static int flash_spi_write_and_read(struct flash_private *priv, const void *tx_b
 
 static uint32_t flash_read_id(struct flash_private *priv) {
     uint8_t cmd[] = {0x90, 0, 0, 0};
-    uint16_t id = 0;
+    uint32_t id = 0;
 
+    // if (!flash_spi_xfer(priv, cmd, &id, 4))
+    //     return id;
     if (flash_spi_write_and_read(priv, cmd, sizeof(cmd), &id, 2) > 0)
         return id;
     return 0;

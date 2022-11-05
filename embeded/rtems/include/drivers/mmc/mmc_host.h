@@ -52,13 +52,20 @@
  *
  * $FreeBSD$
  */
+ /*
+  * Copyright 2022 wtcat
+  */
 
-#ifndef DEV_MMC_BRIDGE_H
-#define	DEV_MMC_BRIDGE_H
+#ifndef DRIVER_MMC_MMC_HOST_H_
+#define	DRIVER_MMC_MMC_HOST_H_
 
-#include <stdint.h>
 #include <stdbool.h>
-#include <sys/bus.h>
+
+#include "drivers/mmc/mmc_base.h"
+
+#ifdef __cplusplus
+extern "C"{
+#endif
 
 /*
  * This file defines interfaces for the mmc bridge.  The names chosen
@@ -143,22 +150,6 @@ enum mmc_retune_req {
 	retune_req_none = 0, retune_req_normal, retune_req_reset
 };
 
-struct mmc_host;
-struct mmc_request;
-
-struct mmc_brige_ops {
-	int (*update_ios)(struct mmc_host *host);
-	int (*request)(struct mmc_host *host, struct mmc_request *req);
-	int (*get_ro)(struct mmc_host *host);
-	int (*acquire_host)(struct mmc_host *host);
-	int (*release_host)(struct mmc_host *host);
-	int (*read_ivar)(struct mmc_host *host, int which, uintptr_t *result);
-	int (*write_ivar)(struct mmc_host *host, int which, uintptr_t *result);
-	int (*switch_vccq)(struct mmc_host *host);
-	int (*tune)(struct mmc_host *host, bool hs400);
-	int (*retune)(struct mmc_host *host, bool reset);
-};
-
 struct mmc_host {
 	int f_min;
 	int f_max;
@@ -194,40 +185,69 @@ struct mmc_host {
 #define	MMC_CAP_DRIVER_TYPE_D	(1 << 23) /* Can do Driver Type D */
 	enum mmc_card_mode mode;
 	struct mmc_ios ios;	/* Current state of the host */
-	const struct mmc_brige_ops *ops;
+};
+
+struct mmc_base_ops {
+	int (*read_ivar)(struct drvmgr_dev *bus, struct drvmgr_dev *child, int which, uintptr_t *result);
+	int (*write_ivar)(struct drvmgr_dev *bus, struct drvmgr_dev *child, int which, uintptr_t *result);
 };
 
 
-static int inline mmcbr_update_ios(struct mmc_host *host) {
-	return host->ops->update_ios(host);
+struct mmc_request;
+struct mmc_host_ops {
+    struct mmc_base_ops rwops;
+	int (*update_ios)(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev);
+	int (*request)(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev, struct mmc_request *req);
+	int (*get_ro)(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev);
+	int (*acquire_host)(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev);
+	int (*release_host)(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev);
+	int (*switch_vccq)(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev);
+	int (*tune)(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev, bool hs400);
+	int (*retune)(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev, bool reset);
+};
+
+static int inline mmcbr_update_ios(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
+    const struct mmc_host_ops *ops = device_get_operations(brdev);
+	return ops->update_ios(brdev, reqdev);
 }
 
-static int inline mmcbr_request(struct mmc_host *host, struct mmc_request *req) {
-	return host->ops->request(host, req);
+static int inline mmcbr_request(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev, 
+    struct mmc_request *req) {
+    const struct mmc_host_ops *ops = device_get_operations(brdev);
+	return ops->request(brdev, reqdev, req);
 }
 
-static int inline mmcbr_get_ro(struct mmc_host *host) {
-	return host->ops->get_ro(host);
+static int inline mmcbr_get_ro(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
+    const struct mmc_host_ops *ops = device_get_operations(brdev);
+	return ops->get_ro(brdev, reqdev);
 }
 
-static int inline mmcbr_acquire_host(struct mmc_host *host) {
-	return host->ops->acquire_host(host);
+static int inline mmcbr_acquire_host(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
+    const struct mmc_host_ops *ops = device_get_operations(brdev);
+	return ops->acquire_host(brdev, reqdev);
 }
 
-static int inline mmcbr_release_host(struct mmc_host *host) {
-	return host->ops->release_host(host);
+static int inline mmcbr_release_host(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
+    const struct mmc_host_ops *ops = device_get_operations(brdev);
+	return ops->release_host(brdev, reqdev);
 }
 
-static int inline mmcbr_switch_vccq(struct mmc_host *host) {
-	return host->ops->switch_vccq(host);
+static int inline mmcbr_switch_vccq(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
+    const struct mmc_host_ops *ops = device_get_operations(brdev);
+	return ops->switch_vccq(brdev, reqdev);
 }
 
-static int inline mmcbr_tune(struct mmc_host *host, bool hs400) {
-	return host->ops->tune(host, hs400);
+static int inline mmcbr_tune(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev, bool hs400) {
+    const struct mmc_host_ops *ops = device_get_operations(brdev);
+	return ops->tune(brdev, reqdev, hs400);
 }
 
-static int inline mmcbr_retune(struct mmc_host *host, bool reset) {
-	return host->ops->retune(host, reset);
+static int inline mmcbr_retune(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev, bool reset) {
+    const struct mmc_host_ops *ops = device_get_operations(brdev);
+	return ops->retune(brdev, reqdev, reset);
 }
 
-#endif /* DEV_MMC_BRIDGE_H */
+#ifdef __cplusplus
+}
+#endif
+#endif /* DRIVER_MMC_MMC_HOST_H_ */

@@ -1,9 +1,8 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
+ * Copyright (c) 2006 Bernd Walter.  All rights reserved.
  * Copyright (c) 2006 M. Warner Losh.
- * Copyright (c) 2017 Marius Strobl <marius@FreeBSD.org>
- * Copyright (c) 2015-2016 Ilya Bakulin <kibab@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -55,11 +54,18 @@
  * $FreeBSD$
  */
 
-#ifndef DEV_MMC_MMCREG_H
-#define	DEV_MMC_MMCREG_H
-#ifdef __rtems__
-#include <rtems/thread.h>
-#endif /* __rtems__ */
+ /*
+  * Copyright 2022 wtcat
+  */
+
+#ifndef DRIVER_MMC_MMC_SD_H_
+#define DRIVER_MMC_MMC_SD_H_
+
+#include "drivers/mmc/mmc_base.h"
+
+#ifdef __cplusplus
+extern "C"{
+#endif
 
 /*
  * This file contains the register definitions for the mmc and sd buses.
@@ -737,4 +743,50 @@ struct mmc_quirk {
  */
 #define	MMC_SECTOR_SIZE	512
 
-#endif /* DEV_MMCREG_H */
+
+enum mmc_device_ivars {
+    MMC_IVAR_SPEC_VERS,
+    MMC_IVAR_DSR_IMP,
+    MMC_IVAR_MEDIA_SIZE,
+    MMC_IVAR_RCA,
+    MMC_IVAR_SECTOR_SIZE,
+    MMC_IVAR_TRAN_SPEED,
+    MMC_IVAR_READ_ONLY,
+    MMC_IVAR_HIGH_CAP,
+    MMC_IVAR_CARD_TYPE,
+    MMC_IVAR_BUS_WIDTH,
+    MMC_IVAR_ERASE_SECTOR,
+    MMC_IVAR_MAX_DATA,
+    MMC_IVAR_CMD6_TIMEOUT,
+    MMC_IVAR_QUIRKS,
+    MMC_IVAR_CARD_ID_STRING,
+    MMC_IVAR_CARD_SN_STRING,
+};
+
+/*
+ * Simplified accessors for mmc devices
+ */
+#define MMC_ACCESSOR(var, ivar, type)					\
+	__MMC_BUS_ACCESSOR(mmc, var, MMC, ivar, type)
+
+MMC_ACCESSOR(spec_vers, SPEC_VERS, uint8_t)
+MMC_ACCESSOR(dsr_imp, DSR_IMP, int)
+MMC_ACCESSOR(media_size, MEDIA_SIZE, long)
+MMC_ACCESSOR(rca, RCA, int)
+MMC_ACCESSOR(sector_size, SECTOR_SIZE, int)
+MMC_ACCESSOR(tran_speed, TRAN_SPEED, int)
+MMC_ACCESSOR(read_only, READ_ONLY, int)
+MMC_ACCESSOR(high_cap, HIGH_CAP, int)
+MMC_ACCESSOR(card_type, CARD_TYPE, int)
+MMC_ACCESSOR(bus_width, BUS_WIDTH, int)
+MMC_ACCESSOR(erase_sector, ERASE_SECTOR, int)
+MMC_ACCESSOR(max_data, MAX_DATA, int)
+MMC_ACCESSOR(cmd6_timeout, CMD6_TIMEOUT, u_int)
+MMC_ACCESSOR(quirks, QUIRKS, u_int)
+MMC_ACCESSOR(card_id_string, CARD_ID_STRING, const char *)
+MMC_ACCESSOR(card_sn_string, CARD_SN_STRING, const char *)
+
+#ifdef __cplusplus
+}
+#endif
+#endif /* DRIVER_MMC_MMC_SD_H_ */
