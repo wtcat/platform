@@ -1,7 +1,3 @@
-#include <machine/rtems-bsd-kernel-space.h>
-
-/* SPDX-License-Identifier: BSD-2-Clause */
-
 /*
  * Copyright (C) 2021 embedded brains GmbH (http://www.embedded-brains.de)
  * Copyright (C) 2022 wtcat
@@ -62,40 +58,36 @@
  * details.
  */
 
+/*
+ * Copyright 2022 wtcat
+ */
+#include <stdlib.h>
+#include <rtems/thread.h>
 #include <rtems/rtems/cache.h>
 #include <rtems/malloc.h>
-#include <rtems/irq-extension.h>
+#include <rtems/counter.h>
+#include <rtems/bspIo.h>
 
-#include <bsp.h>
+#include "drivers/mmc/mmc_host.h"
+#include "drivers/mmc/mmc_bus.h"
+#include "drivers/mmc/mmc_specs.h"
+#include "drivers/clock.h"
+#include "drivers/pinctrl.h"
+#include "drivers/ofw_platform_bus.h"
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
+#include "rtems/rtems/support.h"
+#include "stm32h7xx_ll_rcc.h"
 
-#include <sys/param.h>
-#include <sys/bus.h>
-#include <sys/kernel.h>
-#include <sys/module.h>
-#include <sys/mutex.h>
-#include <sys/resource.h>
-#include <sys/rman.h>
-#include <sys/condvar.h>
+#define SDMMC_DEBUG 
 
-#include <pthread.h>
 
-#include <machine/resource.h>
-
-#include <dev/mmc/bridge.h>
-#include <dev/mmc/mmcbrvar.h>
-#include <dev/ofw/ofw_bus.h>
-#include <dev/ofw/ofw_bus_subr.h>
-
-#include "stm32h7xx.h"
-
-#define	ST_SDMMC_LOCK(_sc)		mtx_lock(&(_sc)->mtx)
-#define	ST_SDMMC_UNLOCK(_sc)		mtx_unlock(&(_sc)->mtx)
+#define	ST_SDMMC_LOCK(_sc)		rtems_mutex_lock(&(_sc)->mtx)
+#define	ST_SDMMC_UNLOCK(_sc)	rtems_mutex_unlock(&(_sc)->mtx)
 #define	ST_SDMMC_LOCK_INIT(_sc) \
-	mtx_init(&_sc->mtx, device_get_nameunit(_sc->dev), \
-	    "st_sdmmc", MTX_DEF)
+	do { \
+		rtems_mutex_init(&(_sc)->mtx, "st_sdmmc"); \
+		rtems_condition_variable_init(&(_sc)->cond, "st_sdmmc"); \
+	} while (0)
 
 #define	SDMMC_INT_ERROR_MASK ( \
 		SDMMC_MASK_CTIMEOUTIE | \
@@ -119,12 +111,12 @@ __FBSDID("$FreeBSD$");
 /* Maximum non-aligned buffer is 512 byte from mmc_send_ext_csd() */
 #define DMA_BUF_SIZE 512
 
-#if 0
-#define debug_print(sc, lvl, ...) \
-    if (lvl <= 1) device_printf(sc->dev, __VA_ARGS__)
+#ifdef SDMMC_DEBUG
+#define devdbg(fmt, ...) printk(fmt, ##__VA_ARGS__)
 #else
-#define debug_print(...)
+#define devdbg(...)
 #endif
+
 
 struct st_sdmmc_softc;
 
@@ -149,57 +141,37 @@ struct st_sdmmc_config {
 };
 
 struct st_sdmmc_softc {
-	device_t dev;
+	struct drvmgr_dev *dev;
 	struct mmc_host host;
-
-	struct mtx mtx;
+	rtems_mutex mtx;
+	rtems_condition_variable cond;
 	rtems_binary_semaphore wait_done;
 	int bus_busy;
 
-	struct resource *res[RES_NR];
 	SDMMC_TypeDef *sdmmc;
 	DLYB_TypeDef *dlyb;
-	rtems_vector_number irq;
-
 	uint32_t sdmmc_ker_ck;
 	struct st_sdmmc_config cfg;
-
 	uint32_t intr_status;
 	uint8_t *dmabuf;
+	struct drvmgr_dev *clk;
+	int clkid;
+	int irq;
 };
 
-static const struct ofw_compat_data compat_data[] = {
-	{"arm,primecell",	1},
-	{NULL,		 	0},
-};
 
-void st_sdmmc_idma_txrx(struct st_sdmmc_softc *sc, void *buf)
-{
-	BSD_ASSERT(
-	    (buf >= (void*) stm32h7_memory_sdram_1_begin &&
-	     buf  < (void*) stm32h7_memory_sdram_1_end) ||
-	    (buf >= (void*) stm32h7_memory_sram_axi_begin &&
-	     buf  < (void*) stm32h7_memory_sram_axi_end) ||
-	    (buf >= (void*) stm32h7_memory_sdram_2_begin &&
-	     buf  < (void*) stm32h7_memory_sdram_2_end) ||
-	    (buf >= (void*) stm32h7_memory_quadspi_begin &&
-	     buf  < (void*) stm32h7_memory_quadspi_end));
+static inline void st_sdmmc_idma_txrx(struct st_sdmmc_softc *sc, void *buf) {
 	sc->sdmmc->IDMABASE0 = (uintptr_t) buf;
 	sc->sdmmc->IDMACTRL = SDMMC_IDMA_IDMAEN;
 }
 
-void st_sdmmc_idma_stop(struct st_sdmmc_softc *sc)
-{
+static inline void st_sdmmc_idma_stop(struct st_sdmmc_softc *sc) {
 	sc->sdmmc->IDMACTRL = 0;
 }
 
-static void
-st_sdmmc_intr(void *arg)
-{
-	struct st_sdmmc_softc *sc;
+static void st_sdmmc_intr(void *arg) {
+	struct st_sdmmc_softc *sc = arg;
 	uint32_t status;
-
-	sc = arg;
 
 	status = sc->sdmmc->STA;
 	sc->sdmmc->ICR = status;
@@ -217,27 +189,8 @@ st_sdmmc_intr(void *arg)
 	}
 }
 
-static int
-st_sdmmc_probe(device_t dev)
-{
-	if (!ofw_bus_status_okay(dev))
-		return (ENXIO);
-
-	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data != 0) {
-		device_set_desc(dev, "STM32H7xx SDMMC Host");
-		return (0);
-	}
-
-	return (ENXIO);
-}
-
-static int
-st_sdmmc_set_clock_and_bus(
-	struct st_sdmmc_softc *sc,
-	uint32_t freq,
-	enum mmc_bus_width width
-)
-{
+static int st_sdmmc_set_clock_and_bus(struct st_sdmmc_softc *sc,
+	uint32_t freq, enum mmc_bus_width width) {
 	uint32_t clk_div;
 	uint32_t clkcr;
 
@@ -250,7 +203,7 @@ st_sdmmc_set_clock_and_bus(
 
 	switch (width) {
 	default:
-		BSD_ASSERT(width == bus_width_1);
+		MMC_ASSERT(width == bus_width_1);
 		clkcr |= 0 << SDMMC_CLKCR_WIDBUS_Pos;
 		break;
 	case bus_width_4:
@@ -262,20 +215,15 @@ st_sdmmc_set_clock_and_bus(
 	}
 
 	sc->sdmmc->CLKCR = clkcr;
-
 	return 0;
 }
 
-static void
-st_sdmmc_host_reset(struct st_sdmmc_softc *sc)
-{
+static void st_sdmmc_host_reset(struct st_sdmmc_softc *sc) {
 	sc->sdmmc->MASK = 0;
 	sc->sdmmc->ICR = 0xFFFFFFFF;
 }
 
-static void
-st_sdmmc_hw_init(struct st_sdmmc_softc *sc)
-{
+static void st_sdmmc_hw_init(struct st_sdmmc_softc *sc) {
 	st_sdmmc_set_clock_and_bus(sc, 400000, bus_width_1);
 	sc->sdmmc->POWER = 0;
 	if (sc->cfg.dirpol) {
@@ -287,177 +235,22 @@ st_sdmmc_hw_init(struct st_sdmmc_softc *sc)
 	 * Wait at least 74 cycles; lowest freq is 400kHz
 	 * -> 1/400kHz * 47 = 117us
 	 */
-	usleep(120000);
-
+	rtems_counter_delay_nanoseconds(120000*1000); //usleep(120000);
 	st_sdmmc_host_reset(sc);
 }
 
-static void
-st_sdmmc_board_init(void)
-{
-	HAL_SD_MspInit(NULL);
-}
-
-static int
-st_sdmmc_attach(device_t dev)
-{
-	static pthread_once_t once = PTHREAD_ONCE_INIT;
-	struct st_sdmmc_softc *sc;
-	int rid, error = 0;
-	pcell_t prop;
-	bool interrupt_installed = false;
-
-	sc = device_get_softc(dev);
-	memset(sc, 0, sizeof(*sc));
-
-	sc->dev = dev;
-	ST_SDMMC_LOCK_INIT(sc);
-	rtems_binary_semaphore_init(&sc->wait_done, "sdmmc-sem");
-	
-	sc->res[RES_MEM_SDMMC] = bus_alloc_resource(dev, SYS_RES_MEMORY,
-		&rid, 0, ~0, 1, RF_ACTIVE);
-	if (sc->res[RES_MEM_SDMMC] == NULL) {
-		device_printf(dev,
-			"could not allocate sdmmc resource\n");
-		error = ENXIO;
-		goto _end;
-	}
-	sc->sdmmc = (SDMMC_TypeDef *)sc->res[RES_MEM_SDMMC]->r_bushandle;
-			
-	sc->res[RES_MEM_DLYB] = bus_alloc_resource(dev, SYS_RES_MEMORY,
-		&rid, 1, ~0, 1, RF_ACTIVE);
-	if (sc->res[RES_MEM_DLYB] == NULL) {
-		device_printf(dev,
-			"could not allocate dlyb resource\n");
-		error = ENXIO;
-		goto _end;
-	}	
-	
-	sc->res[RES_IRQ_SDMMC] = bus_alloc_resource(dev, SYS_RES_IRQ,
-		&rid, 0, ~0, 1, RF_ACTIVE);
-	if (sc->res[RES_IRQ_SDMMC] == NULL) {
-		device_printf(dev,
-			"could not allocate interrupt resource\n");
-		error = ENXIO;
-		goto _end;
-	}
-	sc->irq = sc->res[RES_IRQ_SDMMC]->r_bushandle;
-	
-	/*
-		* FIXME: This memory should be in AXI SRAM, QSPI or FMC. In the
-		* configurations for our BSP, the heap is either in AXI SRAM or
-		* in the SDRAM. So that is OK for now. Only assert that the
-		* assumption is true. A better solution (like fixed AXI SRAM)
-		* might would be a good idea.
-		*/
-	sc->dmabuf = rtems_cache_coherent_allocate(
-		DMA_BUF_SIZE, CPU_CACHE_LINE_BYTES, 0);
-	if (sc->dmabuf == NULL) {
-		device_printf(dev, "could not allocate dma buffer\n");
-		error = ENOMEM;
-		goto _end;
-	}
-
-	pthread_once(&once, st_sdmmc_board_init);
-
-	sc->sdmmc_ker_ck = HAL_RCCEx_GetPeriphCLKFreq(
-		RCC_PERIPHCLK_SDMMC);
-	sc->host.f_min = 400000;
-	sc->host.f_max = (int) sc->sdmmc_ker_ck;
-	if (sc->host.f_max > 50000000)
-		sc->host.f_max = 50000000;
-
-	if (OF_getencprop(node, "bus-width", &prop, sizeof(prop)) < 0) {
-		error = ENOSTR;
-		goto _end;
-	}
-	if (prop != 4 && prop != 8) {
-		device_printf(dev, "Bad bus-width value %u\n", prop);
-		error = EINVAL;
-		goto _end;
-	}
-	sc->cfg.data_lines = prop;
-	sc->cfg.dirpol = true;
-	sc->cfg.ocr_voltage = MMC_OCR_320_330 | MMC_OCR_330_340; /* 3.3v */
-
-	st_sdmmc_hw_init(sc);
-
-	error = rtems_interrupt_handler_install(sc->irq, "SDMMC",
-		RTEMS_INTERRUPT_UNIQUE, st_sdmmc_intr, sc);
-	if (error != 0) {
-		device_printf(dev,
-			"could not setup interrupt handler.\n");
-		goto _end;
-	} else {
-		interrupt_installed = true;
-	}
-	
-	sc->host.host_ocr = sc->cfg.ocr_voltage &
-		((1 << (MMC_OCR_MAX_VOLTAGE_SHIFT + 1)) - 1);
-	if (OF_hasprop(node, "cap-sd-highspeed"))
-		sc->host.caps = MMC_CAP_HSPEED;
-	if (sc->cfg.data_lines >= 4) {
-		sc->host.caps |= MMC_CAP_4_BIT_DATA;
-	}
-	if (sc->cfg.data_lines >= 8) {
-		sc->host.caps |= MMC_CAP_8_BIT_DATA;
-	}
-	
-	device_add_child(dev, "mmc", -1);
-	error = bus_generic_attach(dev);
-
-_end:
-	if (error != 0) {
-		/* Undo relevant parts */
-		if (interrupt_installed) {
-			rtems_interrupt_handler_remove(sc->irq,
-			    st_sdmmc_intr, sc);
-		}
-
-		rtems_cache_coherent_free(sc->dmabuf);
-		if (sc->res[RES_MEM_SDMMC])
-			bus_release_resource(dev, SYS_RES_MEMORY, 0, sc->res[RES_MEM_SDMMC]);
-		if (sc->res[RES_MEM_DLYB])
-			bus_release_resource(dev, SYS_RES_MEMORY, 0, sc->res[RES_MEM_DLYB]);
-		if (sc->res[RES_IRQ_SDMMC])
-			bus_release_resource(dev, SYS_RES_IRQ, 0, sc->res[RES_IRQ_SDMMC]);
-	}
-
-	return error;
-}
-
-static int
-st_sdmmc_detach(device_t dev)
-{
-	struct st_sdmmc_softc *sc;
-
-	sc = device_get_softc(dev);
-
-	/* Always attached. So this is not necessary. */
-	BSD_ASSERT(0);
-
-	(void)sc;
-
-	return (EBUSY);
-}
-
-static int
-st_sdmmc_update_ios(device_t brdev, device_t reqdev)
-{
-	struct st_sdmmc_softc *sc;
+static int st_sdmmc_update_ios(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
+	struct st_sdmmc_softc *sc = brdev->priv;
 	struct mmc_ios *ios;
 	int err;
 
-	sc = device_get_softc(brdev);
-
+	(void) reqdev;
 	ST_SDMMC_LOCK(sc);
-
 	ios = &sc->host.ios;
 	err = st_sdmmc_set_clock_and_bus(sc, ios->clock, ios->bus_width);
-	if (err != 0) {
+	if (err != 0) 
 		return (err);
-	}
-
+	
 	if (ios->power_mode == power_off) {
 		/*
 		 * FIXME: Maybe a reset of the module is necessary instead. But
@@ -470,13 +263,10 @@ st_sdmmc_update_ios(device_t brdev, device_t reqdev)
 	}
 
 	ST_SDMMC_UNLOCK(sc);
-
-	return (EIO);
+	return -EIO;
 }
 
-static int
-st_sdmmc_wait_irq(struct st_sdmmc_softc *sc)
-{
+static int st_sdmmc_wait_irq(struct st_sdmmc_softc *sc) {
 	int error = 0;
 
 	error = rtems_binary_semaphore_wait_timed_ticks(&sc->wait_done,
@@ -494,9 +284,7 @@ st_sdmmc_wait_irq(struct st_sdmmc_softc *sc)
 	return error;
 }
 
-static void
-st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd)
-{
+static void st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd) {
 	uint32_t cmdval;
 	uint32_t xferlen;
 	uint32_t int_mask;
@@ -504,7 +292,7 @@ st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd)
 	void *data = NULL;
 	bool short_xfer = false;
 
-	debug_print(sc, 1, "cmd: %d, arg: %08x, flags: 0x%x\n",
+	devdbg("%s: cmd: %d, arg: %08x, flags: 0x%x\n", __func__,
 	    cmd->opcode, cmd->arg, cmd->flags);
 
 	xferlen = 0;
@@ -525,7 +313,7 @@ st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd)
 	 * produced an interrupt before it has been disabled.
 	 */
 	if (rtems_binary_semaphore_try_wait(&sc->wait_done) == 0) {
-		device_printf(sc->dev, "Semaphore set from last command\n");
+		printk("%s: Semaphore set from last command\n", __func__);
 	}
 
 	int_mask = SDMMC_INT_ERROR_MASK;
@@ -569,11 +357,11 @@ st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd)
 			blksize = ffs(xferlen) - 1;
 		}
 
-		debug_print(sc, 1,
-		    "data: len: %d, xferlen: %d, blksize: %d, dataflags: 0x%x\n",
+		
+		devdbg("%s: data: len: %d, xferlen: %d, blksize: %d, dataflags: 0x%x\n", __func__,
 		    cmd->data->len, xferlen, blksize, cmd->data->flags);
 
-		BSD_ASSERT(xferlen % (1 << blksize) == 0);
+		MMC_ASSERT(xferlen % (1 << blksize) == 0);
 
 		data = cmd->data->data;
 		/*
@@ -582,7 +370,7 @@ st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd)
 		 */
 		if (((uintptr_t)data % CPU_CACHE_LINE_BYTES != 0) ||
 		    (xferlen % CPU_CACHE_LINE_BYTES) != 0) {
-			BSD_ASSERT(xferlen < DMA_BUF_SIZE);
+			MMC_ASSERT(xferlen < DMA_BUF_SIZE);
 			if ((cmd->data->flags & MMC_DATA_READ) == 0) {
 				memcpy(sc->dmabuf, cmd->data->data, xferlen);
 			}
@@ -616,10 +404,9 @@ st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd)
 
 	cmd->error = st_sdmmc_wait_irq(sc);
 	if (cmd->error) {
-		sleep(10);
-		device_printf(sc->dev,
-		    "error (%d) waiting for xfer: status %08x, cmd: %d, flags: %08x\n",
-		    cmd->error, sc->intr_status, cmd->opcode, cmd->flags);
+		rtems_task_wake_after(RTEMS_MICROSECONDS_TO_TICKS(10000)); //sleep(10);
+		printk("%s: error (%d) waiting for xfer: status %08x, cmd: %d, flags: %08x\n",
+		    __func__, cmd->error, sc->intr_status, cmd->opcode, cmd->flags);
 	} else {
 		if ((cmd->flags & MMC_RSP_PRESENT) != 0) {
 			if ((cmd->flags & MMC_RSP_136) != 0) {
@@ -627,14 +414,14 @@ st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd)
 				cmd->resp[1] = sc->sdmmc->RESP2;
 				cmd->resp[2] = sc->sdmmc->RESP3;
 				cmd->resp[3] = sc->sdmmc->RESP4;
-				debug_print(sc, 2, "rsp: %08x %08x %08x %08x\n",
+				devdbg("%s: rsp: %08x %08x %08x %08x\n", __func__,
 				    cmd->resp[0],
 				    cmd->resp[1],
 				    cmd->resp[2],
 				    cmd->resp[3]);
 			} else {
 				cmd->resp[0] = sc->sdmmc->RESP1;
-				debug_print(sc, 2, "rsp: %08x\n", cmd->resp[0]);
+				devdbg("%s: rsp: %08x\n", __func__, cmd->resp[0]);
 			}
 		}
 
@@ -650,72 +437,55 @@ st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd)
 	sc->sdmmc->ICR = 0xFFFFFFFF;
 }
 
-static int
-st_sdmmc_request(device_t brdev, device_t reqdev, struct mmc_request *req)
-{
-	struct st_sdmmc_softc *sc;
-
-	sc = device_get_softc(brdev);
-
+static int st_sdmmc_request(struct drvmgr_dev * brdev, struct drvmgr_dev * reqdev, 
+	struct mmc_request *req) {
+	struct st_sdmmc_softc *sc = brdev->priv;
+	(void) reqdev;
 	ST_SDMMC_LOCK(sc);
 	st_sdmmc_cmd_do(sc, req->cmd);
-	if (req->stop != NULL) {
+	if (req->stop != NULL) 
 		st_sdmmc_cmd_do(sc, req->stop);
-	}
 	ST_SDMMC_UNLOCK(sc);
-
 	(*req->done)(req);
-
-	return (0);
+	return 0;
 }
 
-static int
-st_sdmmc_get_ro(device_t brdev, device_t reqdev)
-{
-
+static int st_sdmmc_get_ro(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
 	/*
 	 * FIXME: Currently just ignore write protection. Micro-SD doesn't have
 	 * it anyway and most boards are now using Micro-SD slots.
 	 */
+	(void) brdev;
+	(void) reqdev;
 	return (0);
 }
 
-static int
-st_sdmmc_acquire_host(device_t brdev, device_t reqdev)
-{
-	struct st_sdmmc_softc *sc;
-
-	sc = device_get_softc(brdev);
-
+static int st_sdmmc_acquire_host(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
+	struct st_sdmmc_softc *sc = brdev->priv;
+	(void) reqdev;
 	ST_SDMMC_LOCK(sc);
 	while (sc->bus_busy)
-		msleep(sc, &sc->mtx, PZERO, "stsdmmcah", hz / 5);
+		rtems_condition_variable_wait(&sc->cond, &sc->mtx);
 	sc->bus_busy++;
 	ST_SDMMC_UNLOCK(sc);
 	return (0);
 }
 
-static int
-st_sdmmc_release_host(device_t brdev, device_t reqdev)
-{
-	struct st_sdmmc_softc *sc;
-
-	sc = device_get_softc(brdev);
-
+static int st_sdmmc_release_host(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
+	struct st_sdmmc_softc *sc = brdev->priv;
+	(void) reqdev;
 	ST_SDMMC_LOCK(sc);
 	sc->bus_busy--;
-	wakeup(sc);
+	rtems_condition_variable_broadcast(&sc->cond);
 	ST_SDMMC_UNLOCK(sc);
-	return (0);
+	return 0;
 }
 
-static int
-st_sdmmc_read_ivar(device_t bus, device_t child, int which, uintptr_t *result)
-{
-	struct st_sdmmc_softc *sc;
+static int st_sdmmc_read_ivar(struct drvmgr_dev *bus, struct drvmgr_dev *child, 
+	int which, uintptr_t *result) {
+	struct st_sdmmc_softc *sc = bus->priv;
 
-	sc = device_get_softc(bus);
-
+	(void) child;
 	switch (which) {
 	default:
 		return (EINVAL);
@@ -772,13 +542,11 @@ st_sdmmc_read_ivar(device_t bus, device_t child, int which, uintptr_t *result)
 	return (0);
 }
 
-static int
-st_sdmmc_write_ivar(device_t bus, device_t child, int which, uintptr_t value)
-{
-	struct st_sdmmc_softc *sc;
+static int st_sdmmc_write_ivar(struct drvmgr_dev *bus, struct drvmgr_dev *child, 
+	int which, uintptr_t value) {
+	struct st_sdmmc_softc *sc = bus->priv;
 
-	sc = device_get_softc(bus);
-
+	(void) child;
 	switch (which) {
 	default:
 		return (EINVAL);
@@ -823,34 +591,159 @@ st_sdmmc_write_ivar(device_t bus, device_t child, int which, uintptr_t value)
 	return (0);
 }
 
-static device_method_t st_sdmmc_methods[] = {
-	/* device_if */
-	DEVMETHOD(device_probe, st_sdmmc_probe),
-	DEVMETHOD(device_attach, st_sdmmc_attach),
-	DEVMETHOD(device_detach, st_sdmmc_detach),
-
-	/* Bus interface */
-	DEVMETHOD(bus_read_ivar, st_sdmmc_read_ivar),
-	DEVMETHOD(bus_write_ivar, st_sdmmc_write_ivar),
-
-	/* mmcbr_if */
-	DEVMETHOD(mmcbr_update_ios, st_sdmmc_update_ios),
-	DEVMETHOD(mmcbr_request, st_sdmmc_request),
-	DEVMETHOD(mmcbr_get_ro, st_sdmmc_get_ro),
-	DEVMETHOD(mmcbr_acquire_host, st_sdmmc_acquire_host),
-	DEVMETHOD(mmcbr_release_host, st_sdmmc_release_host),
-
-	DEVMETHOD_END
+static const struct mmc_host_ops st_sdmmc_ops = {
+	.ivar_ops = {
+		.read_ivar = st_sdmmc_read_ivar,
+		.write_ivar = st_sdmmc_write_ivar
+	},
+	.update_ios = st_sdmmc_update_ios,
+	.request = st_sdmmc_request,
+	.get_ro = st_sdmmc_get_ro,
+	.acquire_host = st_sdmmc_acquire_host,
+	.release_host = st_sdmmc_release_host
 };
 
-static driver_t st_sdmmc_driver = {
-	"st_sdmmc",
-	st_sdmmc_methods,
-	sizeof(struct st_sdmmc_softc)
+static int stm32h7_sdmmc_bus_unite(struct drvmgr_drv *drv, struct drvmgr_dev *dev) {
+	return ofw_platform_bus_match(drv, dev, DRVMGR_BUS_TYPE_SDMMC);
+}
+
+static struct drvmgr_bus_ops stm32h7_sdmmc_bus = {
+	.init = {
+		ofw_platform_bus_populate_device,
+	},
+	.unite = stm32h7_sdmmc_bus_unite
 };
 
-static devclass_t st_sdmmc_devclass;
+static int st_sdmmc_preprobe(struct drvmgr_dev *dev) {
+	struct dev_private *devp = device_get_private(dev);
+    rtems_ofw_memory_area reg;
+    rtems_vector_number irq;
+	struct st_sdmmc_softc *sc;
+    int ret;
 
-DRIVER_MODULE(st_sdmmc, simplebus, st_sdmmc_driver, st_sdmmc_devclass, NULL, NULL);
-DRIVER_MODULE(mmc, st_sdmmc, mmc_driver, mmc_devclass, NULL, NULL);
-MODULE_DEPEND(st_sdmmc, mmc, 1, 1, 1);
+	ret = rtems_ofw_get_reg(devp->np, &reg, sizeof(reg));
+	if (ret < 0) 
+		return -ENOSTR;
+	ret = rtems_ofw_get_interrupts(devp->np, &irq, sizeof(irq));
+	if (ret < 0) 
+		return -ENOSTR;
+	sc = rtems_calloc(1, sizeof(*sc));
+	if (!sc)
+		return -ENOMEM;
+    sc->sdmmc = (void *)reg.start;
+    sc->irq = (int)irq;
+    sc->dev = dev;
+    devp->devops = &st_sdmmc_ops;
+    dev->priv = sc;
+    devdbg("%s: %s reg<0x%x> irq<%d>\n", __func__, dev->name, reg.start, irq);
+    return ofw_platform_bus_device_register(dev, &stm32h7_sdmmc_bus, 
+    	DRVMGR_BUS_TYPE_SDMMC);
+}
+
+static int st_sdmmc_probe(struct drvmgr_dev *dev) {
+	struct dev_private *devp = device_get_private(dev);
+	struct st_sdmmc_softc *sc = dev->priv;
+	int err = 0;
+	pcell_t prop = 0;
+
+	ST_SDMMC_LOCK_INIT(sc);
+	rtems_binary_semaphore_init(&sc->wait_done, "sdmmc-sem");
+	
+    sc->clk = ofw_clock_request(devp->np, NULL, (pcell_t *)&sc->clkid, 
+        sizeof(sc->clkid));
+    if (!sc->clk) {
+        printk("%s: reqeust clock failed!\n", __func__);
+        err = -ENODEV;
+        goto _free_sc;
+    }
+
+	if (rtems_ofw_get_enc_prop(devp->np, "bus-width", &prop, sizeof(prop)) < 0 ||
+		(prop != 4 && prop != 8)) {
+		printk("%s: Bad bus-width value %u\n", __func__, prop);
+		err = -ENOSTR;
+		goto _free_sc;
+	}
+
+	/*
+		* FIXME: This memory should be in AXI SRAM, QSPI or FMC. In the
+		* configurations for our BSP, the heap is either in AXI SRAM or
+		* in the SDRAM. So that is OK for now. Only assert that the
+		* assumption is true. A better solution (like fixed AXI SRAM)
+		* might would be a good idea.
+		*/
+	sc->dmabuf = rtems_cache_coherent_allocate(DMA_BUF_SIZE, CPU_CACHE_LINE_BYTES, 0);
+	if (sc->dmabuf == NULL) {
+		printk("%s: could not allocate dma buffer\n", __func__);
+		err = -ENOMEM;
+		goto _free_sc;
+	}
+
+	sc->sdmmc_ker_ck = LL_RCC_GetSDMMCClockFreq(LL_RCC_SDMMC_CLKSOURCE);
+	sc->host.f_min = 400000;
+	sc->host.f_max = (int) sc->sdmmc_ker_ck;
+	if (sc->host.f_max > 50000000)
+		sc->host.f_max = 50000000;
+
+	sc->cfg.data_lines = prop;
+	sc->cfg.dirpol = true;
+	sc->cfg.ocr_voltage = MMC_OCR_320_330 | MMC_OCR_330_340; /* 3.3v */
+	st_sdmmc_hw_init(sc);
+
+    err = drvmgr_interrupt_register(dev, IRQF_HARD(sc->irq), dev->name, 
+		st_sdmmc_intr, sc);
+	if (err != 0) {
+		printk("could not setup interrupt handler.\n");
+		goto _free_buf;
+	}
+
+	sc->host.host_ocr = sc->cfg.ocr_voltage &
+		((1 << (MMC_OCR_MAX_VOLTAGE_SHIFT + 1)) - 1);
+	if (rtems_ofw_has_prop(devp->np, "cap-sd-highspeed"))
+		sc->host.caps = MMC_CAP_HSPEED;
+	if (sc->cfg.data_lines >= 4)
+		sc->host.caps |= MMC_CAP_4_BIT_DATA;
+	if (sc->cfg.data_lines >= 8)
+		sc->host.caps |= MMC_CAP_8_BIT_DATA;
+
+    /* Enable clock */
+    clk_enable(sc->clk, &sc->clkid);
+    devdbg("%s: sdmmc max-frequency(%u) bus-width(%d)\n", __func__, 
+		sc->sdmmc_ker_ck, sc->cfg.data_lines);
+	return 0;
+
+_free_buf:
+	rtems_cache_coherent_free(sc->dmabuf);
+_free_sc:
+	free(sc);
+	return err;
+}
+
+static int stm32h7_sdmmc_extprobe(struct drvmgr_dev *dev) {
+      if (pinctrl_simple_set("/dev/pinctrl", dev)) 
+        rtems_panic("%s: %s configure pins failed\n", __func__, 
+            dev->name);
+     return 0;
+}
+
+static struct drvmgr_drv_ops stm32h7_sdmmc_driver = {
+	.init = {
+        st_sdmmc_preprobe,
+		st_sdmmc_probe,
+		stm32h7_sdmmc_extprobe
+	}
+};
+
+static const struct dev_id id_table[] = {
+	{"arm,primecell",	NULL},
+	{NULL,		 	NULL},
+};
+
+OFW_PLATFORM_DRIVER(stm32h7_sdmmc) = {
+	.drv = {
+		.drv_id   = DRIVER_SDMMC_ID,
+		.name     = "sdmmc",
+		.bus_type = DRVMGR_BUS_TYPE_PLATFORM,
+		.ops      = &stm32h7_sdmmc_driver
+	},
+    .ids = id_table
+};

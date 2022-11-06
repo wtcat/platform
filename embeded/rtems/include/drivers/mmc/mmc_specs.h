@@ -58,11 +58,12 @@
   * Copyright 2022 wtcat
   */
 
-#ifndef DRIVER_MMC_MMC_SD_H_
-#define DRIVER_MMC_MMC_SD_H_
+#ifndef DRIVER_MMC_MMC_SPECS_H_
+#define DRIVER_MMC_MMC_SPECS_H_
 
+#include <rtems/thread.h>
 #include "drivers/mmc/mmc_base.h"
-
+ 
 #ifdef __cplusplus
 extern "C"{
 #endif
@@ -220,9 +221,7 @@ struct mmc_request {
 	uint32_t flags;
 
 #define	MMC_TUNE_DONE	2
-#ifdef __rtems__
 	rtems_binary_semaphore req_done;
-#endif /* __rtems__ */
 };
 
 /* Command definitions */
@@ -789,4 +788,4 @@ MMC_ACCESSOR(card_sn_string, CARD_SN_STRING, const char *)
 #ifdef __cplusplus
 }
 #endif
-#endif /* DRIVER_MMC_MMC_SD_H_ */
+#endif /* DRIVER_MMC_MMC_SPECS_H_ */

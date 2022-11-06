@@ -76,7 +76,7 @@ struct mmc_softc;
 struct mmc_request;
 
 struct mmc_bus_ops {
-	struct mmc_base_ops rwops;
+	struct mmc_base_ops ivar_ops;
 	void (*retune_pause)(struct drvmgr_dev *busdev, struct drvmgr_dev * reqdev, bool retune);
 	void (*retune_unpause)(struct drvmgr_dev *busdev, struct drvmgr_dev * reqdev);
 	int (*wait_for_request)(struct drvmgr_dev *busdev, struct drvmgr_dev * reqdev, 
@@ -86,8 +86,9 @@ struct mmc_bus_ops {
 };
 
 struct mmc_softc {
-	rtems_recursive_mutex sc_mtx;
-	struct intr_config_hook config_intrhook;
+	rtems_mutex sc_mtx;
+	// struct intr_config_hook config_intrhook;
+	struct drvmgr_dev *dev;
 	struct drvmgr_dev *owner;
 	struct drvmgr_dev **child_list;
 	int child_count;
@@ -116,17 +117,17 @@ static inline void mmcbus_retune_unpause(struct drvmgr_dev *busdev, struct drvmg
 static inline int mmcbus_wait_for_request(struct drvmgr_dev *busdev, struct drvmgr_dev * reqdev, 
 	struct mmc_request *req) {
 	const struct mmc_bus_ops *ops = device_get_operations(busdev);
-	ops->wait_for_request(busdev, reqdev, req);
+	return ops->wait_for_request(busdev, reqdev, req);
 }
 
 static inline int mmcbus_acquire_bus(struct drvmgr_dev *busdev, struct drvmgr_dev * reqdev) {
 	const struct mmc_bus_ops *ops = device_get_operations(busdev);
-	ops->acquire_bus(busdev, reqdev);
+	return ops->acquire_bus(busdev, reqdev);
 }
 
 static inline int mmcbus_release_bus(struct drvmgr_dev *busdev, struct drvmgr_dev * reqdev) {
 	const struct mmc_bus_ops *ops = device_get_operations(busdev);
-	ops->release_bus(busdev, reqdev);
+	return ops->release_bus(busdev, reqdev);
 }
 
 
@@ -174,9 +175,8 @@ MMCBR_ACCESSOR(max_data, MAX_DATA, int)
 MMCBR_ACCESSOR(max_busy_timeout, MAX_BUSY_TIMEOUT, u_int)
 
 
-static int inline mmcbr_get_retune_req(struct drvmgr_dev *dev) {
+static inline int mmcbr_get_retune_req(struct drvmgr_dev *dev) {
 	struct drvmgr_dev *parent = dev->parent->dev;
-	const struct mmc_base_ops *ops = device_get_operations(parent);
 	uintptr_t v;
 	if (__predict_false(__mmc_read_ivar(parent, dev,
 	    MMCBR_IVAR_RETUNE_REQ, &v) != 0))

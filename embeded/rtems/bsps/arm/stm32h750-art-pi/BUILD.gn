@@ -17,6 +17,7 @@ component("board") {
     "stm32h7_dmamux.c",
     "stm32h7_uart.c",
     "stm32h7_spi.c",
+    "stm32h7_sdmmc.c",
     "stm32h7_leds.c",
     "gpio-keys.c",
     "flash_w25q128.c"

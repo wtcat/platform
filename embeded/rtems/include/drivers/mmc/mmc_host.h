@@ -187,15 +187,10 @@ struct mmc_host {
 	struct mmc_ios ios;	/* Current state of the host */
 };
 
-struct mmc_base_ops {
-	int (*read_ivar)(struct drvmgr_dev *bus, struct drvmgr_dev *child, int which, uintptr_t *result);
-	int (*write_ivar)(struct drvmgr_dev *bus, struct drvmgr_dev *child, int which, uintptr_t *result);
-};
-
 
 struct mmc_request;
 struct mmc_host_ops {
-    struct mmc_base_ops rwops;
+    struct mmc_base_ops ivar_ops;
 	int (*update_ios)(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev);
 	int (*request)(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev, struct mmc_request *req);
 	int (*get_ro)(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev);
@@ -206,43 +201,43 @@ struct mmc_host_ops {
 	int (*retune)(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev, bool reset);
 };
 
-static int inline mmcbr_update_ios(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
+static inline int mmcbr_update_ios(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
     const struct mmc_host_ops *ops = device_get_operations(brdev);
 	return ops->update_ios(brdev, reqdev);
 }
 
-static int inline mmcbr_request(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev, 
+static inline int mmcbr_request(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev, 
     struct mmc_request *req) {
     const struct mmc_host_ops *ops = device_get_operations(brdev);
 	return ops->request(brdev, reqdev, req);
 }
 
-static int inline mmcbr_get_ro(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
+static inline int mmcbr_get_ro(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
     const struct mmc_host_ops *ops = device_get_operations(brdev);
 	return ops->get_ro(brdev, reqdev);
 }
 
-static int inline mmcbr_acquire_host(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
+static inline int mmcbr_acquire_host(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
     const struct mmc_host_ops *ops = device_get_operations(brdev);
 	return ops->acquire_host(brdev, reqdev);
 }
 
-static int inline mmcbr_release_host(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
+static inline int mmcbr_release_host(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
     const struct mmc_host_ops *ops = device_get_operations(brdev);
 	return ops->release_host(brdev, reqdev);
 }
 
-static int inline mmcbr_switch_vccq(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
+static inline int mmcbr_switch_vccq(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
     const struct mmc_host_ops *ops = device_get_operations(brdev);
 	return ops->switch_vccq(brdev, reqdev);
 }
 
-static int inline mmcbr_tune(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev, bool hs400) {
+static inline int mmcbr_tune(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev, bool hs400) {
     const struct mmc_host_ops *ops = device_get_operations(brdev);
 	return ops->tune(brdev, reqdev, hs400);
 }
 
-static int inline mmcbr_retune(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev, bool reset) {
+static inline int mmcbr_retune(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev, bool reset) {
     const struct mmc_host_ops *ops = device_get_operations(brdev);
 	return ops->retune(brdev, reqdev, reset);
 }
