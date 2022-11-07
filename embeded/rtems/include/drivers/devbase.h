@@ -4,6 +4,7 @@
 #ifndef DRIVER_DEV_BASE_H_
 #define DRIVER_DEV_BASE_H_
 
+#include "rtems/score/basedefs.h"
 #include <rtems/sysinit.h>
 #include <drvmgr/drvmgr.h>
 #ifdef CONFIG_OFW
@@ -18,6 +19,8 @@
 #ifdef __cplusplus
 extern "C"{
 #endif
+
+RTEMS_STATIC_ASSERT((sizeof(struct drvmgr_dev) % 4) == 0, "");
 
 #define DRVMGR_WARN "DRVMGR_WARNING: " 
 
@@ -79,8 +82,7 @@ static inline void *device_get_parent_priv(struct drvmgr_dev *dev) {
 }
 
 static inline void *device_get_private(struct drvmgr_dev *dev) {
-	void *devp = dev + 1;
-	return (void *)(((uintptr_t)devp + 3) & ~3);
+	return (void *)(dev + 1);
 }
 
 static inline struct drvmgr_dev *device_get_parent(struct drvmgr_dev *dev) {
