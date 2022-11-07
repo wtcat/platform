@@ -4,7 +4,8 @@ component("shared") {
     sources = [
         "vdma.c",
         "dma.c",
-        "mdma.c"
+        "mdma.c",
+        "devbase.c"
     ]
     if (use_ofw_bus) {
         sources += [

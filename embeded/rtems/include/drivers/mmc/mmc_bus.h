@@ -75,6 +75,15 @@ struct mmc_host;
 struct mmc_softc;
 struct mmc_request;
 
+struct mmc_dev_private {
+	void *devops;
+};
+
+struct mmc_carddev_private {
+	void *devops;
+	void *ivar;
+};
+
 struct mmc_bus_ops {
 	struct mmc_base_ops ivar_ops;
 	void (*retune_pause)(struct drvmgr_dev *busdev, struct drvmgr_dev * reqdev, bool retune);
@@ -87,6 +96,7 @@ struct mmc_bus_ops {
 
 struct mmc_softc {
 	rtems_mutex sc_mtx;
+	struct drv_posthook hook;
 	// struct intr_config_hook config_intrhook;
 	struct drvmgr_dev *dev;
 	struct drvmgr_dev *owner;
@@ -183,6 +193,30 @@ static inline int mmcbr_get_retune_req(struct drvmgr_dev *dev) {
 		return retune_req_none;
 	return (int)v;
 }
+
+/*
+ * Convenience wrappers for the mmcbr interface
+ */
+static inline int mmcbr_update_ios(struct drvmgr_dev *dev) {
+	return mmc_host_update_ios(device_get_parent(dev), dev);
+}
+
+static inline int mmcbr_tune(struct drvmgr_dev *dev, bool hs400) {
+	return mmc_host_tune(device_get_parent(dev), dev, hs400);
+}
+
+static inline int mmcbr_retune(struct drvmgr_dev *dev, bool reset) {
+	return mmc_host_retune(device_get_parent(dev), dev, reset);
+}
+
+static inline int mmcbr_switch_vccq(struct drvmgr_dev *dev) {
+	return mmc_host_switch_vccq(device_get_parent(dev), dev);
+}
+
+static inline int mmcbr_get_ro(struct drvmgr_dev *dev) {
+	return mmc_host_get_ro(device_get_parent(dev), dev);
+}
+
 #ifdef __cplusplus
 }
 #endif

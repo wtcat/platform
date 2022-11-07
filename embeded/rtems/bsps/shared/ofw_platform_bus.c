@@ -216,16 +216,8 @@ int __ofw_bus_populate_device(struct drvmgr_bus *bus, phandle_t parent,
         char *name = (char *)devp + sizeof(struct dev_private);
         memcpy(name, buffer, len);
         devp->np = child;
-        dev->next = NULL;
         dev->parent = bus;
-        dev->minor_drv = 0;
-        dev->minor_bus = 0;
-        dev->businfo = NULL;
-        dev->priv = NULL;
-        dev->drv = NULL;
         dev->name = name;
-        dev->next_in_drv = NULL;
-        dev->bus = NULL;
 		if (rtems_ofw_get_enc_prop(devp->np, "phandle", &prop, sizeof(prop)) > 0) 
 			dev->businfo = (void *)prop;
 		rtems_chain_append(&ofw_device_list, &devp->node);
@@ -248,20 +240,13 @@ int ofw_platform_bus_populate_device(struct drvmgr_bus *bus) {
 }
 
 int ofw_platform_bus_device_register(struct drvmgr_dev *dev,
-	struct drvmgr_bus_ops *bus_ops, int bustype) {
+	const struct drvmgr_bus_ops *bus_ops, int bustype) {
 	if (!dev->name)
 		return -DRVMGR_EINVAL;
 	drvmgr_alloc_bus(&dev->bus, 0);
 	dev->bus->bus_type = bustype;
-	dev->bus->next = NULL;
 	dev->bus->dev = dev;
-	dev->bus->priv = NULL;
-	dev->bus->children = NULL;
-	dev->bus->ops = bus_ops;
-	dev->bus->dev_cnt = 0;
-	dev->bus->reslist = NULL;
-	dev->bus->maps_up = NULL;
-	dev->bus->maps_down = NULL;
+	dev->bus->ops = (void *)bus_ops;
 	return drvmgr_bus_register(dev->bus);
 }
 

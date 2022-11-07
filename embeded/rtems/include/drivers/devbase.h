@@ -51,8 +51,10 @@ enum drvmgr_bus_type {
 #define DRIVER_SPI_ID		    DRIVER_ROOTBUS_ID(DRVMGR_BUS_TYPE_SPI)
 	DRVMGR_BUS_TYPE_PINCTRL,
 #define DRIVER_PINCTRL_ID		DRIVER_ROOTBUS_ID(DRVMGR_BUS_TYPE_PINCTRL)
-	DRVMGR_BUS_TYPE_SDMMC,
-#define DRIVER_SDMMC_ID			DRIVER_ROOTBUS_ID(DRVMGR_BUS_TYPE_SDMMC)
+	DRVMGR_BUS_TYPE_MMCHOST,
+#define DRIVER_MMCHOST_ID			DRIVER_ROOTBUS_ID(DRVMGR_BUS_TYPE_MMCHOST)
+	DRVMGR_BUS_TYPE_MMC,
+#define DRIVER_MMC_ID			DRIVER_ROOTBUS_ID(DRVMGR_BUS_TYPE_MMC)
 };
 	
 struct dev_id {
@@ -65,12 +67,20 @@ struct dev_driver {
 	const struct dev_id *const ids;
 };
 
+/* Running at the begin of Init thread */
+struct drv_posthook {
+	struct drv_posthook *next;
+	void (*run)(void *);
+	void *arg;
+};
+
 static inline void *device_get_parent_priv(struct drvmgr_dev *dev) {
 	return dev->parent->dev->priv;
 }
 
-static inline struct dev_private *device_get_private(struct drvmgr_dev *dev) {
-	return (struct dev_private *)(dev + 1);
+static inline void *device_get_private(struct drvmgr_dev *dev) {
+	void *devp = dev + 1;
+	return (void *)(((uintptr_t)devp + 3) & ~3);
 }
 
 static inline struct drvmgr_dev *device_get_parent(struct drvmgr_dev *dev) {
@@ -78,7 +88,8 @@ static inline struct drvmgr_dev *device_get_parent(struct drvmgr_dev *dev) {
 }
 
 static inline const void *device_get_operations(struct drvmgr_dev *dev) {
-	return *(void **)(dev + 1);
+	void **ops = (void **)device_get_private(dev);
+	return *ops;
 }
 
 #define __platform_driver_init(drv) \
@@ -91,6 +102,14 @@ static inline const void *device_get_operations(struct drvmgr_dev *dev) {
 		RTEMS_SYSINIT_DRVMGR,  \
 		RTEMS_SYSINIT_ORDER_MIDDLE \
 	)
+
+
+struct drvmgr_dev *device_add(struct drvmgr_dev *parent, 
+    const struct drvmgr_bus_ops *bus_ops, 
+    int bustype, const char *name, size_t devp_size, size_t priv_size);
+int device_delete(struct drvmgr_dev *parent, struct drvmgr_dev *dev);
+
+int driver_register_posthook(struct drv_posthook *hook);
 
 #ifdef __cplusplus
 }

@@ -228,16 +228,9 @@ int platform_dev_register(struct drvmgr_bus *parent,
 	}
 	priv->res = r;
 	priv->nirq = nr;
-	dev->next = NULL;
 	dev->parent = parent;
-	dev->minor_drv = 0;
-	dev->minor_bus = 0;
 	dev->businfo = priv;
-	dev->priv = NULL;
-	dev->drv = NULL;
 	dev->name = (char *)r->name;
-	dev->next_in_drv = NULL;
-	dev->bus = NULL;
 	drvmgr_dev_register(dev);
 	return 0;
 }
@@ -266,15 +259,8 @@ int platform_bus_device_register(struct drvmgr_dev *dev,
 		return -DRVMGR_EINVAL;
 	drvmgr_alloc_bus(&dev->bus, 0);
 	dev->bus->bus_type = bustype;
-	dev->bus->next = NULL;
 	dev->bus->dev = dev;
-	dev->bus->priv = NULL;
-	dev->bus->children = NULL;
 	dev->bus->ops = bus_ops;
-	dev->bus->dev_cnt = 0;
-	dev->bus->reslist = NULL;
-	dev->bus->maps_up = NULL;
-	dev->bus->maps_down = NULL;
 	return drvmgr_bus_register(dev->bus);
 }
 

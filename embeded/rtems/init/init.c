@@ -14,6 +14,7 @@
 #endif
 #endif /* __rtems_libbsd__ */
 #include "shell/shell_utils.h"
+#include "base/init.h"
 
 #ifndef CONFIGURE_IRQ_SERVER_PRIO
 #define CONFIGURE_IRQ_SERVER_PRIO 1
@@ -29,6 +30,8 @@
 #endif
 
 #define MS(ms) RTEMS_MILLISECONDS_TO_TICKS(ms)
+
+RTEMS_LINKER_ROSET(_Init, rtems_sysinit_item);
 
 void RTEMS_WEAK _shell_init(void) {
 }
@@ -74,6 +77,7 @@ static void rootfs_init(void) {
 
 rtems_task Init(rtems_task_argument arg) {
   (void) arg;
+  sysinit_post();
   rootfs_init();
 
   /* Run startup script */

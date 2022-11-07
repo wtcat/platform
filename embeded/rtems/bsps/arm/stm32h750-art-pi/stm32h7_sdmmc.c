@@ -75,6 +75,7 @@
 #include "drivers/pinctrl.h"
 #include "drivers/ofw_platform_bus.h"
 
+#include "ofw/ofw.h"
 #include "rtems/rtems/support.h"
 #include "stm32h7xx_ll_rcc.h"
 
@@ -297,7 +298,6 @@ static void st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd) 
 
 	xferlen = 0;
 	sc->intr_status = 0;
-
 	sc->sdmmc->CMD = 0;
 	/*
 	 * There should be a delay of "at least seven sdmmc_hclk clock periods"
@@ -312,12 +312,10 @@ static void st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd) 
 	 * error case where a previous command run into a timeout and still
 	 * produced an interrupt before it has been disabled.
 	 */
-	if (rtems_binary_semaphore_try_wait(&sc->wait_done) == 0) {
+	if (rtems_binary_semaphore_try_wait(&sc->wait_done) == 0) 
 		printk("%s: Semaphore set from last command\n", __func__);
-	}
 
 	int_mask = SDMMC_INT_ERROR_MASK;
-
 	arg = cmd->arg;
 	cmdval = (cmd->opcode & SDMMC_CMD_CMDINDEX_Msk) | SDMMC_CMD_CPSMEN;
 
@@ -360,7 +358,6 @@ static void st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd) 
 		
 		devdbg("%s: data: len: %d, xferlen: %d, blksize: %d, dataflags: 0x%x\n", __func__,
 		    cmd->data->len, xferlen, blksize, cmd->data->flags);
-
 		MMC_ASSERT(xferlen % (1 << blksize) == 0);
 
 		data = cmd->data->data;
@@ -468,7 +465,7 @@ static int st_sdmmc_acquire_host(struct drvmgr_dev *brdev, struct drvmgr_dev *re
 		rtems_condition_variable_wait(&sc->cond, &sc->mtx);
 	sc->bus_busy++;
 	ST_SDMMC_UNLOCK(sc);
-	return (0);
+	return 0;
 }
 
 static int st_sdmmc_release_host(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
@@ -488,7 +485,7 @@ static int st_sdmmc_read_ivar(struct drvmgr_dev *bus, struct drvmgr_dev *child,
 	(void) child;
 	switch (which) {
 	default:
-		return (EINVAL);
+		return -EINVAL;
 	case MMCBR_IVAR_BUS_MODE:
 		*(int *)result = sc->host.ios.bus_mode;
 		break;
@@ -539,7 +536,7 @@ static int st_sdmmc_read_ivar(struct drvmgr_dev *bus, struct drvmgr_dev *child,
 		*(int *)result = sc->host.ios.timing;
 		break;
 	}
-	return (0);
+	return 0;
 }
 
 static int st_sdmmc_write_ivar(struct drvmgr_dev *bus, struct drvmgr_dev *child, 
@@ -549,7 +546,7 @@ static int st_sdmmc_write_ivar(struct drvmgr_dev *bus, struct drvmgr_dev *child,
 	(void) child;
 	switch (which) {
 	default:
-		return (EINVAL);
+		return -EINVAL;
 	case MMCBR_IVAR_BUS_MODE:
 		sc->host.ios.bus_mode = value;
 		break;
@@ -586,9 +583,9 @@ static int st_sdmmc_write_ivar(struct drvmgr_dev *bus, struct drvmgr_dev *child,
 	case MMCBR_IVAR_F_MIN:
 	case MMCBR_IVAR_F_MAX:
 	case MMCBR_IVAR_MAX_DATA:
-		return (EINVAL);
+		return -EINVAL;
 	}
-	return (0);
+	return 0;
 }
 
 static const struct mmc_host_ops st_sdmmc_ops = {
@@ -604,7 +601,13 @@ static const struct mmc_host_ops st_sdmmc_ops = {
 };
 
 static int stm32h7_sdmmc_bus_unite(struct drvmgr_drv *drv, struct drvmgr_dev *dev) {
-	return ofw_platform_bus_match(drv, dev, DRVMGR_BUS_TYPE_SDMMC);
+	struct dev_driver *ddrv = (struct dev_driver *)drv;
+	if (ddrv->ids == NULL) {
+		if (!strcmp(drv->name, dev->name))
+			return 1;
+		return 0;
+	}
+	return ofw_platform_bus_match(drv, dev, DRVMGR_BUS_TYPE_MMCHOST);
 }
 
 static struct drvmgr_bus_ops stm32h7_sdmmc_bus = {
@@ -615,6 +618,9 @@ static struct drvmgr_bus_ops stm32h7_sdmmc_bus = {
 };
 
 static int st_sdmmc_preprobe(struct drvmgr_dev *dev) {
+	static const struct drvmgr_bus_ops _busops = {
+		.unite = stm32h7_sdmmc_bus_unite
+	};
 	struct dev_private *devp = device_get_private(dev);
     rtems_ofw_memory_area reg;
     rtems_vector_number irq;
@@ -636,8 +642,19 @@ static int st_sdmmc_preprobe(struct drvmgr_dev *dev) {
     devp->devops = &st_sdmmc_ops;
     dev->priv = sc;
     devdbg("%s: %s reg<0x%x> irq<%d>\n", __func__, dev->name, reg.start, irq);
-    return ofw_platform_bus_device_register(dev, &stm32h7_sdmmc_bus, 
-    	DRVMGR_BUS_TYPE_SDMMC);
+
+	/* If it is not sd-card */
+	if (rtems_ofw_has_prop(devp->np, "non-removable")) {
+    	return ofw_platform_bus_device_register(dev, &stm32h7_sdmmc_bus, 
+    		DRVMGR_BUS_TYPE_MMCHOST);
+	}
+	if (!device_add(dev, &_busops, DRVMGR_BUS_TYPE_MMCHOST, 
+	"mmc", sizeof(struct mmc_dev_private), 
+sizeof(struct mmc_softc))) {
+		free(sc);
+		return -ENOMEM;
+	}
+	return 0;
 }
 
 static int st_sdmmc_probe(struct drvmgr_dev *dev) {
@@ -740,7 +757,7 @@ static const struct dev_id id_table[] = {
 
 OFW_PLATFORM_DRIVER(stm32h7_sdmmc) = {
 	.drv = {
-		.drv_id   = DRIVER_SDMMC_ID,
+		.drv_id   = DRIVER_MMCHOST_ID,
 		.name     = "sdmmc",
 		.bus_type = DRVMGR_BUS_TYPE_PLATFORM,
 		.ops      = &stm32h7_sdmmc_driver

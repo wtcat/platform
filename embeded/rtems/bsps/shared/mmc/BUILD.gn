@@ -1,0 +1,8 @@
+# MMC driver
+component("mmc") {
+    sources = [
+        "mmc.c",
+        "mmc_ops.c",
+        "mmc_sd.c"
+    ]
+}

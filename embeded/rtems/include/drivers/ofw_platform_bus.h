@@ -29,7 +29,7 @@ phandle_t ofw_platform_bus_get_node(struct drvmgr_dev *dev);
 int ofw_bus_populate_device(struct drvmgr_bus *bus, phandle_t parent);
 int ofw_platform_bus_populate_device(struct drvmgr_bus *bus);
 int ofw_platform_bus_device_register(struct drvmgr_dev *dev,
-	struct drvmgr_bus_ops *bus_ops, int bustype);
+	const struct drvmgr_bus_ops *bus_ops, int bustype);
 int ofw_platform_bus_match(struct drvmgr_drv *drv, struct drvmgr_dev *dev, 
 	int bustype);
 const struct dev_id *ofw_device_match(struct drvmgr_dev *dev, 
