@@ -17,7 +17,7 @@ struct drvmgr_dev *device_add(struct drvmgr_dev *parent,
     char *pname;
     int err;
 
-    if (parent || name == NULL) {
+    if (parent == NULL || name == NULL) {
         errno = -EINVAL;
         return NULL;
     }
@@ -28,6 +28,7 @@ struct drvmgr_dev *device_add(struct drvmgr_dev *parent,
         }
         drvmgr_alloc_bus(&parent->bus, 0);
         parent->bus->ops = (void *)bus_ops;
+        parent->bus->dev = parent;
         parent->bus->bus_type = bustype;
         err = drvmgr_bus_register(parent->bus);
         if (err) {

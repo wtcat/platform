@@ -293,8 +293,8 @@ static void st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd) 
 	void *data = NULL;
 	bool short_xfer = false;
 
-	devdbg("%s: cmd: %d, arg: %08x, flags: 0x%x\n", __func__,
-	    cmd->opcode, cmd->arg, cmd->flags);
+	// devdbg("%s: cmd: %d, arg: %08x, flags: 0x%x\n", __func__,
+	//     cmd->opcode, cmd->arg, cmd->flags);
 
 	xferlen = 0;
 	sc->intr_status = 0;
@@ -355,11 +355,9 @@ static void st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd) 
 			blksize = ffs(xferlen) - 1;
 		}
 
-		
-		devdbg("%s: data: len: %d, xferlen: %d, blksize: %d, dataflags: 0x%x\n", __func__,
-		    cmd->data->len, xferlen, blksize, cmd->data->flags);
+		// devdbg("%s: data: len: %d, xferlen: %d, blksize: %d, dataflags: 0x%x\n", __func__,
+		//     cmd->data->len, xferlen, blksize, cmd->data->flags);
 		MMC_ASSERT(xferlen % (1 << blksize) == 0);
-
 		data = cmd->data->data;
 		/*
 		 * Check whether data have to be copied. Reason is either
@@ -401,7 +399,7 @@ static void st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd) 
 
 	cmd->error = st_sdmmc_wait_irq(sc);
 	if (cmd->error) {
-		rtems_task_wake_after(RTEMS_MICROSECONDS_TO_TICKS(10000)); //sleep(10);
+		rtems_task_wake_after(RTEMS_MICROSECONDS_TO_TICKS(1000)); //sleep(10);
 		printk("%s: error (%d) waiting for xfer: status %08x, cmd: %d, flags: %08x\n",
 		    __func__, cmd->error, sc->intr_status, cmd->opcode, cmd->flags);
 	} else {
@@ -418,7 +416,7 @@ static void st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd) 
 				    cmd->resp[3]);
 			} else {
 				cmd->resp[0] = sc->sdmmc->RESP1;
-				devdbg("%s: rsp: %08x\n", __func__, cmd->resp[0]);
+				// devdbg("%s: rsp: %08x\n", __func__, cmd->resp[0]);
 			}
 		}
 
@@ -588,6 +586,12 @@ static int st_sdmmc_write_ivar(struct drvmgr_dev *bus, struct drvmgr_dev *child,
 	return 0;
 }
 
+static int st_sdmmc_switch_vccq(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
+	(void) brdev;
+	(void) reqdev;
+	return 0;
+} 
+
 static const struct mmc_host_ops st_sdmmc_ops = {
 	.ivar_ops = {
 		.read_ivar = st_sdmmc_read_ivar,
@@ -597,7 +601,8 @@ static const struct mmc_host_ops st_sdmmc_ops = {
 	.request = st_sdmmc_request,
 	.get_ro = st_sdmmc_get_ro,
 	.acquire_host = st_sdmmc_acquire_host,
-	.release_host = st_sdmmc_release_host
+	.release_host = st_sdmmc_release_host,
+	.switch_vccq = st_sdmmc_switch_vccq
 };
 
 static int stm32h7_sdmmc_bus_unite(struct drvmgr_drv *drv, struct drvmgr_dev *dev) {
@@ -648,6 +653,7 @@ static int st_sdmmc_preprobe(struct drvmgr_dev *dev) {
     	return ofw_platform_bus_device_register(dev, &stm32h7_sdmmc_bus, 
     		DRVMGR_BUS_TYPE_MMCHOST);
 	}
+
 	if (!device_add(dev, &_busops, DRVMGR_BUS_TYPE_MMCHOST, 
 	"mmc", sizeof(struct mmc_dev_private), 
 sizeof(struct mmc_softc))) {

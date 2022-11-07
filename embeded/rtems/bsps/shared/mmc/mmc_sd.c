@@ -250,26 +250,21 @@ static int mmcsd_disk_read_write(struct mmcsd_part *part, rtems_blkdev_request *
 		memset(&req, 0, sizeof(req));
 		memset(&cmd, 0, sizeof(cmd));
 		memset(&stop, 0, sizeof(stop));
-
 		req.cmd = &cmd;
-
 		cmd.opcode = opcode;
 		cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
 		cmd.data = &data;
 		cmd.arg = sg->block << shift;
-
 		if (block_count > 1) {
 			data_flags |= MMC_DATA_MULTI;
 			stop.opcode = MMC_STOP_TRANSMISSION;
 			stop.flags = MMC_RSP_R1B | MMC_CMD_AC;
 			req.stop = &stop;
 		}
-
 		data.flags = data_flags;;
 		data.data = sg->buffer;
 		data.mrq = &req;
 		data.len = transfer_bytes;
-
 		mmcbus_wait_for_request(device_get_parent(dev), dev,
 		    &req);
 		if (req.cmd->error != MMC_ERR_NONE) {
@@ -285,26 +280,21 @@ static int mmcsd_disk_read_write(struct mmcsd_part *part, rtems_blkdev_request *
 
 			memset(&req2, 0, sizeof(req2));
 			memset(&cmd2, 0, sizeof(cmd2));
-
 			req2.cmd = &cmd2;
-
 			cmd2.opcode = MMC_SEND_STATUS;
 			cmd2.arg = rca << 16;
 			cmd2.flags = MMC_RSP_R1 | MMC_CMD_AC;
-
 			mmcbus_wait_for_request(device_get_parent(dev), dev,
 			    &req2);
 			if (req2.cmd->error != MMC_ERR_NONE) {
 				status_code = RTEMS_IO_ERROR;
 				goto error;
 			}
-
 			status = cmd2.resp[0];
 			if ((status & R1_READY_FOR_DATA) != 0
 			    && R1_CURRENT_STATE(status) != R1_STATE_PRG) {
 				break;
 			}
-
 			if (!rtems_clock_tick_before(timeout)) {
 				status_code = RTEMS_IO_ERROR;
 				goto error;

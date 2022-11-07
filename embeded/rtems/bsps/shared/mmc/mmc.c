@@ -608,8 +608,8 @@ static void mmc_power_up(struct mmc_softc *sc) {
 		if (mmcbr_switch_vccq(dev) == 0 || vccq == vccq_120)
 			break;
 	}
-	mmc_ms_delay(1);
 
+	mmc_ms_delay(1);
 	mmcbr_set_clock(dev, SD_MMC_CARD_ID_FREQUENCY);
 	mmcbr_set_timing(dev, bus_timing_normal);
 	mmcbr_set_power_mode(dev, power_on);
@@ -2342,6 +2342,7 @@ static int mmc_attach(struct drvmgr_dev *dev) {
 	struct mmc_dev_private *devp = device_get_private(dev);
 	struct mmc_softc *sc = dev->priv;
 
+	devdbg("mmc driver probe\n");
 	sc->dev = dev;
 	devp->devops = (void *)&mmc_ops;
 	MMC_LOCK_INIT(sc);
