@@ -6,6 +6,7 @@
 #include <rtems.h>
 #include <rtems/untar.h>
 #include <rtems/sysinit.h>
+#include <rtems/media.h>
 #ifdef __rtems_libbsd__
 #include <rtems/bsd/bsd.h>
 #include <machine/rtems-bsd-rc-conf.h>
@@ -15,6 +16,11 @@
 #endif /* __rtems_libbsd__ */
 #include "shell/shell_utils.h"
 #include "base/init.h"
+
+#define CONFIGURE_INIT
+#include <bsp/stackalloc.h>
+#include <rtems/confdefs.h>
+
 
 #ifndef CONFIGURE_IRQ_SERVER_PRIO
 #define CONFIGURE_IRQ_SERVER_PRIO 1
@@ -27,6 +33,9 @@
 #endif
 #ifndef CONFIGURE_IRQ_SERVER_STKSZ
 #define CONFIGURE_IRQ_SERVER_STKSZ 4096
+#endif
+#ifndef CONFIGURE_MEDIA_SERVER_STKSZ
+#define CONFIGURE_MEDIA_SERVER_STKSZ 2048
 #endif
 
 #define MS(ms) RTEMS_MILLISECONDS_TO_TICKS(ms)
@@ -42,23 +51,33 @@ int RTEMS_WEAK rtems_main(void) {
 
 #ifndef __rtems_libbsd__
 static void svrs_sysinit(void) {
-
 	rtems_status_code sc;
 #ifndef CONFIGURE_IRQ_SERVER_DISABLE
-	sc = rtems_interrupt_server_initialize(CONFIGURE_IRQ_SERVER_PRIO, 4096,
+	sc = rtems_interrupt_server_initialize(CONFIGURE_IRQ_SERVER_PRIO, 
+CONFIGURE_IRQ_SERVER_STKSZ,
 		RTEMS_DEFAULT_MODES, RTEMS_DEFAULT_ATTRIBUTES, NULL);
   if (sc != RTEMS_SUCCESSFUL)
     rtems_panic("irq-server init failed\n");
 #endif /* CONFIGURE_IRQ_SERVER_DISABLE */
 
 #ifndef CONFIGURE_TMS_SERVER_DISABLE
-	sc =  rtems_timer_initiate_server(CONFIGURE_TMS_SERVER_PRIO, 4096,
-		RTEMS_DEFAULT_ATTRIBUTES );
+	sc =  rtems_timer_initiate_server(CONFIGURE_TMS_SERVER_PRIO, 
+  CONFIGURE_TMS_SERVER_STKSZ, RTEMS_DEFAULT_ATTRIBUTES );
   if (sc != RTEMS_SUCCESSFUL)
     rtems_panic("timer-server init failed\n");
 #endif /* CONFIGURE_TMS_SERVER_DISABLE */
-  (void) sc;
 
+#ifndef CONFIGURE_MEDIA_DISABLE
+  rtems_media_initialize();
+  sc = rtems_media_server_initialize(CONFIGURE_INIT_TASK_PRIORITY, 
+  CONFIGURE_MEDIA_SERVER_STKSZ,
+  RTEMS_DEFAULT_MODES, RTEMS_DEFAULT_ATTRIBUTES);
+  if (sc != RTEMS_SUCCESSFUL) {
+    printf("%s: create media server failed(%s)\n", __func__, 
+    rtems_status_text(sc));
+  }
+#endif /* CONFIGURE_MEDIA_DISABLE */
+  (void) sc;
 }
 
 RTEMS_SYSINIT_ITEM(svrs_sysinit, 
@@ -107,7 +126,3 @@ rtems_task Init(rtems_task_argument arg) {
 RTEMS_BSD_DEFINE_NEXUS_DEVICE(ofwbus, 0, 0, NULL);
 SYSINIT_DRIVER_REFERENCE(simplebus, ofwbus);
 #endif
-
-#define CONFIGURE_INIT
-#include <bsp/stackalloc.h>
-#include <rtems/confdefs.h>

@@ -75,8 +75,6 @@
 #include "drivers/pinctrl.h"
 #include "drivers/ofw_platform_bus.h"
 
-#include "ofw/ofw.h"
-#include "rtems/rtems/support.h"
 #include "stm32h7xx_ll_rcc.h"
 
 #define SDMMC_DEBUG 
@@ -104,11 +102,6 @@
 #define	SDMMC_INT_CMD_DONE_MASK ( SDMMC_MASK_CMDSENTIE )
 #define	SDMMC_INT_CMD_RESPONSE_DONE_MASK ( SDMMC_MASK_CMDRENDIE )
 
-#define RES_MEM_SDMMC 0
-#define RES_MEM_DLYB 1
-#define RES_IRQ_SDMMC 2
-#define RES_NR 3
-
 /* Maximum non-aligned buffer is 512 byte from mmc_send_ext_csd() */
 #define DMA_BUF_SIZE 512
 
@@ -117,11 +110,6 @@
 #else
 #define devdbg(...)
 #endif
-
-
-struct st_sdmmc_softc;
-
-typedef void (*st_sdmmc_dma_setup_transfer)(struct st_sdmmc_softc *, void *);
 
 struct st_sdmmc_config {
 	/**

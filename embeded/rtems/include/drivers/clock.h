@@ -11,13 +11,23 @@
 #include <errno.h>
 #include <stddef.h>
 
+#include "base/atomic.h"
 #include "drivers/devbase.h"
+#ifdef CONFIG_OFW
+#include "ofw/ofw_extension.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef void (*clock_async_cb)(struct drvmgr_dev *dev, void *p, void *user);
+
+struct clk {
+	struct drvmgr_dev *dev;
+	int refcnt;
+	unsigned long id;
+};
 
 /**
  * @brief Current clock status.
@@ -36,6 +46,9 @@ struct clock_driver_api {
     int (*async_enable)(struct drvmgr_dev *dev, void *clk, clock_async_cb cb, void *user);
     int (*get_rate)(struct drvmgr_dev *dev, void *p, uint32_t *rate);
     enum clock_state (*get_state)(struct drvmgr_dev *dev, void *clk);
+#ifdef CONFIG_OFW
+	int (*ofw_xlate)(struct drvmgr_dev *dev, struct clk *clk, struct ofw_phandle_args *args);
+#endif
 };
 
 #define _clock_getops(dev) \
@@ -129,9 +142,42 @@ static inline int clk_get_rate(struct drvmgr_dev *dev, void *clk,
 	return api->get_rate(dev, clk, rate);
 }
 
+static inline int clk_xlate(struct drvmgr_dev *dev, struct clk *clk, 
+	struct ofw_phandle_args *args) {
+	const struct clock_driver_api *api = _clock_getops(dev);
+	if (api->ofw_xlate == NULL)
+		return -ENOSYS;
+	return api->ofw_xlate(dev, clk, args);
+}
+
+/*
+ * Device Clock API
+ */
+static inline int clock_enable(struct clk *clk) {
+	int ret = 0;
+	if (clk->refcnt == 0) 
+		ret = clk_enable(clk->dev, (void *)&clk->id);
+	clk->refcnt++;
+	return ret;
+}
+
+static inline int clock_disable(struct clk *clk) {
+	if (clk->refcnt > 0) {
+		clk->refcnt--;
+		if (clk->refcnt == 0)
+			return clk_disable(clk->dev, (void *)&clk->id);
+	} 
+	return -EINVAL;
+}
+
+static inline int clock_get_rate(struct clk *clk, uint32_t *rate) {
+	return clk_get_rate(clk->dev, (void *)&clk->id, rate);
+}
+
 #ifdef CONFIG_OFW
 struct drvmgr_dev *ofw_clock_request(phandle_t np, const char *name, 
     pcell_t *pcell, size_t maxsize);
+int ofw_clk_request(phandle_t np, int index, struct clk *clk);
 #endif /* CONFIG_OFW */
 
 #ifdef __cplusplus

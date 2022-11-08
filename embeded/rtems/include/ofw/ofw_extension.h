@@ -10,6 +10,22 @@
 extern "C"{
 #endif
 
+struct ofw_phandle_args {
+#define OFW_MAX_PHANDLE_ARGS 16
+	phandle_t np; //struct device_node *np;
+	int args_count;
+	uint32_t args[OFW_MAX_PHANDLE_ARGS];
+};
+
+int ofw_count_phandle_with_args(phandle_t np, const char *list_name, 
+	const char *cells_name, int cell_count);
+int ofw_parse_phandle_with_args(phandle_t np, const char *list_name, 
+	const char *cells_name, int cell_count, int index,
+	struct ofw_phandle_args *out_args);
+phandle_t ofw_parse_phandle(phandle_t np, const char *phandle_name, int index);
+
+int ofw_property_match_string(phandle_t np, const char *propname, 
+	const char *string, char *buffer, size_t bufsz);
 int ofw_property_read_string_helper(phandle_t node, const char *propname, 
     const char **out_strs, size_t sz, int skip, char *buffer, size_t bufsz);
 

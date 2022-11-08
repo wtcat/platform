@@ -4,10 +4,44 @@
 #include <errno.h>
 #include <string.h>
 #include <rtems/bspIo.h>
+#include <sys/errno.h>
 
 #include "drivers/clock.h"
+#include "drivers/devbase.h"
 #include "drivers/ofw_platform_bus.h"
 
+#include "ofw/ofw_extension.h"
+
+
+static int clk_ofw_xlate_default(struct clk *clk, struct ofw_phandle_args *args) {
+	if (args->args_count > 1) {
+		printk("Invaild args_count: %d\n", args->args_count);
+		return -EINVAL;
+	}
+	if (args->args_count)
+		clk->id = args->args[0];
+	else
+		clk->id = 0;
+	return 0;
+}
+
+int ofw_clk_request(phandle_t np, int index, struct clk *clk) {
+	struct ofw_phandle_args args;
+    struct drvmgr_dev *dev;
+	int ret;
+
+    ret = ofw_parse_phandle_with_args(np, "clocks", "#clock-cells", 0,
+                index, &args);
+    if (ret)
+        return ret;                 
+    dev = ofw_device_get_by_devnode(args.np);
+    if (!dev)
+        return -ENODEV;
+    if (clk_xlate(dev, clk, &args))
+        clk_ofw_xlate_default(clk, &args);
+    clk->dev = dev;
+    return 0;
+}
 
 struct drvmgr_dev *ofw_clock_request(phandle_t np, const char *name, 
     pcell_t *pcell, size_t maxsize) {
