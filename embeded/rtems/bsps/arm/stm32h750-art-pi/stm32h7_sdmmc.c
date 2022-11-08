@@ -682,7 +682,8 @@ static int st_sdmmc_probe(struct drvmgr_dev *dev) {
 		* assumption is true. A better solution (like fixed AXI SRAM)
 		* might would be a good idea.
 		*/
-	sc->dmabuf = rtems_cache_coherent_allocate(DMA_BUF_SIZE, CPU_CACHE_LINE_BYTES, 0);
+	sc->dmabuf = rtems_heap_allocate_aligned_with_boundary(DMA_BUF_SIZE, 
+		CPU_CACHE_LINE_BYTES, 0);
 	if (sc->dmabuf == NULL) {
 		printk("%s: could not allocate dma buffer\n", __func__);
 		err = -ENOMEM;
@@ -723,7 +724,7 @@ static int st_sdmmc_probe(struct drvmgr_dev *dev) {
 	return 0;
 
 _free_buf:
-	rtems_cache_coherent_free(sc->dmabuf);
+	free(sc->dmabuf);
 _free_sc:
 	free(sc);
 	return err;
