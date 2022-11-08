@@ -4,6 +4,7 @@
 #ifndef RTEMS_CONFDEFS_H_
 #define RTEMS_CONFDEFS_H_
 
+#define CONFIGURE_MEDIA_DISABLE
 #define CONFIGURE_APPLICATION_NEEDS_LIBBLOCK
 
 #if defined(CONFIGURE_APPLICATION_NEEDS_LIBBLOCK)
@@ -3169,7 +3170,7 @@
  * You may use this feature to debug system initialization issues.  The
  * printk() function is used to print the information.
  */
-// #define CONFIGURE_VERBOSE_SYSTEM_INITIALIZATION
+#define CONFIGURE_VERBOSE_SYSTEM_INITIALIZATION
 
 /* Generated from spec:/acfg/if/zero-workspace-automatically */
 
