@@ -13,8 +13,7 @@ component("shell") {
     ]
     if (use_libbsd) {
         sources += [
-            "shell_bsd.c",
-            "shell_media.c"
+            "shell_bsd.c"
         ]
     }
     if (use_rtl) {
