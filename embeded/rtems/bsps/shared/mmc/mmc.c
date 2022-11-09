@@ -73,9 +73,7 @@
 #include "drivers/mmc/mmc_ops.h"
 #include "drivers/ofw_platform_bus.h"
 
-#define MMCBUS_DEBUG
-RTEMS_STATIC_ASSERT(bus_timing_max <= sizeof(uint32_t) * NBBY, "");
-
+// #define MMCBUS_DEBUG
 
 #ifdef MMCBUS_DEBUG
 #define devdbg(fmt, ...) printk("%s: "fmt, __func__, ##__VA_ARGS__)
@@ -83,7 +81,6 @@ RTEMS_STATIC_ASSERT(bus_timing_max <= sizeof(uint32_t) * NBBY, "");
 #define devdbg(...)
 #endif
 #define deverr(fmt, ...) printk("%s: "fmt, __func__, ##__VA_ARGS__)
-
 
 #define be32toh(x) be32_to_cpu(x)
 /*
@@ -117,6 +114,7 @@ struct mmc_ivars {
 	char card_sn_string[16];/* Formatted serial # for disk->d_ident */
 };
 
+RTEMS_STATIC_ASSERT(bus_timing_max <= sizeof(uint32_t) * NBBY, "");
 #define	CMD_RETRIES	3
 
 static const struct mmc_quirk mmc_quirks[] = {
@@ -417,21 +415,15 @@ static int mmc_wait_for_req(struct mmc_softc *sc, struct mmc_request *req) {
 	req->done = mmc_wakeup;
 	req->done_data = sc;
 
-	devdbg("REQUEST: CMD%d arg %#x flags %#x",
-		req->cmd->opcode, req->cmd->arg, req->cmd->flags);
-#ifdef MMCBUS_DEBUG
-	if (req->cmd->data) 
-		devdbg(" data %d\n", (int)req->cmd->data->len);
-	else
-		devdbg("\n");
-#endif /* MMCBUS_DEBUG */
+	devdbg("REQUEST: CMD%d arg %#x flags %#x data %d\n",
+		req->cmd->opcode, req->cmd->arg, req->cmd->flags,
+		req->cmd->data? (int)req->cmd->data->len: 0);
 	mmc_host_request(device_get_parent(sc->dev), sc->dev, req);
 	rtems_binary_semaphore_wait(&req->req_done);
 	rtems_binary_semaphore_destroy(&req->req_done);
-#ifdef MMCBUS_DEBUG
-	if (req->cmd->error != MMC_ERR_NONE)
-		devdbg("CMD%d RESULT: %d\n", req->cmd->opcode, req->cmd->error);
-#endif
+	if (req->cmd->error != MMC_ERR_NONE) {
+		deverr("CMD%d RESULT: %d\n", req->cmd->opcode, req->cmd->error);
+	}
 	return 0;
 }
 

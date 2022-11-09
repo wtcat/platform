@@ -75,9 +75,10 @@
 #include "drivers/pinctrl.h"
 #include "drivers/ofw_platform_bus.h"
 
+#include "rtems/rtems/event.h"
 #include "stm32h7xx_ll_rcc.h"
 
-#define SDMMC_DEBUG 
+// #define SDMMC_DEBUG 
 
 
 #define	ST_SDMMC_LOCK(_sc)		rtems_mutex_lock(&(_sc)->mtx)
@@ -134,7 +135,8 @@ struct st_sdmmc_softc {
 	struct mmc_host host;
 	rtems_mutex mtx;
 	rtems_condition_variable cond;
-	rtems_binary_semaphore wait_done;
+	rtems_id owner;
+	// rtems_binary_semaphore wait_done;
 	int bus_busy;
 
 	SDMMC_TypeDef *sdmmc;
@@ -148,6 +150,7 @@ struct st_sdmmc_softc {
 	int irq;
 };
 
+extern char stm32h7_memory_sram_axi_end[];
 
 static inline void st_sdmmc_idma_txrx(struct st_sdmmc_softc *sc, void *buf) {
 	sc->sdmmc->IDMABASE0 = (uintptr_t) buf;
@@ -174,7 +177,7 @@ static void st_sdmmc_intr(void *arg) {
 	if (status != 0 &&
 	    ((status & SDMMC_STA_BUSYD0) == 0 ||
 	    (sc->sdmmc->MASK & SDMMC_STA_BUSYD0END) == 0)) {
-		rtems_binary_semaphore_post(&sc->wait_done);
+		rtems_event_transient_send(sc->owner);
 	}
 }
 
@@ -257,10 +260,9 @@ static int st_sdmmc_update_ios(struct drvmgr_dev *brdev, struct drvmgr_dev *reqd
 
 static int st_sdmmc_wait_irq(struct st_sdmmc_softc *sc) {
 	int error = 0;
-
-	error = rtems_binary_semaphore_wait_timed_ticks(&sc->wait_done,
-	    RTEMS_MILLISECONDS_TO_TICKS(5000));
-
+	sc->owner = rtems_task_self();
+	error = rtems_event_transient_receive(RTEMS_WAIT|RTEMS_EVENT_ANY, 
+		RTEMS_MILLISECONDS_TO_TICKS(3000));
 	if (error != 0) {
 		error = MMC_ERR_TIMEOUT;
 	} else if ((sc->intr_status &
@@ -269,7 +271,6 @@ static int st_sdmmc_wait_irq(struct st_sdmmc_softc *sc) {
 	} else if ((sc->intr_status & SDMMC_INT_ERROR_MASK) != 0) {
 		error = MMC_ERR_FAILED;
 	}
-
 	return error;
 }
 
@@ -300,9 +301,6 @@ static void st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd) 
 	 * error case where a previous command run into a timeout and still
 	 * produced an interrupt before it has been disabled.
 	 */
-	if (rtems_binary_semaphore_try_wait(&sc->wait_done) == 0) 
-		printk("%s: Semaphore set from last command\n", __func__);
-
 	int_mask = SDMMC_INT_ERROR_MASK;
 	arg = cmd->arg;
 	cmdval = (cmd->opcode & SDMMC_CMD_CMDINDEX_Msk) | SDMMC_CMD_CPSMEN;
@@ -352,7 +350,8 @@ static void st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd) 
 		 * misaligned start address or misaligned length.
 		 */
 		if (((uintptr_t)data % CPU_CACHE_LINE_BYTES != 0) ||
-		    (xferlen % CPU_CACHE_LINE_BYTES) != 0) {
+		    (xferlen % CPU_CACHE_LINE_BYTES) != 0 ||
+			(uintptr_t)data > (uintptr_t)stm32h7_memory_sram_axi_end) {
 			MMC_ASSERT(xferlen < DMA_BUF_SIZE);
 			if ((cmd->data->flags & MMC_DATA_READ) == 0) {
 				memcpy(sc->dmabuf, cmd->data->data, xferlen);
@@ -387,9 +386,8 @@ static void st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd) 
 
 	cmd->error = st_sdmmc_wait_irq(sc);
 	if (cmd->error) {
-		rtems_task_wake_after(RTEMS_MICROSECONDS_TO_TICKS(1000)); //sleep(10);
-		printk("%s: error (%d) waiting for xfer: status %08x, cmd: %d, flags: %08x\n",
-		    __func__, cmd->error, sc->intr_status, cmd->opcode, cmd->flags);
+		printk("%s: error (%d) waiting for xfer: status %08x, cmd: %d, flags: %08x data:%p len:%d\n",
+		    __func__, cmd->error, sc->intr_status, cmd->opcode, cmd->flags, data,  xferlen);
 	} else {
 		if ((cmd->flags & MMC_RSP_PRESENT) != 0) {
 			if ((cmd->flags & MMC_RSP_136) != 0) {
@@ -658,8 +656,6 @@ static int st_sdmmc_probe(struct drvmgr_dev *dev) {
 	pcell_t prop = 0;
 
 	ST_SDMMC_LOCK_INIT(sc);
-	rtems_binary_semaphore_init(&sc->wait_done, "sdmmc-sem");
-	
     sc->clk = ofw_clock_request(devp->np, NULL, (pcell_t *)&sc->clkid, 
         sizeof(sc->clkid));
     if (!sc->clk) {
