@@ -65,14 +65,11 @@
 #include <rtems/malloc.h>
 #include <rtems/bspIo.h>
 
-#include "drivers/devbase.h"
 #include "drivers/mmc/mmc_bus.h"
 #include "drivers/mmc/mmc_host.h"
 #include "drivers/mmc/mmc_specs.h"
 #include "drivers/mmc/mmc_ops.h"
 #include "drivers/ofw_platform_bus.h"
-
-#include "base/byteorder.h"
 
 #define MMCBUS_DEBUG
 RTEMS_STATIC_ASSERT(bus_timing_max <= sizeof(uint32_t) * NBBY, "");

@@ -3,11 +3,9 @@
  */
 #include <errno.h>
 #include <string.h>
-
 #include <rtems/sysinit.h>
 #include <rtems/bspIo.h>
 #include <bsp/irq-generic.h>
-#include <ofw/ofw.h>
 
 #include "drivers/ofw_platform_bus.h"
 

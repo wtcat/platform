@@ -7,6 +7,7 @@
 
 #include <rtems/malloc.h>
 #include <rtems/bspIo.h>
+
 #include "drivers/gpio.h"
 #include "drivers/ofw_platform_bus.h"
 

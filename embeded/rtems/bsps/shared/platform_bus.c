@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
-
 #include <rtems/sysinit.h>
 #include <rtems/bspIo.h>
 #include <bsp.h>

@@ -62,7 +62,6 @@
 #include <rtems/malloc.h>
 #include <rtems/bspIo.h>
 
-#include "drivers/devbase.h"
 #include "drivers/mmc/mmc_bus.h"
 #include "drivers/mmc/mmc_host.h"
 #include "drivers/mmc/mmc_specs.h"
@@ -141,12 +140,6 @@ static const char * const errmsg[] = {
 static int mmcsd_cache = 1;
 
 #define	LOG_PPS		5 /* Log no more than 5 errors per second. */
-
-/* bus entry points */
-static int mmcsd_attach(struct drvmgr_dev *dev);
-static int mmcsd_detach(struct drvmgr_dev *dev);
-static int mmcsd_probe(struct drvmgr_dev *dev);
-static int mmcsd_shutdown(struct drvmgr_dev *dev);
 
 
 /* RMPB cdev interface */

@@ -3,12 +3,9 @@
  */
 #include <errno.h>
 #include <string.h>
-
 #include <rtems/sysinit.h>
 #include <rtems/bspIo.h>
-#include <ofw/ofw.h>
 
-#include "base/minmax.h"
 #include "drivers/ofw_platform_bus.h"
 
 #define SIMPLE_BUS "simple-bus"

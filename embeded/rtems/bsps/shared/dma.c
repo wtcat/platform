@@ -5,7 +5,6 @@
 #include <rtems/malloc.h>
 #include <rtems/bspIo.h>
 
-#include "base/bitops.h"
 #include "drivers/dma.h"
 
 

@@ -4,13 +4,8 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <rtems/bspIo.h>
 
-#include <ofw/ofw.h>
-#include "base/byteorder.h"
-
-#include "drivers/devbase.h"
 #include "drivers/ofw_platform_bus.h"
 
 
