@@ -13,6 +13,7 @@
 #endif
 #include "base/bitops.h"
 #include "base/compiler.h"
+#include "base/byteorder.h"
 #include "base/sections.h"
 #include "base/minmax.h"
 

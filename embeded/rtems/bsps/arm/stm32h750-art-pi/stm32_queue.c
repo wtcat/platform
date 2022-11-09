@@ -7,7 +7,6 @@
 #include <rtems/malloc.h>
 
 #include "drivers/dma.h"
-
 #include "stm32/stm32_queue.h"
 
 struct dma_circle_queue *dma_circle_queue_create(uint16_t size) {
