@@ -43,6 +43,12 @@ size_t cm_backtrace_call_stack(uint32_t *buffer, size_t size, uint32_t sp);
 void cm_backtrace_assert(uint32_t sp);
 void cm_backtrace_fault(uint32_t fault_handler_lr, uint32_t fault_handler_sp);
 
+
+static inline void __do_backtrace(void) {
+    register uint32_t __sp;
+    __asm__ volatile ("mov %0, sp\n" : "=r" (__sp) );
+    cm_backtrace_assert(__sp);
+}
 #ifdef __cplusplus
 }
 #endif
