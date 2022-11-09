@@ -76,12 +76,11 @@ struct mmc_softc;
 struct mmc_request;
 
 struct mmc_dev_private {
-	void *devops;
+	MMCDEV_PRIVATE_BASE
 };
 
 struct mmc_carddev_private {
-	void *devops;
-	void *ivar;
+	MMCDEV_PRIVATE_BASE
 };
 
 struct mmc_bus_ops {

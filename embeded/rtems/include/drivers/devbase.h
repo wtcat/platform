@@ -59,6 +59,8 @@ enum drvmgr_bus_type {
 #define DRIVER_MMCHOST_ID			DRIVER_ROOTBUS_ID(DRVMGR_BUS_TYPE_MMCHOST)
 	DRVMGR_BUS_TYPE_MMC,
 #define DRIVER_MMC_ID			DRIVER_ROOTBUS_ID(DRVMGR_BUS_TYPE_MMC)
+	DRVMGR_BUS_TYPE_SDHCI,
+#define DRIVER_SDHCI_ID			DRIVER_ROOTBUS_ID(DRVMGR_BUS_TYPE_SDHCI)
 };
 	
 struct dev_id {
@@ -109,8 +111,9 @@ static inline const void *device_get_operations(struct drvmgr_dev *dev) {
 
 struct drvmgr_dev *device_add(struct drvmgr_dev *parent, 
     const struct drvmgr_bus_ops *bus_ops, 
-    int bustype, const char *name, size_t devp_size, size_t priv_size);
+    int bustype, const char *name, size_t devp_size, size_t priv_size, bool attach);
 int device_delete(struct drvmgr_dev *parent, struct drvmgr_dev *dev);
+int device_attach(struct drvmgr_dev *dev);
 
 int driver_register_posthook(struct drv_posthook *hook);
 

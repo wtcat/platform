@@ -643,11 +643,11 @@ static int st_sdmmc_preprobe(struct drvmgr_dev *dev) {
 	}
 
 	if (!device_add(dev, &_busops, DRVMGR_BUS_TYPE_MMCHOST, 
-	"mmc", sizeof(struct mmc_dev_private), 
-sizeof(struct mmc_softc))) {
+		"mmc", sizeof(struct mmc_dev_private), sizeof(struct mmc_softc), true)) {
 		free(sc);
 		return -ENOMEM;
 	}
+	
 	return 0;
 }
 

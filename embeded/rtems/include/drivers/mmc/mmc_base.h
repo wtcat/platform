@@ -21,6 +21,15 @@ struct mmc_base_ops {
 	int (*write_ivar)(struct drvmgr_dev *bus, struct drvmgr_dev *child, int which, uintptr_t value);
 };
 
+#define MMCDEV_PRIVATE_BASE \
+    void *devops; \
+    void *ivar;
+
+static inline void mmcdev_set_ivar(struct drvmgr_dev *dev, void *ivar) {
+    struct { MMCDEV_PRIVATE_BASE } *devp = device_get_private(dev);
+	devp->ivar = ivar;
+}
+
 #define __MMC_BUS_ACCESSOR(varp, var, ivarp, ivar, type)			\
     static inline type varp ## _get_ ## var(struct drvmgr_dev *dev) {			\
         uintptr_t v;							\

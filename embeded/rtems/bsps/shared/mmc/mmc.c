@@ -65,6 +65,8 @@
 #include <rtems/malloc.h>
 #include <rtems/bspIo.h>
 
+#include "drivers/devbase.h"
+#include "drivers/mmc/mmc_base.h"
 #include "drivers/mmc/mmc_bus.h"
 #include "drivers/mmc/mmc_host.h"
 #include "drivers/mmc/mmc_specs.h"
@@ -1751,10 +1753,10 @@ child_common:
 				.unite = mmc_bus_unite
 			};
 			child = device_add(sc->dev, &_busops, DRVMGR_BUS_TYPE_MMC, "mmcsd",
-				sizeof(struct mmc_carddev_private), 0);
+				sizeof(struct mmc_carddev_private), 0, false);
 			if (child != NULL) {
-				struct mmc_carddev_private *devp = device_get_private(child);
-				devp->ivar = ivar;
+				mmcdev_set_ivar(child, ivar);
+				device_attach(child);
 				sc->child_list = realloc(sc->child_list,
 				    sizeof(struct drvmgr_dev *) * sc->child_count + 1);
 				sc->child_list[sc->child_count++] = child;

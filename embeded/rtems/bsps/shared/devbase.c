@@ -12,7 +12,7 @@ static struct drv_posthook *drv_post_list;
 
 struct drvmgr_dev *device_add(struct drvmgr_dev *parent, 
     const struct drvmgr_bus_ops *bus_ops, 
-    int bustype, const char *name, size_t devp_size, size_t priv_size) {
+    int bustype, const char *name, size_t devp_size, size_t priv_size, bool attach) {
     struct drvmgr_dev *child;
     char *pname;
     int err;
@@ -49,13 +49,19 @@ struct drvmgr_dev *device_add(struct drvmgr_dev *parent,
     memcpy(pname, name, len);
     child->parent = parent->bus;
     child->name = pname;
-    err = drvmgr_dev_register(child);
-    if (err) {
-        errno = err;
-        printk("%s: register device(%s) failed\n", __func__, child->name);
-        return NULL;
+    if (attach) {
+        err = drvmgr_dev_register(child);
+        if (err) {
+            errno = err;
+            printk("%s: register device(%s) failed\n", __func__, child->name);
+            return NULL;
+        }
     }
     return child;
+}
+
+int device_attach(struct drvmgr_dev *dev) {
+    return drvmgr_dev_register(dev);
 }
 
 int device_delete(struct drvmgr_dev *parent, struct drvmgr_dev *dev) {
