@@ -229,17 +229,23 @@ static inline int mmc_host_release_host(struct drvmgr_dev *brdev, struct drvmgr_
 
 static inline int mmc_host_switch_vccq(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev) {
     const struct mmc_host_ops *ops = device_get_operations(brdev);
-	return ops->switch_vccq(brdev, reqdev);
+	if (ops->switch_vccq)
+		return ops->switch_vccq(brdev, reqdev);
+	return 0;
 }
 
 static inline int mmc_host_tune(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev, bool hs400) {
     const struct mmc_host_ops *ops = device_get_operations(brdev);
-	return ops->tune(brdev, reqdev, hs400);
+	if (ops->tune)
+		return ops->tune(brdev, reqdev, hs400);
+	return 0;
 }
 
 static inline int mmc_host_retune(struct drvmgr_dev *brdev, struct drvmgr_dev *reqdev, bool reset) {
     const struct mmc_host_ops *ops = device_get_operations(brdev);
-	return ops->retune(brdev, reqdev, reset);
+	if (ops->retune)
+		return ops->retune(brdev, reqdev, reset);
+	return 0;
 }
 
 #ifdef __cplusplus

@@ -69,14 +69,15 @@
 #include "drivers/ofw_platform_bus.h"
 
 
-#define MMCSD_DEBUG
+// #define MMCSD_DEBUG
 
+#define deverr(fmt, ...) printk("%s: "fmt, __func__, ##__VA_ARGS__)
 #ifdef MMCSD_DEBUG
 #define devdbg(fmt, ...) printk("%s: "fmt, __func__, ##__VA_ARGS__)
 #else
 #define devdbg(...)
 #endif
-#define deverr(fmt, ...) printk("%s: "fmt, __func__, ##__VA_ARGS__)
+
 
 #define	MMCSD_CMD_RETRIES	5
 
@@ -332,7 +333,6 @@ static rtems_status_code mmcsd_attach_worker(rtems_media_state state, const char
 			printf("OOPS: create path failed\n");
 			goto error;
 		}
-
 		/*
 		 * FIXME: There is no release for this acquire. Implementing
 		 * this would be necessary for:
@@ -342,13 +342,12 @@ static rtems_status_code mmcsd_attach_worker(rtems_media_state state, const char
 		 * On the other hand it would mean that the bus has to be
 		 * acquired on every read which would decrease the performance.
 		 */
-		mmcbus_acquire_bus(device_get_parent(dev), dev);
+		// mmcbus_acquire_bus(device_get_parent(dev), dev);
 		status_code = mmcsd_set_block_size(dev, block_size);
 		if (status_code != RTEMS_SUCCESSFUL) {
 			printf("OOPS: set block size failed\n");
 			goto error;
 		}
-
 		status_code = rtems_blkdev_create(disk, block_size,
 		    block_count, mmcsd_disk_ioctl, part);
 		if (status_code != RTEMS_SUCCESSFUL) {
@@ -654,7 +653,6 @@ static void mmcsd_add_part(struct mmcsd_softc *sc, u_int type, const char *name,
 		printf("%s: Additional partition. This is currently not supported in RTEMS.", part->name);
 	} else {
 		MMCSD_DISK_LOCK_INIT(part);
-
 		rtems_status_code status_code = rtems_media_server_disk_attach(
 		    part->name, mmcsd_attach_worker, part);
 		MMC_ASSERT(status_code == RTEMS_SUCCESSFUL);
