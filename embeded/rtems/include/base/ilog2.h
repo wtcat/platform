@@ -21,7 +21,7 @@ extern "C"{
  */
 #ifndef CONFIG_ARCH_HAS_ILOG2_U32
 static inline __attribute__((const))
-int __ilog2_u32(u32 n)
+int __ilog2_u32(uint32_t n)
 {
 	return fls(n) - 1;
 }
@@ -29,9 +29,9 @@ int __ilog2_u32(u32 n)
 
 #ifndef CONFIG_ARCH_HAS_ILOG2_U64
 static inline __attribute__((const))
-int __ilog2_u64(u64 n)
+int __ilog2_u64(uint64_t n)
 {
-	return fls64(n) - 1;
+	return flsll(n) - 1;
 }
 #endif
 
@@ -56,7 +56,7 @@ bool is_power_of_2(unsigned long n)
 static inline __attribute__((const))
 unsigned long __roundup_pow_of_two(unsigned long n)
 {
-	return 1UL << fls_long(n - 1);
+	return 1UL << flsl(n - 1);
 }
 
 /**
@@ -66,7 +66,7 @@ unsigned long __roundup_pow_of_two(unsigned long n)
 static inline __attribute__((const))
 unsigned long __rounddown_pow_of_two(unsigned long n)
 {
-	return 1UL << (fls_long(n) - 1);
+	return 1UL << (flsl(n) - 1);
 }
 
 /**
@@ -197,7 +197,7 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
 	__rounddown_pow_of_two(n)		\
  )
 
-static inline __attribute_const__
+static inline __attribute__((__const__))
 int __order_base_2(unsigned long n)
 {
 	return n > 1 ? ilog2(n - 1) + 1 : 0;

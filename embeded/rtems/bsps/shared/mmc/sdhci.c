@@ -31,17 +31,17 @@
  */
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <rtems/malloc.h>
 #include <rtems/counter.h>
 
 #include "base/workqueue.h"
 #include "drivers/devbase.h"
-#include "drivers/mmc/mmc_base.h"
 #include "drivers/mmc/sdhci.h"
 #include "drivers/mmc/mmc_specs.h"
 #include "drivers/mmc/mmc_bus.h"
-#include "rtems/rtems/timer.h"
-#include "rtems/score/basedefs.h"
+#include "drivers/mmc/mmc_host.h"
+
 
 
 
@@ -105,6 +105,8 @@ static uint32_t sdhci_tuning_intmask(const struct sdhci_slot *slot);
 #define	SDHCI_LOCK_INIT(_slot)  rtems_mutex_init(&_slot->mtx, "sdhci")
 #define	SDHCI_LOCK_DESTROY(_slot) rtems_mutex_destroy(&_slot->mtx);
 
+#define SDCHI_TIMER_NAME rtems_build_name('s','d','h','c')
+
 #define	SDHCI_DEFAULT_MAX_FREQ	50
 
 #define	SDHCI_200_MAX_DIVIDER	256
@@ -127,6 +129,12 @@ static uint32_t sdhci_tuning_intmask(const struct sdhci_slot *slot);
 #define	BCM577XX_CTRL_CLKSEL_DEFAULT	0x0
 #define	BCM577XX_CTRL_CLKSEL_64MHZ	0x3
 
+
+static const char *
+device_get_nameunit(struct drvmgr_dev *dev) 
+{
+	return dev->name;
+}
 
 static void
 DELAY(int usec)
@@ -754,10 +762,10 @@ sdhci_dma_free(struct sdhci_slot *slot)
 }
 
 int
-sdhci_init_slot(device_t dev, struct sdhci_slot *slot, int num)
+sdhci_init_slot(struct drvmgr_dev *dev, struct sdhci_slot *slot, int num)
 {
-	kobjop_desc_t kobj_desc;
-	kobj_method_t *kobj_method;
+	const struct sdhci_bus_ops *busops = device_get_operations(device_get_parent(dev));
+	const struct mmc_host_ops *devops = device_get_operations(dev);
 	uint32_t caps, caps2, freq, host_caps;
 	int err;
 
@@ -882,13 +890,14 @@ sdhci_init_slot(device_t dev, struct sdhci_slot *slot, int num)
 	 * Disable UHS-I and eMMC modes if the set_uhs_timing method is the
 	 * default NULL implementation.
 	 */
-	kobj_desc = &sdhci_set_uhs_timing_desc;
-	kobj_method = kobj_lookup_method(((kobj_t)dev)->ops->cls, NULL,
-	    kobj_desc);
-	if (kobj_method == &kobj_desc->deflt)
+	// kobj_desc = &sdhci_set_uhs_timing_desc;
+	// kobj_method = kobj_lookup_method(((kobj_t)dev)->ops->cls, NULL,
+	//     kobj_desc);
+	if (busops->set_uhs_timing == NULL) {
 		host_caps &= ~(MMC_CAP_UHS_SDR12 | MMC_CAP_UHS_SDR25 |
 		    MMC_CAP_UHS_SDR50 | MMC_CAP_UHS_DDR50 | MMC_CAP_UHS_SDR104 |
 		    MMC_CAP_MMC_DDR52 | MMC_CAP_MMC_HS200 | MMC_CAP_MMC_HS400);
+	}
 
 #define	SDHCI_CAP_MODES_TUNING(caps2)					\
     (((caps2) & SDHCI_TUNE_SDR50 ? MMC_CAP_UHS_SDR50 : 0) |		\
@@ -899,15 +908,15 @@ sdhci_init_slot(device_t dev, struct sdhci_slot *slot, int num)
 	 * Disable UHS-I and eMMC modes that require (re-)tuning if either
 	 * the tune or re-tune method is the default NULL implementation.
 	 */
-	kobj_desc = &mmcbr_tune_desc;
-	kobj_method = kobj_lookup_method(((kobj_t)dev)->ops->cls, NULL,
-	    kobj_desc);
-	if (kobj_method == &kobj_desc->deflt)
+	// kobj_desc = &mmcbr_tune_desc;
+	// kobj_method = kobj_lookup_method(((kobj_t)dev)->ops->cls, NULL,
+	//     kobj_desc);
+	if (devops->tune == NULL)
 		goto no_tuning;
-	kobj_desc = &mmcbr_retune_desc;
-	kobj_method = kobj_lookup_method(((kobj_t)dev)->ops->cls, NULL,
-	    kobj_desc);
-	if (kobj_method == &kobj_desc->deflt) {
+	// kobj_desc = &mmcbr_retune_desc;
+	// kobj_method = kobj_lookup_method(((kobj_t)dev)->ops->cls, NULL,
+	//     kobj_desc);
+	if (devops->retune == NULL) {
 no_tuning:
 		host_caps &= ~(SDHCI_CAP_MODES_TUNING(caps2));
 	}
@@ -915,12 +924,9 @@ no_tuning:
 	/* Allocate tuning structures and determine tuning parameters. */
 	if (host_caps & SDHCI_CAP_MODES_TUNING(caps2)) {
 		slot->opt |= SDHCI_TUNING_SUPPORTED;
-		slot->tune_req = malloc(sizeof(*slot->tune_req), M_DEVBUF,
-		    M_WAITOK);
-		slot->tune_cmd = malloc(sizeof(*slot->tune_cmd), M_DEVBUF,
-		    M_WAITOK);
-		slot->tune_data = malloc(sizeof(*slot->tune_data), M_DEVBUF,
-		    M_WAITOK);
+		slot->tune_req = rtems_malloc(sizeof(*slot->tune_req));
+		slot->tune_cmd = rtems_malloc(sizeof(*slot->tune_cmd));
+		slot->tune_data = rtems_malloc(sizeof(*slot->tune_data));
 		if (caps2 & SDHCI_TUNE_SDR50)
 			slot->opt |= SDHCI_SDR50_NEEDS_TUNING;
 		slot->retune_mode = (caps2 & SDHCI_RETUNE_MODES_MASK) >>
@@ -953,12 +959,12 @@ no_tuning:
 	 * default NULL implementation.  Disable 1.2 V support if it's the
 	 * generic SDHCI implementation.
 	 */
-	kobj_desc = &mmcbr_switch_vccq_desc;
-	kobj_method = kobj_lookup_method(((kobj_t)dev)->ops->cls, NULL,
-	    kobj_desc);
-	if (kobj_method == &kobj_desc->deflt)
+	// kobj_desc = &mmcbr_switch_vccq_desc;
+	// kobj_method = kobj_lookup_method(((kobj_t)dev)->ops->cls, NULL,
+	//     kobj_desc);
+	if (devops->switch_vccq == NULL)
 		host_caps &= ~(MMC_CAP_SIGNALING_120 | MMC_CAP_SIGNALING_180);
-	else if (kobj_method->func == (kobjop_t)sdhci_generic_switch_vccq)
+	else if (devops->switch_vccq == sdhci_generic_switch_vccq)
 		host_caps &= ~MMC_CAP_SIGNALING_120;
 
 	/* Determine supported driver types (type B is always mandatory). */
@@ -992,9 +998,9 @@ no_tuning:
 		err = sdhci_dma_alloc(slot);
 		if (err != 0) {
 			if (slot->opt & SDHCI_TUNING_SUPPORTED) {
-				free(slot->tune_req, M_DEVBUF);
-				free(slot->tune_cmd, M_DEVBUF);
-				free(slot->tune_data, M_DEVBUF);
+				free(slot->tune_req);
+				free(slot->tune_cmd);
+				free(slot->tune_data);
 			}
 			SDHCI_LOCK_DESTROY(slot);
 			return (err);
@@ -1046,18 +1052,15 @@ no_tuning:
 	}
 
 	slot->timeout = 10;
-	SYSCTL_ADD_INT(device_get_sysctl_ctx(slot->bus),
-	    SYSCTL_CHILDREN(device_get_sysctl_tree(slot->bus)), OID_AUTO,
-	    "timeout", CTLFLAG_RWTUN, &slot->timeout, 0,
-	    "Maximum timeout for SDHCI transfers (in secs)");
-
+	// SYSCTL_ADD_INT(device_get_sysctl_ctx(slot->bus),
+	//     SYSCTL_CHILDREN(device_get_sysctl_tree(slot->bus)), OID_AUTO,
+	//     "timeout", CTLFLAG_RWTUN, &slot->timeout, 0,
+	//     "Maximum timeout for SDHCI transfers (in secs)");
 	work_init(&slot->card_task, sdhci_card_work);
 	delayed_work_init(&slot->card_delayed_task, sdhci_card_delayed_work);
-//TODO: timer create
-	callout_init(&slot->card_poll_callout, 1);
-	callout_init_mtx(&slot->timeout_callout, &slot->mtx, 0);
-	callout_init_mtx(&slot->retune_callout, &slot->mtx, 0);
-
+	rtems_timer_create(SDCHI_TIMER_NAME, (&slot->card_poll_callout); //callout_init(&slot->card_poll_callout, 1);
+	rtems_timer_create(SDCHI_TIMER_NAME, (&slot->timeout_callout); //callout_init_mtx(&slot->timeout_callout, &slot->mtx, 0);
+	rtems_timer_create(SDCHI_TIMER_NAME, (&slot->retune_callout); //callout_init_mtx(&slot->retune_callout, &slot->mtx, 0);
 	if ((slot->quirks & SDHCI_QUIRK_POLL_CARD_PRESENT) &&
 	    !(slot->opt & SDHCI_NON_REMOVABLE)) {
 		rtems_timer_server_fire_after(slot->card_poll_callout,
@@ -1072,20 +1075,20 @@ no_tuning:
 int
 sdhci_cleanup_slot(struct sdhci_slot *slot)
 {
-	device_t d;
-
-	callout_drain(&slot->timeout_callout);
-	callout_drain(&slot->card_poll_callout);
-	callout_drain(&slot->retune_callout);
-	taskqueue_drain(taskqueue_swi_giant, &slot->card_task);
-	taskqueue_drain_timeout(taskqueue_swi_giant, &slot->card_delayed_task);
+	struct drvmgr_dev *d;
+	
+	rtems_timer_cancel(&slot->timeout_callout); //callout_drain(&slot->timeout_callout);
+	rtems_timer_cancel(&slot->card_poll_callout); //callout_drain(&slot->card_poll_callout);
+	rtems_timer_cancel(&slot->retune_callout); //callout_drain(&slot->retune_callout);
+	cancel_work_sync(&slot->card_task);
+	cancel_delayed_work_sync(&slot->card_delayed_task);
 
 	SDHCI_LOCK(slot);
 	d = slot->dev;
 	slot->dev = NULL;
 	SDHCI_UNLOCK(slot);
 	if (d != NULL)
-		device_delete_child(slot->bus, d);
+		device_delete(slot->bus, d);
 
 	SDHCI_LOCK(slot);
 	sdhci_reset(slot, SDHCI_RESET_ALL);
@@ -1135,7 +1138,6 @@ sdhci_generic_resume(struct sdhci_slot *slot)
 uint32_t
 sdhci_generic_min_freq(device_t brdev __unused, struct sdhci_slot *slot)
 {
-
 	if (slot->version >= SDHCI_SPEC_300)
 		return (slot->max_clk / SDHCI_300_MAX_DIVIDER);
 	else
@@ -1145,7 +1147,6 @@ sdhci_generic_min_freq(device_t brdev __unused, struct sdhci_slot *slot)
 bool
 sdhci_generic_get_card_present(device_t brdev __unused, struct sdhci_slot *slot)
 {
-
 	if (slot->opt & SDHCI_NON_REMOVABLE)
 		return true;
 
@@ -1187,7 +1188,7 @@ sdhci_generic_set_uhs_timing(device_t brdev __unused, struct sdhci_slot *slot)
 	sdhci_set_clock(slot, ios->clock);
 }
 
-int
+static int
 sdhci_generic_update_ios(device_t brdev, device_t reqdev)
 {
 	struct sdhci_slot *slot = device_get_ivars(reqdev);
@@ -1229,7 +1230,7 @@ sdhci_generic_update_ios(device_t brdev, device_t reqdev)
 	return (0);
 }
 
-int
+static int
 sdhci_generic_switch_vccq(device_t brdev __unused, device_t reqdev)
 {
 	struct sdhci_slot *slot = device_get_ivars(reqdev);
@@ -1284,7 +1285,7 @@ done:
 	return (err);
 }
 
-int
+static int
 sdhci_generic_tune(device_t brdev __unused, device_t reqdev, bool hs400)
 {
 	struct sdhci_slot *slot = device_get_ivars(reqdev);
@@ -1355,7 +1356,7 @@ sdhci_generic_tune(device_t brdev __unused, device_t reqdev, bool hs400)
 	return (err);
 }
 
-int
+static int
 sdhci_generic_retune(device_t brdev __unused, device_t reqdev, bool reset)
 {
 	struct sdhci_slot *slot = device_get_ivars(reqdev);
@@ -1476,8 +1477,10 @@ static void
 sdhci_retune(rtems_id timer, void *arg)
 {
 	struct sdhci_slot *slot = arg;
-
+	SDHCI_LOCK(slot);
 	slot->retune_req |= SDHCI_RETUNE_REQ_NEEDED;
+	SDHCI_UNLOCK(slot);
+	(void) timer;
 }
 
 static void
@@ -1504,7 +1507,7 @@ static void
 sdhci_timeout(rtems_id timer, void *arg)
 {
 	struct sdhci_slot *slot = arg;
-
+	SDHCI_LOCK(slot);
 	if (slot->curcmd != NULL) {
 		slot_printf(slot, "Controller timeout\n");
 		sdhci_dumpregs(slot);
@@ -1514,6 +1517,7 @@ sdhci_timeout(rtems_id timer, void *arg)
 	} else {
 		slot_printf(slot, "Spurious timeout - no active command\n");
 	}
+	SDHCI_UNLOCK(slot);
 	(void) timer;
 }
 
@@ -1872,7 +1876,7 @@ sdhci_start(struct sdhci_slot *slot)
 	sdhci_req_done(slot);
 }
 
-int
+static int
 sdhci_generic_request(device_t brdev __unused, device_t reqdev,
     struct mmc_request *req)
 {
@@ -1903,7 +1907,7 @@ sdhci_generic_request(device_t brdev __unused, device_t reqdev,
 	return (0);
 }
 
-int
+static int
 sdhci_generic_get_ro(device_t brdev __unused, device_t reqdev)
 {
 	struct sdhci_slot *slot = device_get_ivars(reqdev);
@@ -1915,7 +1919,7 @@ sdhci_generic_get_ro(device_t brdev __unused, device_t reqdev)
 	return (!(val & SDHCI_WRITE_PROTECT));
 }
 
-int
+static int
 sdhci_generic_acquire_host(device_t brdev __unused, device_t reqdev)
 {
 	struct sdhci_slot *slot = device_get_ivars(reqdev);
@@ -1931,7 +1935,7 @@ sdhci_generic_acquire_host(device_t brdev __unused, device_t reqdev)
 	return (err);
 }
 
-int
+static int
 sdhci_generic_release_host(device_t brdev __unused, device_t reqdev)
 {
 	struct sdhci_slot *slot = device_get_ivars(reqdev);
@@ -2173,8 +2177,8 @@ sdhci_generic_intr(struct sdhci_slot *slot)
 	SDHCI_UNLOCK(slot);
 }
 
-int
-sdhci_generic_read_ivar(device_t bus, device_t child, int which,
+static int
+sdhci_generic_read_ivar(struct drvmgr_dev *bus, struct drvmgr_dev *child, int which,
     uintptr_t *result)
 {
 	const struct sdhci_slot *slot = device_get_ivars(child);
@@ -2260,8 +2264,8 @@ sdhci_generic_read_ivar(device_t bus, device_t child, int which,
 	return (0);
 }
 
-int
-sdhci_generic_write_ivar(device_t bus, device_t child, int which,
+static int
+sdhci_generic_write_ivar(struct drvmgr_dev *bus, struct drvmgr_dev *child, int which,
     uintptr_t value)
 {
 	struct sdhci_slot *slot = device_get_ivars(child);
@@ -2335,3 +2339,35 @@ sdhci_generic_write_ivar(device_t bus, device_t child, int which,
 	}
 	return (0);
 }
+
+static struct mmc_host_ops sdhci_ops = {
+	.ivar_ops = {
+		.read_ivar = sdhci_generic_read_ivar,
+		.write_ivar = sdhci_generic_write_ivar
+	},
+	.update_ios = sdhci_generic_update_ios,
+	.request = sdhci_generic_request,
+	.get_ro = sdhci_generic_get_ro,
+	.acquire_host = sdhci_generic_acquire_host,
+	.release_host = sdhci_generic_release_host,
+	.switch_vccq = sdhci_generic_switch_vccq,
+	.tune = sdhci_generic_tune,
+	.retune = sdhci_generic_retune
+};
+
+static struct drvmgr_drv_ops sdhci_driver = {
+	.init = {
+        st_sdmmc_preprobe,
+		st_sdmmc_probe,
+		stm32h7_sdmmc_extprobe
+	}
+};
+
+OFW_PLATFORM_DRIVER(stm32h7_sdmmc) = {
+	.drv = {
+		.drv_id   = DRIVER_SDHCI_ID,
+		.name     = "sdhci",
+		.bus_type = DRVMGR_BUS_TYPE_SDHCI,
+		.ops      = &sdhci_driver
+	},
+};

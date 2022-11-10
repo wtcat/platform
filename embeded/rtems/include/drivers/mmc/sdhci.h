@@ -440,6 +440,7 @@ struct sdhci_slot {
  */
 typedef uintptr_t bus_size_t;
 struct sdhci_bus_ops {
+    struct mmc_base_ops ivar_ops;
 	uint8_t (*read_1)(struct drvmgr_dev *brdev, struct sdhci_slot *slot, bus_size_t off);
 	uint16_t (*read_2)(struct drvmgr_dev *brdev, struct sdhci_slot *slot, bus_size_t off);
 	uint32_t (*read_4)(struct drvmgr_dev *brdev, struct sdhci_slot *slot, bus_size_t off);

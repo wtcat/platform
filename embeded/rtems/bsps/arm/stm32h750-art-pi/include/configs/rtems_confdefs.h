@@ -2036,7 +2036,7 @@
  * This filesystem requires a Block Device Cache configuration, see
  * #CONFIGURE_APPLICATION_NEEDS_LIBBLOCK.
  */
-// #define CONFIGURE_FILESYSTEM_DOSFS
+#define CONFIGURE_FILESYSTEM_DOSFS
 
 /* Generated from spec:/acfg/if/filesystem-ftpfs */
 

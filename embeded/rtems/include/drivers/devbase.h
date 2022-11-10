@@ -97,6 +97,12 @@ static inline const void *device_get_operations(struct drvmgr_dev *dev) {
 	return *ops;
 }
 
+static inline void device_set_operations(struct drvmgr_dev *dev,
+	const void *ops) {
+	void **mp = (void **)device_get_private(dev);
+	*mp = (void *)ops;
+}
+
 #define __platform_driver_init(drv) \
 	RTEMS_STATIC_ASSERT(sizeof(drv) == sizeof(struct dev_driver), \
 		"Device driver object type error!"); \
