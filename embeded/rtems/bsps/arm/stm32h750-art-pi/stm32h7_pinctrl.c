@@ -108,7 +108,8 @@ static int stm32h7_pinctrl_bus_unite(struct drvmgr_drv *drv, struct drvmgr_dev *
 }
 
 static const struct pinctrl_operations stm32h7_pinctrl_ops = {
-    .set_state = stm32h7_pinctrl_set
+    .set_state = stm32h7_pinctrl_set,
+    .set_state_np = stm32h7_setup_pinctrl
 };
 
 static int ofw_pinctrl_bus_populate_device(struct drvmgr_bus *bus) {

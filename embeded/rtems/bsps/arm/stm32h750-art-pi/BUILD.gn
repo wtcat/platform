@@ -1,6 +1,7 @@
 import("//gn/toolchain/rtems/rtems.gni")
 
 component("board") {
+  deps = []
   include_dirs = [
     "include"
   ]
@@ -17,7 +18,6 @@ component("board") {
     "stm32h7_dmamux.c",
     "stm32h7_uart.c",
     "stm32h7_spi.c",
-    "stm32h7_sdmmc.c",
     "stm32h7_leds.c",
     "gpio-keys.c",
     "flash_w25q128.c"
@@ -25,12 +25,22 @@ component("board") {
   sources += [
     "stm32_queue.c"
   ]
+  if (use_libbsd) {
+    sources += [
+      "bsd/stm32h7_sdmmc.c"
+    ]
+  } else {
+    sources += ["stm32h7_sdmmc.c"]
+    deps += [
+      "//embeded/rtems/bsps/shared/mmc"
+    ]
+  }
 
   deps = [
     "//embeded/rtems/bsps/arm/shared",
     "//embeded/rtems/bsps/arm/shared/hal_stm32:stm32h7",
     "//embeded/rtems/bsps/arm/shared/cortexm:cortexm_shared",
-    "//embeded/rtems/bsps/shared/mmc"
+    
   ]
   configs = [
     "//embeded/rtems/bsps/arm/shared/hal_stm32:stm32h7_config"

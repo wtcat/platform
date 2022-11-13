@@ -32,3 +32,7 @@ int stm32_pinctrl_set(struct drvmgr_dev *dev) {
     }
      return pinctrl_generic_set_state(pinctrl, dev);
 }
+
+int stm32_pinctrl_set_np(phandle_t np) {
+    return pinctrl_simple_set_np("/dev/pinctrl", np);
+}

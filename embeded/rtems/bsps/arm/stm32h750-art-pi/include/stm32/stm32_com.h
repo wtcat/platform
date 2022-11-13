@@ -13,7 +13,7 @@ extern "C"{
 struct drvmgr_dev;
 
 int stm32_ofw_get_clkdev(phandle_t np, struct drvmgr_dev **clkdev, int *clkid);
-int stm32_pinctrl_set(struct drvmgr_dev *dev);
+int stm32_pinctrl_set_np(phandle_t np);
 
 #ifdef __cplusplus
 }

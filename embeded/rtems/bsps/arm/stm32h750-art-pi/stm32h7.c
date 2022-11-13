@@ -34,7 +34,7 @@ extern char stm32h7_memory_sdram_2_end[];
 extern void  _cortexm_exception_default(void);
 #define EARLY_UART UART4
 
-static const ARMV7M_MPU_Region_config stm32h7_mpu_map[] = {
+static const ARMV7M_MPU_Region_config stm32h7_mpu_map[] __unused = {
     {
       .begin = stm32h7_memory_sram_axi_begin,
       .end = stm32h7_memory_sram_axi_end,
@@ -133,7 +133,7 @@ void __notrace bsp_start_hook_0(void) {
     SCB_EnableICache();
   if ((SCB->CCR & SCB_CCR_DC_Msk) == 0) 
     SCB_EnableDCache();
-  _ARMV7M_MPU_Setup(stm32h7_mpu_map, RTEMS_ARRAY_SIZE(stm32h7_mpu_map));
+  // _ARMV7M_MPU_Setup(stm32h7_mpu_map, RTEMS_ARRAY_SIZE(stm32h7_mpu_map));
 }
 
 void __notrace bsp_start_hook_1(void) {

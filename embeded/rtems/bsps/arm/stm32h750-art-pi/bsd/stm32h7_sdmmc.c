@@ -89,7 +89,10 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
+#undef log
+#include "stm32/stm32_com.h"
 #include "stm32h7xx.h"
+#include "stm32h7xx_ll_rcc.h"
 
 #define	ST_SDMMC_LOCK(_sc)		mtx_lock(&(_sc)->mtx)
 #define	ST_SDMMC_UNLOCK(_sc)		mtx_unlock(&(_sc)->mtx)
@@ -175,17 +178,18 @@ static const struct ofw_compat_data compat_data[] = {
 
 void st_sdmmc_idma_txrx(struct st_sdmmc_softc *sc, void *buf)
 {
-	BSD_ASSERT(
-	    (buf >= (void*) stm32h7_memory_sdram_1_begin &&
-	     buf  < (void*) stm32h7_memory_sdram_1_end) ||
-	    (buf >= (void*) stm32h7_memory_sram_axi_begin &&
-	     buf  < (void*) stm32h7_memory_sram_axi_end) ||
-	    (buf >= (void*) stm32h7_memory_sdram_2_begin &&
-	     buf  < (void*) stm32h7_memory_sdram_2_end) ||
-	    (buf >= (void*) stm32h7_memory_quadspi_begin &&
-	     buf  < (void*) stm32h7_memory_quadspi_end));
+	// BSD_ASSERT(
+	//     (buf >= (void*) stm32h7_memory_sdram_1_begin &&
+	//      buf  < (void*) stm32h7_memory_sdram_1_end) ||
+	//     (buf >= (void*) stm32h7_memory_sram_axi_begin &&
+	//      buf  < (void*) stm32h7_memory_sram_axi_end) ||
+	//     (buf >= (void*) stm32h7_memory_sdram_2_begin &&
+	//      buf  < (void*) stm32h7_memory_sdram_2_end) ||
+	//     (buf >= (void*) stm32h7_memory_quadspi_begin &&
+	//      buf  < (void*) stm32h7_memory_quadspi_end));
 	sc->sdmmc->IDMABASE0 = (uintptr_t) buf;
 	sc->sdmmc->IDMACTRL = SDMMC_IDMA_IDMAEN;
+	(void) sc;
 }
 
 void st_sdmmc_idma_stop(struct st_sdmmc_softc *sc)
@@ -292,21 +296,16 @@ st_sdmmc_hw_init(struct st_sdmmc_softc *sc)
 	st_sdmmc_host_reset(sc);
 }
 
-static void
-st_sdmmc_board_init(void)
-{
-	HAL_SD_MspInit(NULL);
-}
-
 static int
 st_sdmmc_attach(device_t dev)
 {
-	static pthread_once_t once = PTHREAD_ONCE_INIT;
 	struct st_sdmmc_softc *sc;
+	phandle_t node;
 	int rid, error = 0;
 	pcell_t prop;
 	bool interrupt_installed = false;
 
+	node = ofw_bus_get_node(dev);
 	sc = device_get_softc(dev);
 	memset(sc, 0, sizeof(*sc));
 
@@ -324,14 +323,14 @@ st_sdmmc_attach(device_t dev)
 	}
 	sc->sdmmc = (SDMMC_TypeDef *)sc->res[RES_MEM_SDMMC]->r_bushandle;
 			
-	sc->res[RES_MEM_DLYB] = bus_alloc_resource(dev, SYS_RES_MEMORY,
-		&rid, 1, ~0, 1, RF_ACTIVE);
-	if (sc->res[RES_MEM_DLYB] == NULL) {
-		device_printf(dev,
-			"could not allocate dlyb resource\n");
-		error = ENXIO;
-		goto _end;
-	}	
+	// sc->res[RES_MEM_DLYB] = bus_alloc_resource(dev, SYS_RES_MEMORY,
+	// 	&rid, 1, ~0, 1, RF_ACTIVE);
+	// if (sc->res[RES_MEM_DLYB] == NULL) {
+	// 	device_printf(dev,
+	// 		"could not allocate dlyb resource\n");
+	// 	error = ENXIO;
+	// 	goto _end;
+	// }	
 	
 	sc->res[RES_IRQ_SDMMC] = bus_alloc_resource(dev, SYS_RES_IRQ,
 		&rid, 0, ~0, 1, RF_ACTIVE);
@@ -358,10 +357,12 @@ st_sdmmc_attach(device_t dev)
 		goto _end;
 	}
 
-	pthread_once(&once, st_sdmmc_board_init);
+	if (stm32_pinctrl_set_np(node))
+		panic("sdmmc pinctrl set failed!\n");
 
-	sc->sdmmc_ker_ck = HAL_RCCEx_GetPeriphCLKFreq(
-		RCC_PERIPHCLK_SDMMC);
+	sc->sdmmc_ker_ck = LL_RCC_GetSDMMCClockFreq(LL_RCC_SDMMC_CLKSOURCE);
+	// sc->sdmmc_ker_ck = HAL_RCCEx_GetPeriphCLKFreq(
+	// 	RCC_PERIPHCLK_SDMMC);
 	sc->host.f_min = 400000;
 	sc->host.f_max = (int) sc->sdmmc_ker_ck;
 	if (sc->host.f_max > 50000000)
@@ -417,8 +418,8 @@ _end:
 		rtems_cache_coherent_free(sc->dmabuf);
 		if (sc->res[RES_MEM_SDMMC])
 			bus_release_resource(dev, SYS_RES_MEMORY, 0, sc->res[RES_MEM_SDMMC]);
-		if (sc->res[RES_MEM_DLYB])
-			bus_release_resource(dev, SYS_RES_MEMORY, 0, sc->res[RES_MEM_DLYB]);
+		// if (sc->res[RES_MEM_DLYB])
+		// 	bus_release_resource(dev, SYS_RES_MEMORY, 0, sc->res[RES_MEM_DLYB]);
 		if (sc->res[RES_IRQ_SDMMC])
 			bus_release_resource(dev, SYS_RES_IRQ, 0, sc->res[RES_IRQ_SDMMC]);
 	}
@@ -448,6 +449,7 @@ st_sdmmc_update_ios(device_t brdev, device_t reqdev)
 	struct mmc_ios *ios;
 	int err;
 
+	(void) reqdev;
 	sc = device_get_softc(brdev);
 
 	ST_SDMMC_LOCK(sc);
@@ -654,7 +656,7 @@ static int
 st_sdmmc_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 {
 	struct st_sdmmc_softc *sc;
-
+	(void) reqdev;
 	sc = device_get_softc(brdev);
 
 	ST_SDMMC_LOCK(sc);
@@ -672,7 +674,8 @@ st_sdmmc_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 static int
 st_sdmmc_get_ro(device_t brdev, device_t reqdev)
 {
-
+	(void) brdev;
+	(void) reqdev;
 	/*
 	 * FIXME: Currently just ignore write protection. Micro-SD doesn't have
 	 * it anyway and most boards are now using Micro-SD slots.
@@ -684,7 +687,7 @@ static int
 st_sdmmc_acquire_host(device_t brdev, device_t reqdev)
 {
 	struct st_sdmmc_softc *sc;
-
+	(void) reqdev;
 	sc = device_get_softc(brdev);
 
 	ST_SDMMC_LOCK(sc);
@@ -699,7 +702,7 @@ static int
 st_sdmmc_release_host(device_t brdev, device_t reqdev)
 {
 	struct st_sdmmc_softc *sc;
-
+	(void) reqdev;
 	sc = device_get_softc(brdev);
 
 	ST_SDMMC_LOCK(sc);
@@ -713,7 +716,7 @@ static int
 st_sdmmc_read_ivar(device_t bus, device_t child, int which, uintptr_t *result)
 {
 	struct st_sdmmc_softc *sc;
-
+	(void) child;
 	sc = device_get_softc(bus);
 
 	switch (which) {
@@ -776,7 +779,7 @@ static int
 st_sdmmc_write_ivar(device_t bus, device_t child, int which, uintptr_t value)
 {
 	struct st_sdmmc_softc *sc;
-
+	(void) child;
 	sc = device_get_softc(bus);
 
 	switch (which) {

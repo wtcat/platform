@@ -330,7 +330,7 @@ static rtems_status_code mmcsd_attach_worker(rtems_media_state state, const char
 
 		disk = rtems_media_create_path("/dev", src, dev->minor_bus);
 		if (disk == NULL) {
-			printf("OOPS: create path failed\n");
+			printk("OOPS: create path failed\n");
 			goto error;
 		}
 		/*
@@ -342,10 +342,10 @@ static rtems_status_code mmcsd_attach_worker(rtems_media_state state, const char
 		 * On the other hand it would mean that the bus has to be
 		 * acquired on every read which would decrease the performance.
 		 */
-		// mmcbus_acquire_bus(device_get_parent(dev), dev);
+		mmcbus_acquire_bus(device_get_parent(dev), dev);
 		status_code = mmcsd_set_block_size(dev, block_size);
 		if (status_code != RTEMS_SUCCESSFUL) {
-			printf("OOPS: set block size failed\n");
+			printk("OOPS: set block size failed\n");
 			goto error;
 		}
 		status_code = rtems_blkdev_create(disk, block_size,
@@ -510,7 +510,7 @@ static int mmcsd_attach(struct drvmgr_dev *dev) {
 	/* Belatedly announce enhanced user data slice. */
 	if (sc->enh_size != 0) {
 		bytes = mmcsd_pretty_size(size, unit);
-		printf("%ss.%s" ": %ju%sB enhanced user data area "
+		printk("%ss.%s" ": %ju%sB enhanced user data area "
 		    "slice offset 0x%jx at %s\n", dev->name,
 		    MMCSD_LABEL_ENH, bytes, unit, (uintmax_t)sc->enh_base,
 		    dev->name);
@@ -648,9 +648,9 @@ static void mmcsd_add_part(struct mmcsd_softc *sc, u_int type, const char *name,
 		// 	free(part, M_DEVBUF);
 		// 	return;
 		// }
-		printf("%s: Additional partition. This is currently not supported in RTEMS.", part->name);
+		printk("%s: Additional partition. This is currently not supported in RTEMS.", part->name);
 	} else if (type != EXT_CSD_PART_CONFIG_ACC_DEFAULT) {
-		printf("%s: Additional partition. This is currently not supported in RTEMS.", part->name);
+		printk("%s: Additional partition. This is currently not supported in RTEMS.", part->name);
 	} else {
 		MMCSD_DISK_LOCK_INIT(part);
 		rtems_status_code status_code = rtems_media_server_disk_attach(
@@ -661,13 +661,13 @@ static void mmcsd_add_part(struct mmcsd_softc *sc, u_int type, const char *name,
 	bytes = mmcsd_pretty_size(media_size, unit);
 	if (type == EXT_CSD_PART_CONFIG_ACC_DEFAULT) {
 		speed = mmcbr_get_clock(mmcbus);
-		printf("%s%d: %ju%sB <%s>%s at %s %d.%01dMHz/%dbit/%d-block\n",
+		printk("%s%d: %ju%sB <%s>%s at %s %d.%01dMHz/%dbit/%d-block\n",
 		    part->name, cnt, bytes, unit, mmc_get_card_id_string(dev),
 		    ro ? " (read-only)" : "", device_get_nameunit(mmcbus),
 		    speed / 1000000, (speed / 100000) % 10,
 		    mmcsd_bus_bit_width(dev), sc->max_data);
 	} else if (type == EXT_CSD_PART_CONFIG_ACC_RPMB) {
-		printf("%s: %ju%sB partition %d%s at %s\n", part->name, bytes,
+		printk("%s: %ju%sB partition %d%s at %s\n", part->name, bytes,
 		    unit, type, ro ? " (read-only)" : "",
 		    device_get_nameunit(dev));
 	} else {
@@ -703,12 +703,12 @@ static void mmcsd_add_part(struct mmcsd_softc *sc, u_int type, const char *name,
 			}
 		}
 		if (ext == NULL)
-			printf("%s%d: %ju%sB partition %d%s%s at %s\n",
+			printk("%s%d: %ju%sB partition %d%s%s at %s\n",
 			    part->name, cnt, bytes, unit, type, enh ?
 			    " enhanced" : "", ro ? " (read-only)" : "",
 			    device_get_nameunit(dev));
 		else
-			printf("%s%d: %ju%sB partition %d extended 0x%x "
+			printk("%s%d: %ju%sB partition %d extended 0x%x "
 			    "(%s)%s at %s\n", part->name, cnt, bytes, unit,
 			    type, extattr, ext, ro ? " (read-only)" : "",
 			    device_get_nameunit(dev));

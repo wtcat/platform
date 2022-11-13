@@ -550,7 +550,7 @@ void cm_backtrace_assert(uint32_t sp) {
     CMB_ASSERT(init_ok);
     uint32_t cur_stack_pointer = cmb_get_sp();
 
-    cm_backtrace_firmware_info();
+    // cm_backtrace_firmware_info();
 
     /* OS environment */
     if (cur_stack_pointer == cmb_get_msp()) {

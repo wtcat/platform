@@ -1176,7 +1176,7 @@ static void mmc_app_decode_scr(uint32_t *raw_scr, struct mmc_scr *scr) {
 	memset(scr, 0, sizeof(*scr));
 	scr_struct = mmc_get_bits(raw_scr, 64, 60, 4);
 	if (scr_struct != 0) {
-		printf("Unrecognised SCR structure version %d\n",
+		printk("Unrecognised SCR structure version %d\n",
 		    scr_struct);
 		return;
 	}
@@ -1406,20 +1406,20 @@ static bool mmc_host_timing(struct drvmgr_dev *dev, enum mmc_bus_timing timing) 
 static void mmc_log_card(struct drvmgr_dev *dev, struct mmc_ivars *ivar, int newcard) {
 	enum mmc_bus_timing timing;
 
-	printf("Card at relative address 0x%04x%s:\n",
+	printk("Card at relative address 0x%04x%s:\n",
 	    ivar->rca, newcard ? " added" : "");
-	printf(" card: %s\n", ivar->card_id_string);
+	printk(" card: %s\n", ivar->card_id_string);
 	for (timing = bus_timing_max; timing > bus_timing_normal; timing--) {
 		if (isset(&ivar->timings, timing))
 			break;
 	}
-	// printf(" quirks: %b\n", ivar->quirks, MMC_QUIRKS_FMT);
-	printf(" bus: %ubit, %uMHz (%s timing)\n",
+	// printk(" quirks: %b\n", ivar->quirks, MMC_QUIRKS_FMT);
+	printk(" bus: %ubit, %uMHz (%s timing)\n",
 	    (ivar->bus_width == bus_width_1 ? 1 :
 	    (ivar->bus_width == bus_width_4 ? 4 : 8)),
 	    mmc_timing_to_dtr(ivar, timing) / 1000000,
 	    mmc_timing_to_string(timing));
-	printf(" memory: %u blocks, erase sector %u blocks%s\n",
+	printk(" memory: %u blocks, erase sector %u blocks%s\n",
 	    ivar->sec_count, ivar->erase_sector,
 	    ivar->read_only ? ", read-only" : "");
 	(void) dev;
@@ -1748,7 +1748,7 @@ child_common:
 				sizeof(struct mmc_carddev_private), 0, false);
 			if (child != NULL) {
 				mmcdev_set_ivar(child, ivar);
-				device_attach(child);
+				// device_attach(child);
 				sc->child_list = realloc(sc->child_list,
 				    sizeof(struct drvmgr_dev *) * sc->child_count + 1);
 				sc->child_list[sc->child_count++] = child;
@@ -2238,6 +2238,9 @@ static void mmc_scan(struct mmc_softc *sc) {
 		deverr("Failed to release bus after scanning\n");
 		return;
 	}
+	for (int i = 0; i < sc->child_count; i++) 
+		device_attach(sc->child_list[i]);
+	
 	// (void)bus_generic_attach(dev);
 }
 
