@@ -4146,7 +4146,7 @@
  * be compliant with various standards.  These priorities range from 0 to 255.
  * @endparblock
  */
-#if defined(__rtems_bsd__)
+#if defined(__rtems_libbsd__)
 #define CONFIGURE_MAXIMUM_PRIORITY 127
 #else
 #define CONFIGURE_MAXIMUM_PRIORITY 31

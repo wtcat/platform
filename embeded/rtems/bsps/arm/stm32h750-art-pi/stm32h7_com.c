@@ -6,6 +6,8 @@
 
 #include "drivers/ofw_platform_bus.h"
 #include "drivers/pinctrl.h"
+#include "drivers/clock.h"
+
 
 
 int stm32_ofw_get_clkdev(phandle_t np, struct drvmgr_dev **clkdev, int *clkid) {
@@ -35,4 +37,16 @@ int stm32_pinctrl_set(struct drvmgr_dev *dev) {
 
 int stm32_pinctrl_set_np(phandle_t np) {
     return pinctrl_simple_set_np("/dev/pinctrl", np);
+}
+
+int stm32_clk_enable(phandle_t np, int index) {
+    struct drvmgr_dev *clk;
+    pcell_t clkid;
+
+    clk = ofw_clock_request(np, NULL, (pcell_t *)&clkid, 
+    sizeof(clkid));
+    if (clk)
+        return clk_enable(clk, &clkid);
+    (void) index;
+    return -ENODEV;
 }

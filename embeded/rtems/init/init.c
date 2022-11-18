@@ -49,9 +49,10 @@ int RTEMS_WEAK rtems_main(void) {
   return 0;
 }
 
-#ifndef __rtems_libbsd__
+
 static void svrs_sysinit(void) {
 	rtems_status_code sc;
+#ifndef __rtems_libbsd__
 #ifndef CONFIGURE_IRQ_SERVER_DISABLE
 	sc = rtems_interrupt_server_initialize(CONFIGURE_IRQ_SERVER_PRIO, 
 CONFIGURE_IRQ_SERVER_STKSZ,
@@ -66,6 +67,7 @@ CONFIGURE_IRQ_SERVER_STKSZ,
   if (sc != RTEMS_SUCCESSFUL)
     rtems_panic("timer-server init failed\n");
 #endif /* CONFIGURE_TMS_SERVER_DISABLE */
+#endif /* !__rtems_libbsd__ */
 
 #ifndef CONFIGURE_MEDIA_DISABLE
   rtems_media_initialize();
@@ -84,7 +86,6 @@ RTEMS_SYSINIT_ITEM(svrs_sysinit,
   RTEMS_SYSINIT_ROOT_FILESYSTEM, 
   RTEMS_SYSINIT_LAST
 );
-#endif /* !__rtems_libbsd__ */
 
 static void rootfs_init(void) {
   extern char __rootfs_image[];
@@ -99,9 +100,11 @@ rtems_task Init(rtems_task_argument arg) {
   sysinit_post();
   rootfs_init();
 
+#ifndef __rtems_libbsd__
   /* Run startup script */
   if (shell_run_script("/etc/start.rs"))
     rtems_panic("run /etc/start.rs failed\n");
+#endif /* __rtems_libbsd__ */
 
 #if defined(__rtems_libbsd__)
   /* Setup run environment for freebsd */
@@ -114,7 +117,12 @@ rtems_task Init(rtems_task_argument arg) {
 #ifdef CONFIGURE_GDBSERVER
   rtems_debugger_register_tcp_remote();
 #endif
+
+  /* Run startup script */
+  if (shell_run_script("/etc/start.rs"))
+    rtems_panic("run /etc/start.rs failed\n");
 #endif /* __rtems_libbsd__ */
+
   _shell_init();
   rtems_main();
   rtems_task_exit();

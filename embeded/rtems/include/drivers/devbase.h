@@ -4,6 +4,10 @@
 #ifndef DRIVER_DEV_BASE_H_
 #define DRIVER_DEV_BASE_H_
 
+#ifdef _RTEMS_BSD_MACHINE_RTEMS_BSD_KERNEL_SPACE_H_
+#undef LIST_HEAD
+#endif /* _RTEMS_BSD_MACHINE_RTEMS_BSD_KERNEL_SPACE_H_ */
+
 #include "rtems/score/basedefs.h"
 #include <rtems/sysinit.h>
 #include <drvmgr/drvmgr.h>
@@ -11,11 +15,14 @@
 #include <ofw/ofw.h>
 #include "ofw/ofw_extension.h"
 #endif
+
+#include "base/sections.h"
+#ifndef _RTEMS_BSD_MACHINE_RTEMS_BSD_KERNEL_SPACE_H_
 #include "base/bitops.h"
 #include "base/compiler.h"
 #include "base/byteorder.h"
-#include "base/sections.h"
 #include "base/minmax.h"
+#endif /* !_RTEMS_BSD_MACHINE_RTEMS_BSD_KERNEL_SPACE_H_ */
 
 #ifdef __cplusplus
 extern "C"{
@@ -88,9 +95,11 @@ static inline void *device_get_private(struct drvmgr_dev *dev) {
 	return (void *)(dev + 1);
 }
 
+#ifndef _RTEMS_BSD_MACHINE_RTEMS_BSD_KERNEL_SPACE_H_
 static inline struct drvmgr_dev *device_get_parent(struct drvmgr_dev *dev) {
 	return dev->parent->dev;
 }
+#endif /* _RTEMS_BSD_MACHINE_RTEMS_BSD_KERNEL_SPACE_H_ */
 
 static inline const void *device_get_operations(struct drvmgr_dev *dev) {
 	void **ops = (void **)device_get_private(dev);
@@ -115,11 +124,13 @@ static inline void device_set_operations(struct drvmgr_dev *dev,
 	)
 
 
+#ifndef __rtems_libbsd__
 struct drvmgr_dev *device_add(struct drvmgr_dev *parent, 
     const struct drvmgr_bus_ops *bus_ops, 
     int bustype, const char *name, size_t devp_size, size_t priv_size, bool attach);
 int device_delete(struct drvmgr_dev *parent, struct drvmgr_dev *dev);
 int device_attach(struct drvmgr_dev *dev);
+#endif /* __rtems_libbsd__ */
 
 int driver_register_posthook(struct drv_posthook *hook);
 

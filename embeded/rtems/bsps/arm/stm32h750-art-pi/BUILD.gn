@@ -19,7 +19,7 @@ component("board") {
     "stm32h7_uart.c",
     "stm32h7_spi.c",
     "stm32h7_leds.c",
-    "gpio-keys.c",
+    
     "flash_w25q128.c"
   ]
   sources += [
@@ -27,10 +27,14 @@ component("board") {
   ]
   if (use_libbsd) {
     sources += [
-      "bsd/stm32h7_sdmmc.c"
+      "bsd/stm32h7_sdmmc.c",
+      "bsd/keys.c"
     ]
   } else {
-    sources += ["stm32h7_sdmmc.c"]
+    sources += [
+      "stm32h7_sdmmc.c",
+      "gpio-keys.c",
+    ]
     deps += [
       "//embeded/rtems/bsps/shared/mmc"
     ]

@@ -5,7 +5,6 @@
 #define DRIVER_GPIOD_H_
 
 #include "drivers/devbase.h"
-#include <drvmgr/drvmgr.h>
 
 #ifdef __cplusplus
 extern "C"{

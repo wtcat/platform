@@ -11,9 +11,12 @@
 #include <rtems/chain.h>
 #include <rtems/score/assert.h>
 #include <rtems/sysinit.h>
+#include <rtems/bspIo.h>
 
 #include "base/atomic.h"
 #include "base/workqueue.h"
+#include "base/sections.h"
+
 
 struct helper_work_struct {
     struct work_struct work;
@@ -34,7 +37,7 @@ struct helper_work_struct {
 #define RTEMS_EVENT_WORKQUEUE_TERMINAL  RTEMS_EVENT_21
 #define RTEMS_EVENT_WORK_CANCEL         RTEMS_EVENT_22
 
-struct workqueue _system_workqueue[CONFIGURE_MAXIMUM_PROCESSORS];
+struct workqueue _system_workqueue[CONFIGURE_MAXIMUM_PROCESSORS] __fastdata;
 
 static void cancel_helper_work(struct work_struct *work) {
     struct helper_work_struct *helper = RTEMS_CONTAINER_OF(work, 
@@ -70,7 +73,7 @@ static int request_event_helper(struct workqueue *wq, uint32_t events,
     return rtems_status_code_to_errno(sc);
 }
 
-static void schedule_worker(rtems_task_argument arg) {
+static void __fastcode schedule_worker(rtems_task_argument arg) {
     struct workqueue *wq = (struct workqueue *)arg;
     void (*handler)(struct work_struct *work);
     rtems_interrupt_lock_context lock_context;
@@ -97,13 +100,13 @@ static void schedule_worker(rtems_task_argument arg) {
     }
 }
 
-static void schedule_delayed_timer_cb(struct timer_ii *timer) {
+static void __fastcode schedule_delayed_timer_cb(struct timer_ii *timer) {
 	struct delayed_work_struct *work = RTEMS_CONTAINER_OF(timer, 
 		struct delayed_work_struct, timer);
 	schedule_work_to_queue(work->wq, &work->work);
 }
 
-int schedule_work_to_queue(struct workqueue *wq, 
+int __fastcode schedule_work_to_queue(struct workqueue *wq, 
     struct work_struct *work) {
     rtems_interrupt_lock_context lock_context;
     _Assert(wq != NULL);
@@ -139,7 +142,7 @@ int cancel_queue_work(struct workqueue *wq, struct work_struct *work,
     return 0;
 }
 
-int schedule_delayed_work_to_queue(struct workqueue *wq, 
+int __fastcode schedule_delayed_work_to_queue(struct workqueue *wq, 
     struct delayed_work_struct *work, uint32_t ticks) {
     _Assert(wq != NULL);
     _Assert(work != NULL);
@@ -197,8 +200,10 @@ int workqueue_create(struct workqueue *wq, int cpu_index, uint32_t prio,
         return -EINVAL;
     sc = rtems_task_create(rtems_build_name('W', 'Q', '@', 'X'),
         prio, stksize, modes, attributes, &wq->thread);
-    if (sc != RTEMS_SUCCESSFUL)
+    if (sc != RTEMS_SUCCESSFUL) {
+        printk("%s: workqueue create failed(%s)\n", __func__, rtems_status_text(sc));
         return -rtems_status_code_to_errno(sc);
+    }
     rtems_interrupt_lock_initialize(&wq->lock, "Workqueue");
     rtems_chain_initialize_empty(&wq->entries);
 #if defined(RTEMS_SMP)
@@ -214,7 +219,9 @@ int workqueue_create(struct workqueue *wq, int cpu_index, uint32_t prio,
     (void)cpu_index;
 #endif
     sc = rtems_task_start(wq->thread, schedule_worker, (rtems_task_argument)wq);
-    _Assert(sc == RTEMS_SUCCESSFUL);
+    if (sc != RTEMS_SUCCESSFUL) 
+        printk("%s: workqueue start failed(%s)\n", __func__, rtems_status_text(sc));
+    
     return -rtems_status_code_to_errno(sc);
 }
 

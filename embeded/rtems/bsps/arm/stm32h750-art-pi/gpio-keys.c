@@ -36,13 +36,13 @@ static void report_key(struct gpio_button *btn, bool pressed) {
         pressed? "PRESSED": "RELEASE");
 }
 
-static void gpio_keys_work(struct work_struct *work) {
+static void __isr gpio_keys_work(struct work_struct *work) {
     struct gpio_button *btn = RTEMS_CONTAINER_OF(work, 
         struct gpio_button, work);
     report_key(btn, gpiod_is_active(btn->btn));
 }
 
-static void gpio_keys_isr(void *arg) {
+static void __isr gpio_keys_isr(void *arg) {
     (void) arg;
     struct gpio_button *btn = arg;
     schedule_delayed_work(&btn->work, GPIO_DEBOUNCE_TIME);

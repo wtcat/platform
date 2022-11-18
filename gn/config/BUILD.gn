@@ -6,7 +6,12 @@ import("//gn/toolchain/rtems/rtems.gni")
 config("feature_flags") {
   defines = []
   if (use_ofw_bus) {
-    defines += ["CONFIG_OFW"]
+    defines += [
+      "CONFIG_OFW"
+    ]
+  }
+  if (use_libbsd) {
+    defines += ["__rtems_libbsd__"]
   }
 }
 

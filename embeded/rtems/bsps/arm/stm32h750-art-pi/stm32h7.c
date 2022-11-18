@@ -30,6 +30,7 @@ extern char stm32h7_memory_sdram_1_end[];
 
 extern char stm32h7_memory_sdram_2_begin[];
 extern char stm32h7_memory_sdram_2_end[];
+extern char stm32h7_memory_sdram_2_size[];
 
 extern void  _cortexm_exception_default(void);
 #define EARLY_UART UART4
@@ -98,16 +99,16 @@ static void __fastcode cortexm_interrupt_dispatch(void) {
 }
 
 static void __notrace bsp_vector_setup(void) {
-  _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_HARD_FAULT, 
-    _cortexm_exception_default);
-  _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_MEM_MANAGE, 
-    _cortexm_exception_default);
-  _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_BUS_FAULT , 
-    _cortexm_exception_default);
-  _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_USAGE_FAULT, 
-    _cortexm_exception_default);
-  _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_DEBUG_MONITOR, 
-    _cortexm_exception_default);
+  // _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_HARD_FAULT, 
+  //   _cortexm_exception_default);
+  // _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_MEM_MANAGE, 
+  //   _cortexm_exception_default);
+  // _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_BUS_FAULT , 
+  //   _cortexm_exception_default);
+  // _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_USAGE_FAULT, 
+  //   _cortexm_exception_default);
+  // _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_DEBUG_MONITOR, 
+  //   _cortexm_exception_default);
 
   for (int i = 0; i < BSP_INTERRUPT_VECTOR_COUNT; i++) {
     _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_IRQ(i), 
@@ -120,6 +121,8 @@ void __notrace bsp_start(void) {
     bsp_vector_setup();
     rtems_cache_coherent_add_area(bsp_section_nocacheheap_begin,
         (uintptr_t)bsp_section_nocacheheap_size);
+    rtems_cache_coherent_add_area(stm32h7_memory_sdram_2_begin,
+      (uintptr_t)stm32h7_memory_sdram_2_size);
 }
 
 void __notrace bsp_start_hook_0(void) {
@@ -158,4 +161,10 @@ uint32_t stm32h7_systick_frequency(void) {
   LL_RCC_ClocksTypeDef rcc_clks;
   LL_RCC_GetSystemClocksFreq(&rcc_clks);
   return rcc_clks.SYSCLK_Frequency;
+}
+
+uint32_t bsp_fdt_map_intr(const uint32_t *intr, 
+	size_t icells) {
+    (void) icells;
+    return intr[0];
 }

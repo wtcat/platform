@@ -14,6 +14,7 @@ struct drvmgr_dev;
 
 int stm32_ofw_get_clkdev(phandle_t np, struct drvmgr_dev **clkdev, int *clkid);
 int stm32_pinctrl_set_np(phandle_t np);
+int stm32_clk_enable(phandle_t np, int index);
 
 #ifdef __cplusplus
 }
