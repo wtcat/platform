@@ -11,7 +11,7 @@
 #include "dt-bindings/pinctrl/stm32-pinctrl.h"
 
 
-#define PINCTRL_DEBUG
+// #define PINCTRL_DEBUG
 
 struct stm32h7_pinctrl {
     int nr;
@@ -53,8 +53,7 @@ static int stm32h7_setup_pinctrl(struct drvmgr_dev *pinctrl, phandle_t np) {
     phandle_t parent, child;
     pcell_t ospeed = 0;
     pcell_t pins[32];
-    int conf = 0;
-
+    
     if (rtems_ofw_get_enc_prop(np, "pinctrl-0", &parent, sizeof(parent)) < 0) {
         printk("%s: not found \"pinctrl-0\" property!\n", __func__);
         return -ENOSTR;
@@ -67,6 +66,7 @@ static int stm32h7_setup_pinctrl(struct drvmgr_dev *pinctrl, phandle_t np) {
     }
 
     ofw_foreach_child_node(parent, child) {
+        int conf = 0;
         int n = rtems_ofw_get_enc_prop(child, "pinmux", pins, sizeof(pins));
         if (n < 0) {
             printk("%s: not found \"pinmux\" property!\n", __func__);
@@ -75,22 +75,26 @@ static int stm32h7_setup_pinctrl(struct drvmgr_dev *pinctrl, phandle_t np) {
 
         if (rtems_ofw_get_enc_prop(child, "slew-rate", &ospeed, sizeof(ospeed)) < 0)
             ospeed = 1;
-
         if (rtems_ofw_has_prop(child, "drive-push-pull"))
             conf |= STM32_OTYPER_PUSH_PULL;
+        if (rtems_ofw_has_prop(child, "pull-up"))
+            conf |= STM32_PUPDR_PULL_UP;
+        if (rtems_ofw_has_prop(child, "pull-down"))
+            conf |= STM32_PUPDR_PULL_DOWN;
 
+        conf |= (ospeed << STM32_OTYPER_SHIFT) | STM32_MODER_ALT_MODE;
         n /= sizeof(pcell_t);
+
         for (int i = 0; i < n; i++) {
             int af = (pins[i] & 0xFF) - 1;
             int port = (pins[i] >> 12) & 0xF;
             int pin = (pins[i] >> 8) & 0xF;       
-            conf |= (ospeed << STM32_OTYPER_SHIFT) | STM32_MODER_ALT_MODE;
             if (port > priv->nr || !priv->gpios[port]) {
                 printk("Invalid GPIO device port (%d)\n", port);
                 return -EINVAL;
             }
-            devdbg("\tconfigure pinmux(%s) pin(%d) speed(%d) af(%d)\n", 
-                priv->gpios[port]->name, pin, ospeed, af);
+            devdbg("\tconfigure pinmux(%s) pin(%d) speed(%d) af(%d) conf(%x)\n", 
+                priv->gpios[port]->name, pin, ospeed, af, conf);
             stm32_gpio_setup(priv->gpios[port], pin, conf, af);
         }
     }

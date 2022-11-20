@@ -99,16 +99,16 @@ static void __fastcode cortexm_interrupt_dispatch(void) {
 }
 
 static void __notrace bsp_vector_setup(void) {
-  // _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_HARD_FAULT, 
-  //   _cortexm_exception_default);
-  // _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_MEM_MANAGE, 
-  //   _cortexm_exception_default);
-  // _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_BUS_FAULT , 
-  //   _cortexm_exception_default);
-  // _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_USAGE_FAULT, 
-  //   _cortexm_exception_default);
-  // _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_DEBUG_MONITOR, 
-  //   _cortexm_exception_default);
+  _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_HARD_FAULT, 
+    _cortexm_exception_default);
+  _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_MEM_MANAGE, 
+    _cortexm_exception_default);
+  _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_BUS_FAULT , 
+    _cortexm_exception_default);
+  _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_USAGE_FAULT, 
+    _cortexm_exception_default);
+  _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_DEBUG_MONITOR, 
+    _cortexm_exception_default);
 
   for (int i = 0; i < BSP_INTERRUPT_VECTOR_COUNT; i++) {
     _ARMV7M_Set_exception_handler(ARMV7M_VECTOR_IRQ(i), 

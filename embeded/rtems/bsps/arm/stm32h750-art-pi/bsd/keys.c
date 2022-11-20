@@ -125,7 +125,7 @@ static const struct ofw_compat_data compat_data[] = {
 
 static int gpio_keys_probe(device_t dev) {
 	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data != 0) {
-		device_set_desc(dev, "GPIO-KEYS driver\n");
+		device_set_desc(dev, "GPIO-KEYS driver");
 		return (0);
 	}
     return ENXIO;

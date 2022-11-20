@@ -11,6 +11,7 @@
 
 #include "asm/cortexm_trace.h"
 #include "asm/cmsis_cortexm.h"
+#include "base/toolchain/compiler_types.h"
 
 
 #define EXC_RETURN_INDICATOR_PREFIX  (0xFFu << 24)
@@ -75,9 +76,11 @@ static void reserved_exception(const rtems_exception_frame *frame, int fault) {
 
 static void fault_show(const rtems_exception_frame *frame, int fault) {
     (void)frame;
+#define SCB_UFSR  (*((__IOM uint16_t *) &SCB->CFSR + 1))
+#define SCB_BFSR  (*((__IOM uint8_t *) &SCB->CFSR + 1))
+#define SCB_MMFSR (*((__IOM uint8_t *) &SCB->CFSR))
 	printk("Fault! EXC #%d\n", fault);
-	// printk("MMFSR: 0x%x, BFSR: 0x%x, UFSR: 0x%x\n", SCB_CFSR_MEMFAULTSR,
-	//        SCB_CFSR_BUSFAULTSR, SCB_CFSR_USGFAULTSR);
+	printk("MMFSR: 0x%x, BFSR: 0x%x, UFSR: 0x%x\n", SCB_MMFSR, SCB_BFSR, SCB_UFSR);
 #if defined(CONFIG_ARM_SECURE_FIRMWARE)
 	printk("SFSR: 0x%x", SAU->SFSR);
 #endif /* CONFIG_ARM_SECURE_FIRMWARE */
@@ -295,6 +298,7 @@ void _cortexm_fault(uint32_t msp, uint32_t psp, uint32_t exc_return,
 		printk("Fatal*** Invalid EXC_RETURN value. This is a fatal error.\n");
 		return;
 	}
+
 	cm_backtrace_fault(exc_return, msp);
 	if (exc_return & EXC_RETURN_MODE_THREAD) 
 		v7m = (ARMV7M_Exception_frame *)psp;
@@ -321,4 +325,32 @@ void _cortexm_fault(uint32_t msp, uint32_t psp, uint32_t exc_return,
 	cpu.vfp_context = NULL;
 	fault_handle(&cpu, fault);
 	rtems_fatal(RTEMS_FATAL_SOURCE_EXCEPTION, (rtems_fatal_code)&cpu);
+}
+
+void  __attribute__((naked)) _cortexm_exception_default(void) {
+	__asm__ volatile(
+		"mrs r0, msp\n"
+		"mrs r1, psp\n"
+		"push {r0, lr}\n"
+		"push {r1, r2}\n"
+
+		/* push {r4-r11} */
+		"mov  r3, r11\n"
+		"mov  r2, r10\n"
+		"push {r2, r3}\n"
+		"mov  r3, r9\n"
+		"mov  r2, r8\n"
+		"push {r2, r3}\n"
+		"push {r4-r7}\n"
+
+		/* pointer to struct cortexm_exception */
+		"mov r3, sp\n"
+		/* EXC_RETURN */
+		"mov r2, lr\n"
+		"bl _cortexm_fault\n"
+
+		"add sp, #40\n"
+		"pop {r0, pc}\n"
+		:::
+	);
 }

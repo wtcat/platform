@@ -3170,7 +3170,7 @@
  * You may use this feature to debug system initialization issues.  The
  * printk() function is used to print the information.
  */
-#define CONFIGURE_VERBOSE_SYSTEM_INITIALIZATION
+// #define CONFIGURE_VERBOSE_SYSTEM_INITIALIZATION
 
 /* Generated from spec:/acfg/if/zero-workspace-automatically */
 
@@ -4863,7 +4863,8 @@
 /*
  * libbsd configure options
  */
-#define RTEMS_BSD_CONFIG_DOMAIN_PAGE_MBUFS_SIZE (8 * 1024 * 1024ul)
+#define RTEMS_BSD_CONFIG_DOMAIN_PAGE_MBUFS_SIZE (4 * 1024 * 1024ul) //(8 * 1024 * 1024ul)
+#define RTEMS_BSD_CONFIG_DOMAIN_BIO_SIZE (1 * 1024 * 1024ul) //(4 * 1024 * 1024ul)
 #define RTEMS_BSD_CONFIG_NET_PF_UNIX
 // #define RTEMS_BSD_CONFIG_NET_IP_MROUTE
 // #define RTEMS_BSD_CONFIG_NET_IP6_MROUTE

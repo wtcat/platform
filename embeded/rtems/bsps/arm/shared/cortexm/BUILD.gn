@@ -3,8 +3,7 @@ component("cortexm_shared") {
     sources = [
         "cortexm_dwt.c",
         "cortexm_fault.c",
-        "cortexm_trace.c",
-        "fault.S"
+        "cortexm_trace.c"
     ]
     configs = [
         "//embeded/rtems/bsps/arm/shared/hal_stm32:cortexm_config"

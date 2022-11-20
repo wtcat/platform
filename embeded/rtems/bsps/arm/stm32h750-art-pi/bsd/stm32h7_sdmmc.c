@@ -62,9 +62,9 @@
  * details.
  */
 
-#include <rtems/rtems/cache.h>
 #include <rtems/malloc.h>
 #include <rtems/irq-extension.h>
+#include <rtems/bsd/bsd.h>
 
 #include <bsp.h>
 
@@ -88,7 +88,9 @@ __FBSDID("$FreeBSD$");
 #include <dev/mmc/mmcbrvar.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
+#undef free
 
+#include "base/sections.h"
 #undef log
 #include "stm32/stm32_com.h"
 #include "stm32h7xx.h"
@@ -159,7 +161,8 @@ struct st_sdmmc_softc {
 	rtems_binary_semaphore wait_done;
 	int bus_busy;
 
-	struct resource *res[RES_NR];
+	struct resource *mem_res;
+	struct resource *irq_res;
 	SDMMC_TypeDef *sdmmc;
 	DLYB_TypeDef *dlyb;
 	rtems_vector_number irq;
@@ -197,7 +200,7 @@ void st_sdmmc_idma_stop(struct st_sdmmc_softc *sc)
 	sc->sdmmc->IDMACTRL = 0;
 }
 
-static void
+static void __fastcode
 st_sdmmc_intr(void *arg)
 {
 	struct st_sdmmc_softc *sc;
@@ -227,6 +230,9 @@ st_sdmmc_probe(device_t dev)
 	if (!ofw_bus_status_okay(dev))
 		return (ENXIO);
 
+	if (ofw_bus_has_prop(dev, "non-removable"))
+		return ENXIO;
+
 	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data != 0) {
 		device_set_desc(dev, "STM32H7xx SDMMC Host");
 		return (0);
@@ -245,13 +251,16 @@ st_sdmmc_set_clock_and_bus(
 	uint32_t clk_div;
 	uint32_t clkcr;
 
+	if (freq == 0)
+		return 0;
+
 	clkcr = SDMMC_CLKCR_NEGEDGE | SDMMC_CLKCR_PWRSAV | SDMMC_CLKCR_HWFC_EN;
 	clk_div = howmany(sc->sdmmc_ker_ck, freq) / 2;
 	if (clk_div > SDMMC_CLKCR_CLKDIV >> SDMMC_CLKCR_CLKDIV_Pos) {
 		clk_div = SDMMC_CLKCR_CLKDIV >> SDMMC_CLKCR_CLKDIV_Pos;
 	}
-	clkcr |= clk_div << SDMMC_CLKCR_CLKDIV_Pos;
 
+	clkcr |= clk_div << SDMMC_CLKCR_CLKDIV_Pos;
 	switch (width) {
 	default:
 		BSD_ASSERT(width == bus_width_1);
@@ -266,7 +275,7 @@ st_sdmmc_set_clock_and_bus(
 	}
 
 	sc->sdmmc->CLKCR = clkcr;
-
+	device_printf(sc->dev, "update bus-clock(%d) and width(%d) clk_dev(%d)\n", freq, width, clk_div);
 	return 0;
 }
 
@@ -313,34 +322,27 @@ st_sdmmc_attach(device_t dev)
 	ST_SDMMC_LOCK_INIT(sc);
 	rtems_binary_semaphore_init(&sc->wait_done, "sdmmc-sem");
 	
-	sc->res[RES_MEM_SDMMC] = bus_alloc_resource(dev, SYS_RES_MEMORY,
-		&rid, 0, ~0, 1, RF_ACTIVE);
-	if (sc->res[RES_MEM_SDMMC] == NULL) {
-		device_printf(dev,
-			"could not allocate sdmmc resource\n");
+	rid = 0;
+	sc->mem_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+		&rid, RF_ACTIVE);
+	if (sc->mem_res == NULL) {
+		device_printf(dev, "could not allocate sdmmc memory resource\n");
 		error = ENXIO;
 		goto _end;
 	}
-	sc->sdmmc = (SDMMC_TypeDef *)sc->res[RES_MEM_SDMMC]->r_bushandle;
-			
-	// sc->res[RES_MEM_DLYB] = bus_alloc_resource(dev, SYS_RES_MEMORY,
-	// 	&rid, 1, ~0, 1, RF_ACTIVE);
-	// if (sc->res[RES_MEM_DLYB] == NULL) {
-	// 	device_printf(dev,
-	// 		"could not allocate dlyb resource\n");
-	// 	error = ENXIO;
-	// 	goto _end;
-	// }	
 	
-	sc->res[RES_IRQ_SDMMC] = bus_alloc_resource(dev, SYS_RES_IRQ,
-		&rid, 0, ~0, 1, RF_ACTIVE);
-	if (sc->res[RES_IRQ_SDMMC] == NULL) {
-		device_printf(dev,
-			"could not allocate interrupt resource\n");
+	rid = 0;
+	sc->irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+		&rid, RF_ACTIVE);
+	if (sc->irq_res == NULL) {
+		device_printf(dev, "could not allocate interrupt resource\n");
 		error = ENXIO;
 		goto _end;
 	}
-	sc->irq = sc->res[RES_IRQ_SDMMC]->r_bushandle;
+
+	sc->sdmmc = (SDMMC_TypeDef *)sc->mem_res->r_bushandle;
+	sc->irq = rman_get_start(sc->irq_res);
+	device_printf(dev, "sc->sdmmc(%p) sc->irq(%d)\n", sc->sdmmc, sc->irq);
 	
 	/*
 		* FIXME: This memory should be in AXI SRAM, QSPI or FMC. In the
@@ -349,7 +351,7 @@ st_sdmmc_attach(device_t dev)
 		* assumption is true. A better solution (like fixed AXI SRAM)
 		* might would be a good idea.
 		*/
-	sc->dmabuf = rtems_cache_coherent_allocate(
+	sc->dmabuf = rtems_heap_allocate_aligned_with_boundary(
 		DMA_BUF_SIZE, CPU_CACHE_LINE_BYTES, 0);
 	if (sc->dmabuf == NULL) {
 		device_printf(dev, "could not allocate dma buffer\n");
@@ -357,12 +359,13 @@ st_sdmmc_attach(device_t dev)
 		goto _end;
 	}
 
+	if (stm32_clk_enable(node, 0))
+		panic("sdmmc enable clock err\n");
+
 	if (stm32_pinctrl_set_np(node))
 		panic("sdmmc pinctrl set failed!\n");
 
 	sc->sdmmc_ker_ck = LL_RCC_GetSDMMCClockFreq(LL_RCC_SDMMC_CLKSOURCE);
-	// sc->sdmmc_ker_ck = HAL_RCCEx_GetPeriphCLKFreq(
-	// 	RCC_PERIPHCLK_SDMMC);
 	sc->host.f_min = 400000;
 	sc->host.f_max = (int) sc->sdmmc_ker_ck;
 	if (sc->host.f_max > 50000000)
@@ -382,7 +385,6 @@ st_sdmmc_attach(device_t dev)
 	sc->cfg.ocr_voltage = MMC_OCR_320_330 | MMC_OCR_330_340; /* 3.3v */
 
 	st_sdmmc_hw_init(sc);
-
 	error = rtems_interrupt_handler_install(sc->irq, "SDMMC",
 		RTEMS_INTERRUPT_UNIQUE, st_sdmmc_intr, sc);
 	if (error != 0) {
@@ -414,14 +416,11 @@ _end:
 			rtems_interrupt_handler_remove(sc->irq,
 			    st_sdmmc_intr, sc);
 		}
-
-		rtems_cache_coherent_free(sc->dmabuf);
-		if (sc->res[RES_MEM_SDMMC])
-			bus_release_resource(dev, SYS_RES_MEMORY, 0, sc->res[RES_MEM_SDMMC]);
-		// if (sc->res[RES_MEM_DLYB])
-		// 	bus_release_resource(dev, SYS_RES_MEMORY, 0, sc->res[RES_MEM_DLYB]);
-		if (sc->res[RES_IRQ_SDMMC])
-			bus_release_resource(dev, SYS_RES_IRQ, 0, sc->res[RES_IRQ_SDMMC]);
+		if (sc->mem_res)
+			bus_release_resource(dev, SYS_RES_MEMORY, 0, sc->mem_res);
+		if (sc->irq_res)
+			bus_release_resource(dev, SYS_RES_IRQ, 0, sc->irq_res);
+		free(sc->dmabuf);
 	}
 
 	return error;
@@ -571,12 +570,7 @@ st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd)
 			blksize = ffs(xferlen) - 1;
 		}
 
-		debug_print(sc, 1,
-		    "data: len: %d, xferlen: %d, blksize: %d, dataflags: 0x%x\n",
-		    cmd->data->len, xferlen, blksize, cmd->data->flags);
-
 		BSD_ASSERT(xferlen % (1 << blksize) == 0);
-
 		data = cmd->data->data;
 		/*
 		 * Check whether data have to be copied. Reason is either
@@ -620,8 +614,8 @@ st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd)
 	if (cmd->error) {
 		sleep(10);
 		device_printf(sc->dev,
-		    "error (%d) waiting for xfer: status %08x, cmd: %d, flags: %08x\n",
-		    cmd->error, sc->intr_status, cmd->opcode, cmd->flags);
+		    "error (%d) waiting for xfer: status %08x, cmd: %d, flags: %08x data: %p len: %d\n",
+		    cmd->error, sc->intr_status, cmd->opcode, cmd->flags, data, xferlen);
 	} else {
 		if ((cmd->flags & MMC_RSP_PRESENT) != 0) {
 			if ((cmd->flags & MMC_RSP_136) != 0) {
@@ -857,3 +851,4 @@ static devclass_t st_sdmmc_devclass;
 DRIVER_MODULE(st_sdmmc, simplebus, st_sdmmc_driver, st_sdmmc_devclass, NULL, NULL);
 DRIVER_MODULE(mmc, st_sdmmc, mmc_driver, mmc_devclass, NULL, NULL);
 MODULE_DEPEND(st_sdmmc, mmc, 1, 1, 1);
+SYSINIT_DRIVER_REFERENCE(mmcsd, mmc);
