@@ -76,7 +76,7 @@
  * @endparblock
  */
 #if defined(__rtems_libbsd__)
-#define CONFIGURE_BDBUF_CACHE_MEMORY_SIZE (256ul * 1024)
+#define CONFIGURE_BDBUF_CACHE_MEMORY_SIZE (512ul * 1024)
 #else
 #define CONFIGURE_BDBUF_CACHE_MEMORY_SIZE (16ul * 1024)
 #endif
