@@ -275,7 +275,7 @@ st_sdmmc_set_clock_and_bus(
 	}
 
 	sc->sdmmc->CLKCR = clkcr;
-	device_printf(sc->dev, "update bus-clock(%d) and width(%d) clk_dev(%d)\n", freq, width, clk_div);
+	// device_printf(sc->dev, "update bus-clock(%d) and width(%d) clk_dev(%d)\n", freq, width, clk_div);
 	return 0;
 }
 
@@ -365,9 +365,12 @@ st_sdmmc_attach(device_t dev)
 	if (stm32_pinctrl_set_np(node))
 		panic("sdmmc pinctrl set failed!\n");
 
+	if (OF_getencprop(node, "max-frequency", &prop, sizeof(prop)) < 0)
+		sc->host.f_max = 50000000;
+
 	sc->sdmmc_ker_ck = LL_RCC_GetSDMMCClockFreq(LL_RCC_SDMMC_CLKSOURCE);
 	sc->host.f_min = 400000;
-	sc->host.f_max = (int) sc->sdmmc_ker_ck;
+	sc->host.f_max = prop;
 	if (sc->host.f_max > 50000000)
 		sc->host.f_max = 50000000;
 

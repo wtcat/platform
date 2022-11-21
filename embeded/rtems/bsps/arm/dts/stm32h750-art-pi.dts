@@ -16,7 +16,7 @@
 
 	chosen {
 		bootargs = "root=/dev/ram";
-		stdout-path = "serial0:115200n8";
+		stdout-path = "serial0:2000000n8";
 	};
 
 	memory@c0000000 {
@@ -122,6 +122,7 @@
 	broken-cd;
 	st,neg-edge;
 	bus-width = <4>;
+	max-frequency = <800000>;
 	vmmc-supply = <&v3v3>;
 	status = "okay";
 };
