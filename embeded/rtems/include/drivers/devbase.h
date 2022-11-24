@@ -17,6 +17,7 @@
 #endif
 
 #include "base/sections.h"
+#include "base/types.h"
 #ifndef _RTEMS_BSD_MACHINE_RTEMS_BSD_KERNEL_SPACE_H_
 #include "base/bitops.h"
 #include "base/compiler.h"
