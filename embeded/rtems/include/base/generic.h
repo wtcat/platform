@@ -1,8 +1,8 @@
 /*
  * Copyright 2022 wtcat
  */
-#ifndef BASE_BASE_H_
-#define BASE_BASE_H_
+#ifndef BASE_GENERIC_H_
+#define BASE_GENERIC_H_
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -140,4 +140,4 @@ static inline void udelay(int usec) {
 #ifdef __cplusplus
 }
 #endif
-#endif /* BASE_BASE_H_ */
+#endif /* BASE_GENERIC_H_ */
