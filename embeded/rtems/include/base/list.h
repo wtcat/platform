@@ -5,8 +5,7 @@
 #ifndef BASE_LIST_H_
 #define BASE_LIST_H_
 
-#include <rtems/score/basedefs.h>
-#include "base/compiler.h"
+#include "base/generic.h"
 
 #ifdef __cplusplus
 extern "C"{
@@ -26,9 +25,6 @@ struct hlist_node {
 
 #define LIST_POISON1 NULL
 #define LIST_POISON2 NULL
-
-#define container_of(_m, _type, _member) \
-    RTEMS_CONTAINER_OF(_m, _type, _member)
 
 /*
  * Simple doubly linked list implementation.
