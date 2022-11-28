@@ -1040,6 +1040,7 @@ static void __isr stm32f7_i2c_isr_event(void *data)
 		} else {
 			i2c_dev->master_mode = false;
 			rtems_event_transient_send(i2c_dev->complete);
+			devdbg(i2c_dev->dev, "%s: i2c transfer completed\n", __func__);
 			// complete(&i2c_dev->complete);
 		}
 	}

@@ -204,3 +204,9 @@
 	dma-names = "rx";
 	status = "okay";
 };
+
+&i2c1 {
+	pinctrl-0 = <&i2c1_pins_a>;
+	pinctrl-names = "default";
+	status = "okay";
+};
