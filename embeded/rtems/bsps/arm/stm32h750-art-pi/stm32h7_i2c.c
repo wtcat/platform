@@ -877,7 +877,7 @@ static int stm32f7_i2c_wait_free_bus(struct stm32f7_i2c_dev *i2c_dev)
 
 	return 0;
 _err:
-	dev_info(i2c_dev->dev, "bus busy\n");
+	dev_warn(i2c_dev->dev, "bus busy\n");
 	ret = stm32f7_i2c_release_bus(&i2c_dev->adap);
 	if (ret) {
 		dev_err(i2c_dev->dev, "Failed to recover the bus (%d)\n", ret);

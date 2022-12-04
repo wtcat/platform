@@ -158,7 +158,7 @@ struct st_sdmmc_softc {
 	struct mmc_host host;
 
 	struct mtx mtx;
-	rtems_binary_semaphore wait_done;
+	rtems_id wait_done;
 	int bus_busy;
 
 	struct resource *mem_res;
@@ -220,7 +220,7 @@ st_sdmmc_intr(void *arg)
 	if (status != 0 &&
 	    ((status & SDMMC_STA_BUSYD0) == 0 ||
 	    (sc->sdmmc->MASK & SDMMC_STA_BUSYD0END) == 0)) {
-		rtems_binary_semaphore_post(&sc->wait_done);
+		rtems_event_transient_send(sc->wait_done);
 	}
 }
 
@@ -320,7 +320,6 @@ st_sdmmc_attach(device_t dev)
 
 	sc->dev = dev;
 	ST_SDMMC_LOCK_INIT(sc);
-	rtems_binary_semaphore_init(&sc->wait_done, "sdmmc-sem");
 	
 	rid = 0;
 	sc->mem_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
@@ -481,12 +480,12 @@ st_sdmmc_update_ios(device_t brdev, device_t reqdev)
 static int
 st_sdmmc_wait_irq(struct st_sdmmc_softc *sc)
 {
+	rtems_status_code rsc;
 	int error = 0;
 
-	error = rtems_binary_semaphore_wait_timed_ticks(&sc->wait_done,
-	    RTEMS_MILLISECONDS_TO_TICKS(5000));
-
-	if (error != 0) {
+	rsc = rtems_event_transient_receive(RTEMS_WAIT, 
+		RTEMS_MILLISECONDS_TO_TICKS(5000));
+	if (rsc != RTEMS_SUCCESSFUL) {
 		error = MMC_ERR_TIMEOUT;
 	} else if ((sc->intr_status &
 	    (SDMMC_STA_DTIMEOUT | SDMMC_STA_CTIMEOUT)) != 0) {
@@ -528,9 +527,7 @@ st_sdmmc_cmd_do(struct st_sdmmc_softc *sc, struct mmc_command *cmd)
 	 * error case where a previous command run into a timeout and still
 	 * produced an interrupt before it has been disabled.
 	 */
-	if (rtems_binary_semaphore_try_wait(&sc->wait_done) == 0) {
-		device_printf(sc->dev, "Semaphore set from last command\n");
-	}
+	rtems_event_transient_clear();
 
 	int_mask = SDMMC_INT_ERROR_MASK;
 
@@ -657,6 +654,7 @@ st_sdmmc_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 	sc = device_get_softc(brdev);
 
 	ST_SDMMC_LOCK(sc);
+	sc->wait_done = rtems_task_self();
 	st_sdmmc_cmd_do(sc, req->cmd);
 	if (req->stop != NULL) {
 		st_sdmmc_cmd_do(sc, req->stop);
