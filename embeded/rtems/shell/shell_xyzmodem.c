@@ -28,9 +28,9 @@ static int xyzmodem_transmit(const char *filename, connection_info_t *conn) {
     char mbuffer[1024];
     int fd, len, err;
 
-    fd = open(filename, O_CREAT | O_WRONLY);
-    if (fd) {
-        fprintf(stderr, "Open %s failed\n", filename);
+    fd = open(filename, O_CREAT | O_TRUNC | O_RDWR, S_IRWXU|S_IRWXG|S_IRWXO);
+    if (fd < 0) {
+        fprintf(stderr, "%s: open %s failed\n", __func__, filename);
         return -ENOENT;
     }
     if (xyzModem_stream_open(conn, &err)) {

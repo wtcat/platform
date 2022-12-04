@@ -206,7 +206,7 @@
  *   href="https://en.cppreference.com/w/c/types/integer">UINT32_MAX</a>.
  * @endparblock
  */
-#define CONFIGURE_SWAPOUT_BLOCK_HOLD (30 * 60 * 1000u)
+#define CONFIGURE_SWAPOUT_BLOCK_HOLD (3 * 1000)
 
 /* Generated from spec:/acfg/if/bdbuf-swapout-swap-period */
 
@@ -230,7 +230,7 @@
  *   href="https://en.cppreference.com/w/c/types/integer">UINT32_MAX</a>.
  * @endparblock
  */
-#define CONFIGURE_SWAPOUT_SWAP_PERIOD (30 * 60 * 1000u)
+#define CONFIGURE_SWAPOUT_SWAP_PERIOD (1000)
 
 /* Generated from spec:/acfg/if/bdbuf-swapout-task-priority */
 
@@ -248,7 +248,7 @@
  * configuration.
  */
 #if defined(__rtems_libbsd__)
-#define CONFIGURE_SWAPOUT_TASK_PRIORITY 100
+#define CONFIGURE_SWAPOUT_TASK_PRIORITY 103
 #else
 #define CONFIGURE_SWAPOUT_TASK_PRIORITY 15
 #endif
@@ -275,7 +275,7 @@
  *   href="https://en.cppreference.com/w/c/types/integer">UINT32_MAX</a>.
  * @endparblock
  */
-#define CONFIGURE_SWAPOUT_WORKER_TASKS 0
+#define CONFIGURE_SWAPOUT_WORKER_TASKS 2
 
 /* Generated from spec:/acfg/if/bdbuf-swapout-worker-taskp-riority */
 
@@ -4815,6 +4815,7 @@
 /*
  * Shell configure options
  */
+#define CONFIGURE_SHELL_COMMAND_SYNC
 #define CONFIGURE_SHELL_COMMAND_XYZMODEM
 #define CONFIGURE_SHELL_COMMAND_IRQ
 #define CONFIGURE_SHELL_COMMAND_CLEAR

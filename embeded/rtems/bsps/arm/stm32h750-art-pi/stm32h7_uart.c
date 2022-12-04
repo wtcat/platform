@@ -26,6 +26,8 @@
 #include "drivers/ofw_platform_bus.h"
 #include "stm32/stm32_queue.h"
 
+//#define UART_USE_TX_BUFFER 1
+
 #define UART_FIFO_SIZE 8
 #define UART_INPUT_BUFSZ 1200
 #define UART_OUTPUT_BUSSZ 256
@@ -45,8 +47,10 @@ struct stm32h7_uart {
     const char *buf;
     size_t transmited;
     size_t length;
+#ifdef UART_USE_TX_BUFFER
     size_t txbuf_size;
     char *txbuf;
+#endif /* UART_USE_TX_BUFFER */
     struct dma_chan *tx;
     struct dma_chan *rx;
     struct dma_circle_queue *rxq;
@@ -76,7 +80,7 @@ static size_t stm32h7_uart_fifo_write(USART_TypeDef *reg, const char *buf,
 static int stm32h7_uart_dma_transmit(struct stm32h7_uart *uart, 
     const char *buffer, size_t size) {
     _Assert(size < 65536);
-    char *sndbuf;
+    const char *sndbuf;
     int err;
 
     /* Stop transmit */
@@ -84,7 +88,11 @@ static int stm32h7_uart_dma_transmit(struct stm32h7_uart *uart,
         LL_USART_DisableDMAReq_TX(uart->reg);
         return 0;
     }
+#ifdef UART_USE_TX_BUFFER
     sndbuf = memcpy(uart->txbuf, buffer, size);
+#else
+    sndbuf = buffer;
+#endif
     uart->length = size;
     rtems_cache_invalidate_multiple_data_lines(sndbuf, size);
     err = dma_reload(uart->tx->dev, uart->tx->channel, (dma_addr_t)sndbuf, 
@@ -525,6 +533,7 @@ static int stm32h7_uart_extprobe(struct drvmgr_dev *dev) {
     uart->tx = ofw_dma_chan_request(devp->np, "tx", 
         specs, sizeof(specs));
     if (uart->tx) {
+    #ifdef UART_USE_TX_BUFFER
         uart->txbuf_size = UART_OUTPUT_BUSSZ;
         uart->txbuf = rtems_cache_coherent_allocate(uart->txbuf_size, 
         sizeof(void *), 0);
@@ -534,6 +543,9 @@ static int stm32h7_uart_extprobe(struct drvmgr_dev *dev) {
         } else {
             uart->tx->config.dma_slot = specs[0];
         }
+    #else
+        uart->tx->config.dma_slot = specs[0];
+    #endif
     }
 
     uart->rx = ofw_dma_chan_request(devp->np, "rx", 

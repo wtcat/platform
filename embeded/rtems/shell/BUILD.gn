@@ -9,7 +9,8 @@ component("shell") {
         "shell_mem.c",
         "shell_misc.c",
         "shell_xecho.c",
-        "shell_xyzmodem.c"
+        "shell_xyzmodem.c",
+        "shell_sync.c"
     ]
     if (use_libbsd) {
         sources += [
