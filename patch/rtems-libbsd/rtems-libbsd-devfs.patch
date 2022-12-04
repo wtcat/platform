@@ -1,0 +1,11 @@
+diff -uNr rtems-libbsd/rtemsbsd/sys/fs/devfs/devfs_devs.c rtems-libbsd-modified/rtemsbsd/sys/fs/devfs/devfs_devs.c
+--- rtems-libbsd/rtemsbsd/sys/fs/devfs/devfs_devs.c	2022-12-04 17:38:37.031765700 +0800
++++ rtems-libbsd-modified/rtemsbsd/sys/fs/devfs/devfs_devs.c	2022-12-04 17:30:53.121765700 +0800
+@@ -103,6 +103,7 @@
+ 			goto err;
+ 		}
+ 		fpop = td->td_fpop;
++		fp->f_data = cdev;
+ 		curthread->td_fpop = fp;
+ 		fp->f_cdevpriv = NULL;
+ 		error = dsw->d_open(cdev, oflag + 1, 0, td);
