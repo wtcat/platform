@@ -17,7 +17,7 @@
 #include "base/xyz_modem.h"
 
 static const char xyzmodem_usage[] = {
-	"xyzmode -[x|y|z] -f <filename>\n" 
+	"xyz -[x|y|z] -f <filename>\n" 
 	"options:\n"
 	"  @ XYZ Modem file transmit protocol\n"
 	"  -x|y|z protocol type\n"
