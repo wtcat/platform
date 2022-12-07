@@ -17,7 +17,7 @@
 #include "base/xyz_modem.h"
 
 static const char xyzmodem_usage[] = {
-	"xyz -[x|y|z] -f <filename>\n" 
+	"xy -[x|y|z] -f <filename>\n" 
 	"options:\n"
 	"  @ XYZ Modem file transmit protocol\n"
 	"  -x|y|z protocol type\n"
@@ -48,6 +48,7 @@ static int xyzmodem_transmit(const char *filename, connection_info_t *conn) {
     close(fd);
     xyzModem_stream_close(&err);
     xyzModem_stream_terminate(false, NULL);
+	printf("xyzmodem_transmit completed!\n");
     return 0;
 }
 
@@ -59,7 +60,7 @@ static int shell_cmd_xyzmodem(int argc, char **argv) {
 
 	memset(&getopt_reent, 0, sizeof(getopt_data));
     conn.mode = 0;
-	while ((ch = getopt_r(argc, argv, "f:xyz", &getopt_reent)) != -1) {
+	while ((ch = getopt_r(argc, argv, "f:xy", &getopt_reent)) != -1) {
 		switch (ch) {
 		case 'f':
 			filename = getopt_reent.optarg;
@@ -85,7 +86,7 @@ static int shell_cmd_xyzmodem(int argc, char **argv) {
 
 SHELL_CMDS_DEFINE(xyzmodem_cmds,
 	{
-		.name = "xyzmodem",
+		.name = "xy",
 		.usage = xyzmodem_usage,
 		.topic = "misc",
 		.command = shell_cmd_xyzmodem
