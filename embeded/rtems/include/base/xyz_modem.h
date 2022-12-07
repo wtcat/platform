@@ -51,9 +51,9 @@
 #define CYGNUM_CALL_IF_SET_COMM_ID_QUERY_CURRENT
 #define CYGACC_CALL_IF_SET_CONSOLE_COMM(x)
 
-#define diag_vprintf vprintf
-#define diag_printf printf
-#define diag_vsprintf vsprintf
+#define diag_vprintf(...) //vprintf
+#define diag_printf(...) //printf
+#define diag_vsprintf(...) //vsprintf
 
 
 #ifdef __cplusplus
