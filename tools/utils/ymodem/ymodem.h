@@ -58,6 +58,8 @@ enum rym_code
 /* transmit file invalid */
 #define RYM_ERR_FILE 0x77
 
+#define RT_TICK_PER_SECOND 0
+
 /* how many ticks wait for chars between packet. */
 #ifndef RYM_WAIT_CHR_TICK
 #define RYM_WAIT_CHR_TICK (RT_TICK_PER_SECOND * 3)

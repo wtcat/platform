@@ -9,7 +9,11 @@
  * 2013-04-14     Grissiom     initial implementation
  * 2019-12-09     Steven Liu   add YMODEM send protocol
  */
+#include <errno.h>
+#include <assert.h>
+
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "ymodem.h"
 
@@ -70,25 +74,11 @@ static enum rym_code _rym_read_code(
     struct rym_ctx *ctx,
     rtems_interval timeout)
 {
-    /* Fast path */
-    if (rt_device_read(ctx->dev, 0, ctx->buf, 1) == 1)
+    (void) timeout;
+    if (read(ctx->devfd, ctx->buf, 1) == 1)
         return (enum rym_code)(*ctx->buf);
 
-    /* Slow path */
-    do
-    {
-        size_t rsz;
-
-        /* No data yet, wait for one */
-        if (rt_sem_take(&ctx->sem, timeout) != 0)
-            return RYM_CODE_NONE;
-
-        /* Try to read one */
-        rsz = rt_device_read(ctx->dev, 0, ctx->buf, 1);
-        if (rsz == 1)
-            return (enum rym_code)(*ctx->buf);
-    }
-    while (1);
+    return -RYM_ERR_TMO;
 }
 
 /* the caller should at least alloc _RYM_STX_PKG_SZ buffer */
@@ -102,7 +92,7 @@ static size_t _rym_read_data(
 
     do
     {
-        readlen += read(ctx->dev, buf + readlen, len - readlen);
+        readlen += read(ctx->devfd, buf + readlen, len - readlen);
     }
     while (readlen < len);
 
@@ -127,7 +117,7 @@ static int _rym_send_packet(
 
     do
     {
-        writelen += write(ctx->dev, ctx->buf + writelen,
+        writelen += write(ctx->devfd, ctx->buf + writelen,
                                     _RYM_SOH_PKG_SZ - writelen);
     }
     while (writelen < _RYM_SOH_PKG_SZ);
@@ -137,7 +127,7 @@ static int _rym_send_packet(
 
 static size_t _rym_putchar(struct rym_ctx *ctx, uint8_t code)
 {
-    write(ctx->dev, &code, sizeof(code));
+    write(ctx->devfd, &code, sizeof(code));
     return 1;
 }
 
@@ -145,10 +135,9 @@ static size_t _rym_getchar(struct rym_ctx *ctx)
 {
     uint8_t getc_ack;
 
-    while (read(ctx->dev, &getc_ack, 1) != 1)
-    {
-	
-    }
+    if (read(ctx->devfd, &getc_ack, 1) != 1)
+        return -1;
+
     return getc_ack;
 }
 
@@ -219,7 +208,7 @@ static int _rym_do_send_handshake(
     int tm_sec)
 {
     enum rym_code code;
-    size_t i;
+    int i;
     size_t data_sz;
     uint8_t index = 0;
     uint8_t getc_ack;
@@ -367,7 +356,7 @@ static int _rym_do_send_trans(struct rym_ctx *ctx)
     ctx->stage = RYM_STAGE_TRANSMITTING;
     enum rym_code code;
     size_t data_sz;
-    rt_uint32_t index = 1;
+    uint32_t index = 1;
     uint8_t getc_ack;
 
     data_sz = _RYM_SOH_PKG_SZ;
@@ -601,7 +590,7 @@ static int _rym_open_termios(
 	t->c_cflag = CS8 | CREAD | CLOCAL;
 	t->c_lflag = 0;
 	t->c_cc[VMIN] = 0;
-	t->c_cc[VTIME] = xyzModem_CHAR_TIMEOUT;
+	t->c_cc[VTIME] = 30; /* 3 seconds */
 	tcsetattr(fd, TCSANOW, t);
 	
 	return 0;
@@ -610,7 +599,7 @@ static int _rym_open_termios(
 static void _rym_close_termios(
 	struct rym_ctx *ctx) 
 {
-	tcgetattr(ctx->devfd, &ctx->t_old);
+	tcsetattr(ctx->devfd, TCSANOW, &ctx->t_old);
 	close(ctx->devfd);
 }
 
@@ -623,7 +612,7 @@ int rym_recv_on_device(
     int handshake_timeout)
 {
 	int err = -EINVAL;
-    assert(_rym_the_ctx == 0);
+    assert(_rym_the_ctx == NULL);
     _rym_the_ctx = ctx;
 
     ctx->on_begin = on_begin;
@@ -635,7 +624,7 @@ int rym_recv_on_device(
 
     err = _rym_do_recv(ctx, handshake_timeout);
 
-    _rym_close_termios(ctx->devfd);
+    _rym_close_termios(ctx);
 
 __exit:
     _rym_the_ctx = NULL;

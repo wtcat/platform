@@ -359,12 +359,14 @@ static bool stm32h7_uart_set_termios(rtems_termios_device_context *base,
     LL_USART_InitTypeDef ll_struct;
     uint32_t bdr;
 
+    bdr = t->c_ospeed;
+    if (bdr == uart->bdr && t->c_cflag == uart->cflag)
+        return true;
     /*
     *  Calculate the baud rate divisor
     *  Assert ensures there is no division by 0.
     */
     LL_USART_StructInit(&ll_struct);
-    bdr = t->c_ospeed;
     ll_struct.BaudRate = bdr;
 
     /* Parity */
@@ -404,19 +406,18 @@ static bool stm32h7_uart_set_termios(rtems_termios_device_context *base,
 
     /* Now actually set the chip */
     rtems_termios_device_lock_acquire(base, &ctx);
-    if (bdr != uart->bdr || t->c_cflag != uart->cflag) {
-        uart->cflag = t->c_cflag;
-        uart->bdr = bdr;
-        uart->reg->CR1 = 0;
-        uart->reg->CR2 = 0;
-        uart->reg->CR3 = 0;
-        LL_USART_Init(uart->reg, &ll_struct);
-        LL_USART_ConfigFIFOsThreshold(uart->reg, LL_USART_FIFOTHRESHOLD_1_8, 
-            LL_USART_FIFOTHRESHOLD_8_8);
-        stm32h7_uart_intr_enable(uart);
-        uart->reg->CR1 |= USART_CR1_FIFOEN | USART_CR1_UE;
-    }
+    uart->cflag = t->c_cflag;
+    uart->bdr = bdr;
+    uart->reg->CR1 = 0;
+    uart->reg->CR2 = 0;
+    uart->reg->CR3 = 0;
+    LL_USART_Init(uart->reg, &ll_struct);
+    LL_USART_ConfigFIFOsThreshold(uart->reg, LL_USART_FIFOTHRESHOLD_1_8, 
+        LL_USART_FIFOTHRESHOLD_8_8);
+    stm32h7_uart_intr_enable(uart);
+    uart->reg->CR1 |= USART_CR1_FIFOEN | USART_CR1_UE;
     rtems_termios_device_lock_release(base, &ctx);
+    
     return true;
 }
 
