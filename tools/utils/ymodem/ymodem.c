@@ -70,6 +70,25 @@ static struct rym_ctx *_rym_the_ctx;
 #define _RYM_SOH_PKG_SZ (1+2+128+2)
 #define _RYM_STX_PKG_SZ (1+2+1024+2)
 
+static int _rym_set_termios(
+    struct rym_ctx *ctx,
+    uint8_t vmin,
+    uint8_t vtime)
+{
+    struct termios t;
+    tcgetattr(ctx->devfd, &t);
+	t.c_cc[VMIN] = vmin;
+	t.c_cc[VTIME] = vtime;
+    tcsetattr(ctx->devfd, TCSANOW, &t);
+    return 0;
+}
+
+static void _rym_restore_termios(
+    struct rym_ctx *ctx)
+{
+    tcsetattr(ctx->devfd, TCSANOW, &ctx->t_new);
+}
+
 static enum rym_code _rym_read_code(
     struct rym_ctx *ctx,
     rtems_interval timeout)
@@ -78,7 +97,7 @@ static enum rym_code _rym_read_code(
     if (read(ctx->devfd, ctx->buf, 1) == 1)
         return (enum rym_code)(*ctx->buf);
 
-    return -RYM_ERR_TMO;
+    return RYM_ERR_TMO;
 }
 
 /* the caller should at least alloc _RYM_STX_PKG_SZ buffer */
@@ -146,10 +165,9 @@ static int _rym_do_handshake(
     int tm_sec)
 {
     enum rym_code code;
-    size_t i;
+    int i;
     uint16_t recv_crc, cal_crc;
     size_t data_sz;
-    rt_tick_t tick;
 
     ctx->stage = RYM_STAGE_ESTABLISHING;
     /* send C every second, so the sender could know we are waiting for it. */
@@ -175,14 +193,18 @@ static int _rym_do_handshake(
     }
 
     /* receive all data */
-    i = 0;
+    // i = 0;
     /* automatic exit after receiving specified length data, timeout: 100ms */
-    tick = rt_tick_get();
-    while (rt_tick_get() <= (tick + rt_tick_from_millisecond(100)) && i < (data_sz - 1))
-    {
-        i += _rym_read_data(ctx, data_sz - 1);
-        rt_thread_mdelay(5);
-    }
+    _rym_set_termios(ctx, 1, 1);
+    i = _rym_read_data(ctx, data_sz - 1);
+    _rym_restore_termios(ctx);
+
+    // tick = rt_tick_get();
+    // while (rt_tick_get() <= (tick + rt_tick_from_millisecond(100)) && i < (data_sz - 1))
+    // {
+    //     i += _rym_read_data(ctx, data_sz - 1);
+    //     rt_thread_mdelay(5);
+    // }
 
     if (i != (data_sz - 1))
         return -RYM_ERR_DSZ;
@@ -498,7 +520,7 @@ static int _rym_do_recv(
     struct rym_ctx *ctx,
     int handshake_timeout)
 {
-	char rx_buffer[_RYM_STX_PKG_SZ];
+	uint8_t rx_buffer[_RYM_STX_PKG_SZ];
     int err;
 
     ctx->stage = RYM_STAGE_NONE;
@@ -537,7 +559,7 @@ static int _rym_do_send(
     struct rym_ctx *ctx,
     int handshake_timeout)
 {
-	char tx_buffer[_RYM_STX_PKG_SZ];
+	uint8_t tx_buffer[_RYM_STX_PKG_SZ];
     int err;
 
     ctx->stage = RYM_STAGE_NONE;
@@ -566,7 +588,7 @@ static int _rym_do_send(
 
     return err;
 }
-	
+
 static int _rym_open_termios(
 	struct rym_ctx *ctx,
     const char *dev)

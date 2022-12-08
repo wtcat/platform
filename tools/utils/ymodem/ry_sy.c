@@ -101,18 +101,17 @@ static enum rym_code _rym_send_begin(
     cctx->fd = open(cctx->fpath, O_RDONLY);
     if (cctx->fd < 0)
     {
-        err = rt_get_errno();
-        printf("error open file: %d\n", err);
+        printf("error open file: %d\n", errno);
         return RYM_ERR_FILE;
     }
-    rt_memset(buf, 0, len);
+    memset(buf, 0, len);
     err = stat(cctx->fpath, &file_buf);
     if (err != RT_EOK)
     {
         printf("error open file.\n");
         return RYM_ERR_FILE;
     }
-    rt_sprintf((char *)buf, "%s%c%d", (char *) & (cctx->fpath[1]), insert_0, file_buf.st_size);
+    sprintf((char *)buf, "%s%c%d", (char *) & (cctx->fpath[1]), insert_0, file_buf.st_size);
 
     return RYM_CODE_SOH;
 }
@@ -136,7 +135,7 @@ static enum rym_code _rym_send_data(
 
     if (read_size < len)
     {
-        rt_memset(buf + read_size, 0x1A, len - read_size);
+        memset(buf + read_size, 0x1A, len - read_size);
         ctx->stage = RYM_STAGE_FINISHING;
     }
 
@@ -148,12 +147,12 @@ static enum rym_code _rym_send_end(
     uint8_t *buf,
     size_t len)
 {
-    rt_memset(buf, 0, len);
+    memset(buf, 0, len);
 
     return RYM_CODE_SOH;
 }
 
-int rym_download_file(rt_device_t idev)
+int rym_download_file(const char *idev, const char *filepath)
 {
     struct custom_ctx *ctx = calloc(1, sizeof(*ctx));
     int err;
@@ -165,13 +164,13 @@ int rym_download_file(rt_device_t idev)
     }
     ctx->fd = -1;
     assert(idev);
-    err = rym_recv_on_device(&ctx->parent, idev, RT_DEVICE_OFLAG_RDWR | RT_DEVICE_FLAG_INT_RX,
+    err = rym_recv_on_device(&ctx->parent, idev, 
                              _rym_recv_begin, _rym_recv_data, _rym_recv_end, 1000);
     free(ctx);
     return err;
 }
 
-int rym_upload_file(rt_device_t idev, const char *file_path)
+int rym_upload_file(const char *idev, const char *file_path)
 {
     int err = 0;
 
@@ -179,13 +178,12 @@ int rym_upload_file(rt_device_t idev, const char *file_path)
     if (!ctx)
     {
         printf("rt_malloc failed\n");
-        return RT_ENOMEM;
+        return -ENOMEM;
     }
     ctx->fd = -1;
     strncpy(ctx->fpath, file_path, DFS_PATH_MAX);
     assert(idev);
     err = rym_send_on_device(&ctx->parent, idev,
-                             RT_DEVICE_OFLAG_RDWR | RT_DEVICE_FLAG_INT_RX,
                              _rym_send_begin, _rym_send_data, _rym_send_end, 1000);
     free(ctx);
 

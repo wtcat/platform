@@ -63,7 +63,7 @@ static struct
   struct termios t_new, t_old;
 } xyz;
 
-#define xyzModem_CHAR_TIMEOUT            15	/* 1.5 seconds */
+#define xyzModem_CHAR_TIMEOUT            30	/* 1.5 seconds */
 #define xyzModem_MAX_RETRIES             20
 #define xyzModem_MAX_RETRIES_WITH_CRC    10
 #define xyzModem_CAN_COUNT                3	/* Wait for 3 CAN before quitting */
@@ -162,7 +162,7 @@ static void
 close_termios(void) 
 {
     if (xyz.__chan > 0) {
-        tcgetattr(xyz.__chan, &xyz.t_old);
+        tcsetattr(xyz.__chan, TCSANOW, &xyz.t_old);
         close(xyz.__chan);
         xyz.__chan = -1;
     }
