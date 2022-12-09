@@ -17,5 +17,8 @@ component("component") {
         sources += ["compiler_stack_protect.c"]
     }
 
-    deps = ["//embeded/rtems/component/lib"]
+    deps = [
+        "//embeded/rtems/component/lib",
+        "//embeded/rtems/component/utils"
+    ]
 }

@@ -14,12 +14,13 @@
   */
 #include <errno.h>
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
 
-#include <ymodem.h>
+#include "base/ymodem.h"
 
 
 struct custom_ctx
@@ -79,6 +80,8 @@ static enum rym_code _rym_recv_end(
     uint8_t *buf,
     size_t len)
 {
+    (void) buf;
+    (void) len;
     struct custom_ctx *cctx = (struct custom_ctx *)ctx;
 
     assert(cctx->fd >= 0);
@@ -106,7 +109,7 @@ static enum rym_code _rym_send_begin(
     }
     memset(buf, 0, len);
     err = stat(cctx->fpath, &file_buf);
-    if (err != RT_EOK)
+    if (err)
     {
         printf("error open file.\n");
         return RYM_ERR_FILE;
@@ -147,6 +150,7 @@ static enum rym_code _rym_send_end(
     uint8_t *buf,
     size_t len)
 {
+    (void) ctx;
     memset(buf, 0, len);
 
     return RYM_CODE_SOH;
@@ -160,7 +164,7 @@ int rym_download_file(const char *idev, const char *filepath)
     if (!ctx)
     {
         printf("rt_malloc failed\n");
-        return RT_ENOMEM;
+        return -ENOMEM;
     }
     ctx->fd = -1;
     assert(idev);

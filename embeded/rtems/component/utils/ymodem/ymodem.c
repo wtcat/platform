@@ -11,11 +11,12 @@
  */
 #include <errno.h>
 #include <assert.h>
+#include <stdio.h>
 
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "ymodem.h"
+#include "base/ymodem.h"
 
 static const uint16_t ccitt_table[256] =
 {
@@ -64,7 +65,7 @@ static uint16_t CRC16(unsigned char *q, int len)
 
 // we could only use global varible because we could not use
 // rt_device_t->user_data(it is used by the serial driver)...
-static struct rym_ctx *_rym_the_ctx;
+// static struct rym_ctx *_rym_the_ctx;
 
 /* SOH/STX + seq + payload + crc */
 #define _RYM_SOH_PKG_SZ (1+2+128+2)
@@ -91,7 +92,7 @@ static void _rym_restore_termios(
 
 static enum rym_code _rym_read_code(
     struct rym_ctx *ctx,
-    rtems_interval timeout)
+    int timeout)
 {
     (void) timeout;
     if (read(ctx->devfd, ctx->buf, 1) == 1)
@@ -167,7 +168,7 @@ static int _rym_do_handshake(
     enum rym_code code;
     int i;
     uint16_t recv_crc, cal_crc;
-    size_t data_sz;
+    size_t data_sz = 1;
 
     ctx->stage = RYM_STAGE_ESTABLISHING;
     /* send C every second, so the sender could know we are waiting for it. */
@@ -206,7 +207,7 @@ static int _rym_do_handshake(
     //     rt_thread_mdelay(5);
     // }
 
-    if (i != (data_sz - 1))
+    if (i != (int)(data_sz - 1))
         return -RYM_ERR_DSZ;
 
     /* sanity check */
@@ -634,14 +635,14 @@ int rym_recv_on_device(
     int handshake_timeout)
 {
 	int err = -EINVAL;
-    assert(_rym_the_ctx == NULL);
-    _rym_the_ctx = ctx;
+    assert(ctx != NULL);
+    // _rym_the_ctx = ctx;
 
     ctx->on_begin = on_begin;
     ctx->on_data  = on_data;
     ctx->on_end   = on_end;
 	_rym_open_termios(ctx, dev);
-    if (_rym_open_termios() < 0)
+    if (_rym_open_termios(ctx, dev) < 0)
         goto __exit;
 
     err = _rym_do_recv(ctx, handshake_timeout);
@@ -649,7 +650,7 @@ int rym_recv_on_device(
     _rym_close_termios(ctx);
 
 __exit:
-    _rym_the_ctx = NULL;
+    // _rym_the_ctx = NULL;
     return err;
 }
 
@@ -663,8 +664,8 @@ int rym_send_on_device(
 {
     int err = -EINVAL;
 
-    assert(_rym_the_ctx == 0);
-    _rym_the_ctx = ctx;
+    assert(ctx != NULL);
+    // _rym_the_ctx = ctx;
 
     ctx->on_begin = on_begin;
     ctx->on_data  = on_data;
@@ -675,10 +676,10 @@ int rym_send_on_device(
 
     err = _rym_do_send(ctx, handshake_timeout);
 
-	_rym_close_termios(ctx->devfd);
+	_rym_close_termios(ctx);
 
 __exit:
-    _rym_the_ctx = NULL;
+    // _rym_the_ctx = NULL;
     return err;
 }
 

@@ -14,13 +14,11 @@
  * Copyright 2022 wtcat
  */
  
-#ifndef __YMODEM_H__
-#define __YMODEM_H__
+#ifndef COMPONENT_LIB_YMODEM_H_
+#define COMPONENT_LIB_YMODEM_H_
 
-#include <rtems.h>
+// #include <rtems.h>
 #include <termios.h>
-
-#include <string.h>
 
 /* The word "RYM" is stand for "Real-YModem". */
 

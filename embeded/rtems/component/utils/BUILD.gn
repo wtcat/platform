@@ -1,0 +1,9 @@
+# Copyright(c) 2022 wtcat
+# import("//gn/toolchain/rtems/rtems.gni")
+
+component("utils") {
+    sources = [
+        "ymodem/ymodem.c",
+        "ymodem/ry_sy.c"
+    ]
+}
