@@ -12,6 +12,8 @@
  /*
   * Copyright 2022 wtcat
   */
+#define pr_fmt(fmt) "ry_sy: "fmt
+
 #include <errno.h>
 #include <assert.h>
 #include <stdio.h>
@@ -21,14 +23,18 @@
 #include <fcntl.h>
 
 #include "base/ymodem.h"
+#include "base/log.h"
 
 
 struct custom_ctx
 {
+#define RYM_MAX_PATH 256
     struct rym_ctx parent;
     int fd;
     int flen;
-    char fpath[];
+    off_t offset;
+    char *root;
+    char fpath[RYM_MAX_PATH];
 };
 
 static enum rym_code _rym_recv_begin(
@@ -37,13 +43,37 @@ static enum rym_code _rym_recv_begin(
     size_t len)
 {
     struct custom_ctx *cctx = (struct custom_ctx *)ctx;
+    size_t plen = strlen(cctx->root);
+
+    if (plen + len >= RYM_MAX_PATH)
+    {
+        pr_err("file path is too long!\n");
+        return RYM_CODE_CAN;
+    }
+
+    if (!strncmp(cctx->root, "/dev/", 4))
+    {
+        cctx->fd = open(cctx->fpath, O_WRONLY);
+        if (cctx->fd < 0)
+        {
+            pr_err("Open file error(%s)\n", cctx->fpath);
+            return RYM_CODE_CAN;
+        }
+
+        seek
+    }
+    else 
+    {
+    
+    }
 
     cctx->fpath[0] = '/';
     strncpy(&(cctx->fpath[1]), (const char *)buf, len - 1);
-    cctx->fd = open(cctx->fpath, O_CREAT | O_WRONLY | O_TRUNC, 0);
+    cctx->fd = open(cctx->fpath, O_CREAT | O_WRONLY | O_TRUNC, 
+        S_IRWXU|S_IRWXG|S_IRWXO);
     if (cctx->fd < 0)
     {
-        printf("error creating file: %d\n", errno);
+        pr_err("error creating file: %d\n", errno);
         return RYM_CODE_CAN;
     }
     cctx->flen = atoi(1 + (const char *)buf + strnlen((const char *)buf, len - 1));
@@ -61,13 +91,13 @@ static enum rym_code _rym_recv_data(
     struct custom_ctx *cctx = (struct custom_ctx *)ctx;
 
     assert(cctx->fd >= 0);
-    if (cctx->flen == -1)
+    if (cctx->flen < 0)
     {
         write(cctx->fd, buf, len);
     }
     else
     {
-        int wlen = len > cctx->flen ? cctx->flen : len;
+        size_t wlen = len > (size_t)cctx->flen ? (size_t)cctx->flen : len;
         write(cctx->fd, buf, wlen);
         cctx->flen -= wlen;
     }
@@ -104,17 +134,17 @@ static enum rym_code _rym_send_begin(
     cctx->fd = open(cctx->fpath, O_RDONLY);
     if (cctx->fd < 0)
     {
-        printf("error open file: %d\n", errno);
+        pr_err("error open file: %d\n", errno);
         return RYM_ERR_FILE;
     }
     memset(buf, 0, len);
     err = stat(cctx->fpath, &file_buf);
     if (err)
     {
-        printf("error open file.\n");
+        pr_err("error open file.\n");
         return RYM_ERR_FILE;
     }
-    sprintf((char *)buf, "%s%c%d", (char *) & (cctx->fpath[1]), insert_0, file_buf.st_size);
+    sprintf((char *)buf, "%s%c%d", (char *) & (cctx->fpath[1]), insert_0, (int)file_buf.st_size);
 
     return RYM_CODE_SOH;
 }
@@ -156,14 +186,20 @@ static enum rym_code _rym_send_end(
     return RYM_CODE_SOH;
 }
 
-int rym_download_file(const char *idev, const char *filepath)
+int rym_download_file(const char *idev, const char *path, off_t offset)
 {
-    struct custom_ctx *ctx = calloc(1, sizeof(*ctx));
+    struct custom_ctx *ctx;
     int err;
 
+    if (!path)
+    {
+        ctx->root = "/";
+    }
+
+    ctx = calloc(1, sizeof(*ctx));
     if (!ctx)
     {
-        printf("rt_malloc failed\n");
+        pr_err("No more memory\n");
         return -ENOMEM;
     }
     ctx->fd = -1;
@@ -181,11 +217,11 @@ int rym_upload_file(const char *idev, const char *file_path)
     struct custom_ctx *ctx = calloc(1, sizeof(*ctx));
     if (!ctx)
     {
-        printf("rt_malloc failed\n");
+        pr_err("No more memory\n");
         return -ENOMEM;
     }
     ctx->fd = -1;
-    strncpy(ctx->fpath, file_path, DFS_PATH_MAX);
+    strncpy(ctx->fpath, file_path, RYM_MAX_PATH - 1);
     assert(idev);
     err = rym_send_on_device(&ctx->parent, idev,
                              _rym_send_begin, _rym_send_data, _rym_send_end, 1000);
