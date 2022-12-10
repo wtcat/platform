@@ -47,6 +47,14 @@ static inline int virt_format(struct printer *printer, const char *fmt, ...) {
 }
 
 extern struct printer *__log_default_printer;
+extern struct printer __log_printer[];
+
+/*
+ * Log handles
+ */
+#define klog (&__log_printer[0]) /* for kernel and driver */
+#define ulog (&__log_printer[1]) /* for application */
+#define flog (&__log_printer[2]) /* file log */
 
 /**
  * __pr_generic - Print an generic message
