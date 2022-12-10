@@ -16,6 +16,7 @@
 
 #include <errno.h>
 #include <assert.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -45,7 +46,7 @@ static enum rym_code _rym_recv_begin(
     struct custom_ctx *cctx = (struct custom_ctx *)ctx;
     size_t plen = strlen(cctx->root);
 
-    if (plen + len >= RYM_MAX_PATH)
+    if (plen + len + 1 >= RYM_MAX_PATH)
     {
         pr_err("file path is too long!\n");
         return RYM_CODE_CAN;
@@ -60,22 +61,50 @@ static enum rym_code _rym_recv_begin(
             return RYM_CODE_CAN;
         }
 
-        seek
+        if (cctx->offset)
+            lseek(cctx->fd, cctx->offset, SEEK_SET);
     }
     else 
     {
-    
+        const char *ss = cctx->root + plen - 1;
+        bool is_file = false;
+        bool append_split = false;
+
+        if (*ss != '/') 
+        {
+            ss--;
+            while (ss >= cctx->root)
+            {
+                if (*ss == '.')
+                {
+                    is_file = true;
+                    break;
+                }
+                if (*ss == '/')
+                {
+                    break;
+                }
+                ss--;
+            }
+            append_split = !is_file;
+        }
+        if (!is_file)
+        {
+            strcpy(cctx->fpath, cctx->root);
+            if (append_split)
+                cctx->fpath[plen++] = '/';
+            memcpy(&cctx->fpath[plen], (const char *)buf, len - 1);
+        }
+
+        cctx->fd = open(cctx->fpath, O_CREAT | O_WRONLY | O_TRUNC, 
+            S_IRWXU|S_IRWXG|S_IRWXO);
+        if (cctx->fd < 0)
+        {
+            pr_err("error creating file(%s)\n", cctx->fpath);
+            return RYM_CODE_CAN;
+        }
     }
 
-    cctx->fpath[0] = '/';
-    strncpy(&(cctx->fpath[1]), (const char *)buf, len - 1);
-    cctx->fd = open(cctx->fpath, O_CREAT | O_WRONLY | O_TRUNC, 
-        S_IRWXU|S_IRWXG|S_IRWXO);
-    if (cctx->fd < 0)
-    {
-        pr_err("error creating file: %d\n", errno);
-        return RYM_CODE_CAN;
-    }
     cctx->flen = atoi(1 + (const char *)buf + strnlen((const char *)buf, len - 1));
     if (cctx->flen == 0)
         cctx->flen = -1;
@@ -191,18 +220,20 @@ int rym_download_file(const char *idev, const char *path, off_t offset)
     struct custom_ctx *ctx;
     int err;
 
-    if (!path)
-    {
-        ctx->root = "/";
-    }
-
     ctx = calloc(1, sizeof(*ctx));
     if (!ctx)
     {
         pr_err("No more memory\n");
         return -ENOMEM;
     }
+
+    if (!path)
+    {
+        ctx->root = "/";
+    }
+
     ctx->fd = -1;
+    ctx->offset = offset;
     assert(idev);
     err = rym_recv_on_device(&ctx->parent, idev, 
                              _rym_recv_begin, _rym_recv_data, _rym_recv_end, 1000);

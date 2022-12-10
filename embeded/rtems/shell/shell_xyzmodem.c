@@ -2,6 +2,7 @@
  * Copyright 2022 wtcat
  */
 #include "configs/rtems_confdefs.h"
+#include <sys/unistd.h>
 
 #ifdef CONFIGURE_SHELL_COMMAND_XYZMODEM
 #include <unistd.h>
@@ -15,6 +16,7 @@
 
 #include "shell/shell_utils.h"
 #include "base/xyz_modem.h"
+#include "base/ymodem.h"
 
 static const char xyzmodem_usage[] = {
 	"xy -[x|y|z] -f <filename>\n" 
@@ -84,12 +86,34 @@ static int shell_cmd_xyzmodem(int argc, char **argv) {
 	return xyzmodem_transmit(filename, &conn);
 }
 
+static int shell_cmd_ry(int argc, char **argv) {
+	const char *dev = "/dev/console";
+	char path_buffer[128];
+	const char *path = NULL;
+
+	if (argc == 1) {
+		path = getcwd(path_buffer, sizeof(path_buffer));
+	} else if (argc == 2) {
+		
+	} 
+
+
+	return rym_download_file(dev, path, 0);
+}
+
+
 SHELL_CMDS_DEFINE(xyzmodem_cmds,
 	{
 		.name = "xy",
 		.usage = xyzmodem_usage,
 		.topic = "misc",
 		.command = shell_cmd_xyzmodem
+	},
+	{
+		.name = "ry",
+		.usage = "YModem command\nry [filepath] [offset] [-d device]",
+		.topic = "misc",
+		.command = shell_cmd_ry
 	}
 );
 #endif /* CONFIGURE_SHELL_COMMAND_XYZMODEM */

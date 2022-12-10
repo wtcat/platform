@@ -17,7 +17,10 @@
 #ifndef COMPONENT_LIB_YMODEM_H_
 #define COMPONENT_LIB_YMODEM_H_
 
-// #include <rtems.h>
+#ifdef __cplusplus
+extern "C"{
+#endif
+
 #include <termios.h>
 
 /* The word "RYM" is stand for "Real-YModem". */
@@ -176,4 +179,9 @@ int rym_send_on_device(struct rym_ctx *ctx, const char *dev,
                             rym_callback on_begin, rym_callback on_data, rym_callback on_end,
                             int handshake_timeout);
 
+int rym_download_file(const char *idev, const char *path, off_t offset);
+int rym_upload_file(const char *idev, const char *file_path);
+#ifdef __cplusplus
+}
 #endif
+#endif /* COMPONENT_LIB_YMODEM_H_ */
