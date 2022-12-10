@@ -94,7 +94,7 @@ static int shell_cmd_ry(int argc, char **argv) {
 	if (argc == 1) {
 		path = getcwd(path_buffer, sizeof(path_buffer));
 	} else if (argc == 2) {
-		
+
 	} 
 
 
@@ -111,7 +111,7 @@ SHELL_CMDS_DEFINE(xyzmodem_cmds,
 	},
 	{
 		.name = "ry",
-		.usage = "YModem command\nry [filepath] [offset] [-d device]",
+		.usage = "YModem command\nry [filepath] [-o offset] [-d device]",
 		.topic = "misc",
 		.command = shell_cmd_ry
 	}
