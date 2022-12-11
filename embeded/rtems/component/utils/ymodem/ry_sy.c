@@ -71,24 +71,21 @@ static enum rym_code _rym_recv_begin(
         bool is_file = false;
         bool append_split = false;
 
-        if (*ss != '/') 
+        while (ss >= cctx->root)
         {
-            ss--;
-            while (ss >= cctx->root)
+            if (*ss == '.')
             {
-                if (*ss == '.')
-                {
-                    is_file = true;
-                    break;
-                }
-                if (*ss == '/')
-                {
-                    break;
-                }
-                ss--;
+                is_file = true;
+                break;
             }
-            append_split = !is_file;
+            if (*ss == '/')
+            {
+                break;
+            }
+            ss--;
         }
+        append_split = !is_file;
+        
         if (!is_file)
         {
             strcpy(cctx->fpath, cctx->root);
@@ -101,7 +98,7 @@ static enum rym_code _rym_recv_begin(
             S_IRWXU|S_IRWXG|S_IRWXO);
         if (cctx->fd < 0)
         {
-            pr_err("error creating file(%s)\n", cctx->fpath);
+            npr_err(ulog, "error creating file(%s)\n", cctx->fpath);
             return RYM_CODE_CAN;
         }
     }

@@ -2,9 +2,7 @@
 import("//gn/toolchain/rtems/rtems.gni")
 
 component("component") {
-
     sources = [
-        "xmodem.c",
         "timer_ii.c",
         "workqueue.c",
         "crc.c",

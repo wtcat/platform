@@ -21,6 +21,7 @@
 extern "C"{
 #endif
 
+#include <setjmp.h>
 #include <termios.h>
 
 /* The word "RYM" is stand for "Real-YModem". */
@@ -30,6 +31,7 @@ enum rym_code
     RYM_CODE_NONE = 0x00,
     RYM_CODE_SOH  = 0x01,
     RYM_CODE_STX  = 0x02,
+    RYM_CODE_ETX  = 0x03,
     RYM_CODE_EOT  = 0x04,
     RYM_CODE_ACK  = 0x06,
     RYM_CODE_NAK  = 0x15,
@@ -125,6 +127,7 @@ struct rym_ctx
 	int devfd;
 	struct termios t_new;
 	struct termios t_old;
+    jmp_buf jmp_ctx;
 };
 
 /* recv a file on device dev with ymodem session ctx.

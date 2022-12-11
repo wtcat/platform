@@ -9,14 +9,17 @@
  * 2013-04-14     Grissiom     initial implementation
  * 2019-12-09     Steven Liu   add YMODEM send protocol
  */
+#define pr_fmt(fmt) "ymodem: "fmt
 #include <errno.h>
 #include <assert.h>
 #include <stdio.h>
+#include <setjmp.h>
 
 #include <unistd.h>
 #include <fcntl.h>
 
 #include "base/ymodem.h"
+#include "base/log.h"
 
 static const uint16_t ccitt_table[256] =
 {
@@ -187,6 +190,10 @@ static int _rym_do_handshake(
             data_sz = _RYM_STX_PKG_SZ;
             break;
         }
+        else if (code == RYM_CODE_ETX)
+        {
+            longjmp(ctx->jmp_ctx, RYM_ERR_CAN);
+        }
     }
     if (i == tm_sec)
     {
@@ -326,6 +333,7 @@ static int _rym_trans_data(
 
 static int _rym_do_trans(struct rym_ctx *ctx)
 {
+    int errs = 0;
     _rym_putchar(ctx, RYM_CODE_ACK);
     _rym_putchar(ctx, RYM_CODE_C);
     ctx->stage = RYM_STAGE_ESTABLISHED;
@@ -348,13 +356,24 @@ static int _rym_do_trans(struct rym_ctx *ctx)
             break;
         case RYM_CODE_EOT:
             return 0;
+        case RYM_CODE_ETX:
+            return RYM_ERR_CAN;
         default:
-            return -RYM_ERR_CODE;
+            errs++;
+            usleep(200000);
+            tcflush(ctx->devfd, TCIOFLUSH);
+            _rym_putchar(ctx, RYM_CODE_NAK);
+            if (errs > 128)
+                return -RYM_ERR_CODE;
+            continue;
         };
 
         err = _rym_trans_data(ctx, data_sz, &code);
-        if (err != 0)
-            return err;
+        if (err != 0) {
+            code = err;
+            errs++;
+        }
+        
         switch (code)
         {
         case RYM_CODE_CAN:
@@ -366,9 +385,15 @@ static int _rym_do_trans(struct rym_ctx *ctx)
             return -RYM_ERR_CAN;
         case RYM_CODE_ACK:
             _rym_putchar(ctx, RYM_CODE_ACK);
+            errs = 0;
             break;
         default:
-            // wrong code
+            usleep(200000);
+            tcflush(ctx->devfd, TCIOFLUSH);
+            _rym_putchar(ctx, RYM_CODE_NAK);
+            if (errs > 20)
+                return code;
+            // wrong code 
             break;
         };
     }
@@ -533,6 +558,7 @@ static int _rym_do_recv(
     err = _rym_do_handshake(ctx, handshake_timeout);
     if (err != 0)
     {
+        npr_err(klog, "handshake error(%d)\n", err);
         return err;
     }
     while (1)
@@ -540,12 +566,14 @@ static int _rym_do_recv(
         err = _rym_do_trans(ctx);
         if (err != 0)
         {
+            npr_err(klog, "transmit error(%d)\n", err);
             return err;
         }
 
         err = _rym_do_fin(ctx);
         if (err != 0)
         {
+            npr_err(klog, "finish error(%d)\n", err);
             return err;
         }
 
@@ -610,11 +638,12 @@ static int _rym_open_termios(
 	ctx->devfd = fd;
 	t->c_iflag = BRKINT;
 	t->c_oflag = 0;
-	t->c_cflag = CS8 | CREAD | CLOCAL;
+	t->c_cflag = CS8 | CREAD;
 	t->c_lflag = 0;
 	t->c_cc[VMIN] = 0;
 	t->c_cc[VTIME] = 30; /* 3 seconds */
 	tcsetattr(fd, TCSANOW, t);
+    tcflush(fd, TCIFLUSH);
 	
 	return 0;
 }
@@ -624,6 +653,7 @@ static void _rym_close_termios(
 {
 	tcsetattr(ctx->devfd, TCSANOW, &ctx->t_old);
 	close(ctx->devfd);
+    usleep(500*1000);
 }
 
 int rym_recv_on_device(
@@ -641,15 +671,16 @@ int rym_recv_on_device(
     ctx->on_begin = on_begin;
     ctx->on_data  = on_data;
     ctx->on_end   = on_end;
-	_rym_open_termios(ctx, dev);
     if (_rym_open_termios(ctx, dev) < 0)
-        goto __exit;
+        goto _exit;
 
-    err = _rym_do_recv(ctx, handshake_timeout);
+    err = setjmp(ctx->jmp_ctx);
+    if (!err)
+        err = _rym_do_recv(ctx, handshake_timeout);
 
     _rym_close_termios(ctx);
 
-__exit:
+_exit:
     // _rym_the_ctx = NULL;
     return err;
 }
