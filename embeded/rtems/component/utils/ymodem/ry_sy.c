@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -146,7 +147,7 @@ static enum rym_code _rym_recv_end(
     assert(cctx->fd >= 0);
     close(cctx->fd);
     cctx->fd = -1;
-
+    
     return RYM_CODE_ACK;
 }
 
@@ -226,10 +227,14 @@ int rym_download_file(const char *idev, const char *path, off_t offset)
         pr_err("No more memory\n");
         return -ENOMEM;
     }
-
+    
     if (!path)
     {
         ctx->root = "/";
+    }
+    else 
+    {
+        ctx->root = (char *)path;
     }
 
     ctx->fd = -1;

@@ -28,8 +28,8 @@ extern "C"{
 #endif
 
 struct printer {
-    int (*format)(void *context, const char *fmt, va_list ap);
     void *context;
+    int (*format)(void *context, const char *fmt, va_list ap);
 };
 
 /*
