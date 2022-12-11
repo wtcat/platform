@@ -703,13 +703,13 @@ int rym_send_on_device(
     ctx->on_end   = on_end;
   
     if (_rym_open_termios(ctx, dev) < 0)
-        goto __exit;
+        goto _exit;
 
     err = _rym_do_send(ctx, handshake_timeout);
 
 	_rym_close_termios(ctx);
 
-__exit:
+_exit:
     // _rym_the_ctx = NULL;
     return err;
 }
