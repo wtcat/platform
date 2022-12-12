@@ -7,27 +7,26 @@
  * 2011-03-29     itspy
  * 2011-12-12     aozima       fixed syntax error.
  */
-
-#include <rtthread.h>
-#include <finsh.h>
-#include <shell.h>
-#include <rtdef.h>
-#include <dfs.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <sys/statfs.h>
+/*
+ * Copyright 
+ */
+#include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
 #include "zdef.h"
 
 
 void zr_start(char *path);
-static rt_err_t zrec_init(rt_uint8_t *rxbuf, struct zfile *zf);
-static rt_err_t zrec_files(struct zfile *zf);
-static rt_err_t zwrite_file(rt_uint8_t *buf, rt_uint16_t size, struct zfile *zf);
-static rt_err_t zrec_file_data(rt_uint8_t *buf, struct zfile *zf);;
-static rt_err_t zrec_file(rt_uint8_t *rxbuf, struct zfile *zf);
-static rt_err_t zget_file_info(char *name, struct zfile *zf);
-static rt_err_t zwrite_file(rt_uint8_t *buf, rt_uint16_t size, struct zfile *zf);
+static int zrec_init(uint8_t *rxbuf, struct zfile *zf);
+static int zrec_files(struct zfile *zf);
+static int zwrite_file(uint8_t *buf, uint16_t size, struct zfile *zf);
+static int zrec_file_data(uint8_t *buf, struct zfile *zf);;
+static int zrec_file(uint8_t *rxbuf, struct zfile *zf);
+static int zget_file_info(char *name, struct zfile *zf);
+static int zwrite_file(uint8_t *buf, uint16_t size, struct zfile *zf);
 static void zrec_ack_bibi(void);
 
 
@@ -35,17 +34,17 @@ static void zrec_ack_bibi(void);
 void zr_start(char *path)
 {
     struct zfile *zf;
-    rt_uint8_t n;
+    uint8_t n;
     char ch,*p,*q;
-    rt_err_t res = -RT_ERROR;
+    int res = -RT_ERROR;
 
-    zf = rt_malloc(sizeof(struct zfile));
-    if (zf == RT_NULL)
+    zf = malloc(sizeof(struct zfile));
+    if (zf == NULL)
     {
-        rt_kprintf("zf: out of memory\r\n");
+        printf("zf: out of memory\r\n");
         return;
     }
-    rt_memset(zf, 0, sizeof(struct zfile));
+    memset(zf, 0, sizeof(struct zfile));
     zf->fname = path;
     zf->fd = -1;
     res = zrec_files(zf);
@@ -53,30 +52,30 @@ void zr_start(char *path)
     for (;;)
     {
         q = strstr(p,"/");
-        if (q == RT_NULL)  break;
+        if (q == NULL)  break;
         p = q+1;
     }
-    if (res == RT_EOK)
+    if (res == 0)
     {
-        rt_kprintf("\b\b\bfile: %s                           \r\n",p);
-        rt_kprintf("size: %ld bytes\r\n",zf->bytes_received);
-        rt_kprintf("receive completed.\r\n");
+        printf("\b\b\bfile: %s                           \r\n",p);
+        printf("size: %ld bytes\r\n",zf->bytes_received);
+        printf("receive completed.\r\n");
         close(zf->fd);
-        rt_free(zf->fname);
+        free(zf->fname);
     }
     else
     {
-        rt_kprintf("\b\b\bfile: %s                           \r\n",p);
-        rt_kprintf("size: 0 bytes\r\n");
-        rt_kprintf("receive failed.\r\n");
+        printf("\b\b\bfile: %s                           \r\n",p);
+        printf("size: 0 bytes\r\n");
+        printf("receive failed.\r\n");
         if (zf->fd >= 0)
         {
             close(zf->fd);
             unlink(zf->fname);    /* remove this file */
-            rt_free(zf->fname);
+            free(zf->fname);
         }
     }
-    rt_free(zf);
+    free(zf);
     /* waiting,clear console buffer */
     rt_thread_delay(RT_TICK_PER_SECOND/2);
     while(1)
@@ -89,10 +88,10 @@ void zr_start(char *path)
 }
 
 /* receiver init, wait for ack */
-static rt_err_t zrec_init(rt_uint8_t *rxbuf, struct zfile *zf)
+static int zrec_init(uint8_t *rxbuf, struct zfile *zf)
 {
-    rt_uint8_t err_cnt = 0;
-    rt_err_t res = -RT_ERROR;
+    uint8_t err_cnt = 0;
+    int res = -RT_ERROR;
 
     for (;;)
     {
@@ -113,17 +112,17 @@ again:
              res = zget_data(rxbuf, RX_BUFFER_SIZE);
              if (res == GOTCRCW)
              {
-                 if ((res =zget_file_info((char*)rxbuf,zf))!= RT_EOK)
+                 if ((res =zget_file_info((char*)rxbuf,zf))!= 0)
                  {
                      zsend_hex_header(ZSKIP, tx_header);
                      return (res);
                  }
-                 return RT_EOK;;
+                 return 0;;
              }
              zsend_hex_header(ZNAK, tx_header);
              goto again;
         case ZSINIT:
-             if (zget_data((rt_uint8_t*)Attn, ZATTNLEN) == GOTCRCW)       /* send zack */
+             if (zget_data((uint8_t*)Attn, ZATTNLEN) == GOTCRCW)       /* send zack */
              {
                 zsend_hex_header(ZACK, tx_header);
                 goto again;
@@ -147,48 +146,48 @@ again:
 }
 
 /* receive files */
-static rt_err_t zrec_files(struct zfile *zf)
+static int zrec_files(struct zfile *zf)
 {
-    rt_uint8_t *rxbuf;
-    rt_err_t res = -RT_ERROR;
+    uint8_t *rxbuf;
+    int res = -RT_ERROR;
 
     zinit_parameter();
-    rxbuf = rt_malloc(RX_BUFFER_SIZE*sizeof(rt_uint8_t));
-    if (rxbuf == RT_NULL)
+    rxbuf = malloc(RX_BUFFER_SIZE*sizeof(uint8_t));
+    if (rxbuf == NULL)
     {
-         rt_kprintf("rxbuf: out of memory\r\n");
+         printf("rxbuf: out of memory\r\n");
          return -RT_ERROR;
     }
-    rt_kprintf("\r\nrz: ready...\r\n");    /* here ready to receive things */
-    if ((res = zrec_init(rxbuf,zf))!= RT_EOK)
+    printf("\r\nrz: ready...\r\n");    /* here ready to receive things */
+    if ((res = zrec_init(rxbuf,zf))!= 0)
     {
-         rt_kprintf("\b\b\breceive init failed\r\n");
-         rt_free(rxbuf);
+         printf("\b\b\breceive init failed\r\n");
+         free(rxbuf);
          return -RT_ERROR;
     }
     res = zrec_file(rxbuf,zf);
     if (res == ZFIN)
     {
-        rt_free(rxbuf);
-        return RT_EOK;       /* if finish session */
+        free(rxbuf);
+        return 0;       /* if finish session */
     }
     else if (res == ZCAN)
     {
-        rt_free(rxbuf);
+        free(rxbuf);
         return ZCAN;        /* cancel by sender */
     }
     else
     {
        zsend_can();
-       rt_free(rxbuf);
+       free(rxbuf);
        return res;
     }
 }
 /* receive file */
-static rt_err_t zrec_file(rt_uint8_t *rxbuf, struct zfile *zf)
+static int zrec_file(uint8_t *rxbuf, struct zfile *zf)
 {
-    rt_err_t res = - RT_ERROR;
-    rt_uint16_t err_cnt = 0;
+    int res = - RT_ERROR;
+    uint16_t err_cnt = 0;
 
     do
     {
@@ -230,7 +229,7 @@ again:
              return ZCOMPL;
         case ZCAN:
 #ifdef ZDEBUG
-             rt_kprintf("error code: sender cancelled \r\n");
+             printf("error code: sender cancelled \r\n");
 #endif
              zf->bytes_received = 0L;        /* throw the received data */
              return res;
@@ -250,30 +249,30 @@ again:
 }
 
 /* proccess file infomation */
-static rt_err_t zget_file_info(char *name, struct zfile *zf)
+static int zget_file_info(char *name, struct zfile *zf)
 {
     char *p;
     char *full_path,*ptr;
-    rt_uint16_t i,len;
-    rt_err_t res  = -RT_ERROR;
+    uint16_t i,len;
+    int res  = -RT_ERROR;
     struct statfs buf;
     struct stat finfo;
 
-    if (zf->fname == RT_NULL)              /* extract file path  */
+    if (zf->fname == NULL)              /* extract file path  */
     {
         len = strlen(name)+2;
     }
     else
         len = strlen(zf->fname)+strlen(name)+2;
-    full_path = rt_malloc(len);
-    if (full_path == RT_NULL)
+    full_path = malloc(len);
+    if (full_path == NULL)
     {
         zsend_can();
-        rt_kprintf("\b\b\bfull_path: out of memory\n");
-        rt_free(full_path);
+        printf("\b\b\bfull_path: out of memory\n");
+        free(full_path);
         return -RT_ERROR;
     }
-    rt_memset(full_path,0,len);
+    memset(full_path,0,len);
 
     for (i=0,ptr=zf->fname;i<len-strlen(name)-2;i++)
          full_path[i] = *ptr++;
@@ -282,10 +281,10 @@ static rt_err_t zget_file_info(char *name, struct zfile *zf)
     if ((zf->fd=open(full_path, DFS_O_DIRECTORY,0)) < 0)
     {
         zsend_can();
-        rt_kprintf("\b\b\bcan not open file:%s\r\n",zf->fname+1);
+        printf("\b\b\bcan not open file:%s\r\n",zf->fname+1);
         close(zf->fd);
         zf->fd = -1;
-        rt_free(full_path);
+        free(full_path);
         return res;
     }
     fstat(zf->fd, &finfo);
@@ -306,9 +305,9 @@ static rt_err_t zget_file_info(char *name, struct zfile *zf)
     if (zf->bytes_total > (buf.f_blocks * buf.f_bfree))
     {
         zsend_can();
-        rt_kprintf("\b\b\bnot enough disk space\r\n");
+        printf("\b\b\bnot enough disk space\r\n");
         zf->fd = -1;
-        rt_free(full_path);
+        free(full_path);
         return -RT_ERROR;
     }
 #else
@@ -318,17 +317,17 @@ static rt_err_t zget_file_info(char *name, struct zfile *zf)
     if ((zf->fd = open(zf->fname,DFS_O_CREAT|DFS_O_WRONLY,0)) < 0)   /* create or replace exist file */
     {
         zsend_can();
-        rt_kprintf("\b\b\bcan not create file:%s \r\n",zf->fname);
+        printf("\b\b\bcan not create file:%s \r\n",zf->fname);
         return -RT_ERROR;
     }
 
-    return RT_EOK;
+    return 0;
 }
 
 /* receive file data,continously, no ack */
-static rt_err_t zrec_file_data(rt_uint8_t *buf, struct zfile *zf)
+static int zrec_file_data(uint8_t *buf, struct zfile *zf)
 {
-    rt_err_t res = -RT_ERROR;
+    int res = -RT_ERROR;
 
 more_data:
     res = zget_data(buf,RX_BUFFER_SIZE);
@@ -340,7 +339,7 @@ more_data:
          zput_pos(zf->bytes_received);
          zsend_line(XON);
          zsend_hex_header(ZACK, tx_header);
-         return RT_EOK;
+         return 0;
     case GOTCRCQ:
          zwrite_file(buf,Rxcount,zf);
          zf->bytes_received += Rxcount;
@@ -354,10 +353,10 @@ more_data:
     case GOTCRCE:
          zwrite_file(buf,Rxcount,zf);
          zf->bytes_received += Rxcount;
-         return RT_EOK;
+         return 0;
     case GOTCAN:
 #ifdef ZDEBUG
-         rt_kprintf("error code : ZCAN \r\n");
+         printf("error code : ZCAN \r\n");
 #endif
          return res;
     case TIMEOUT:
@@ -371,7 +370,7 @@ more_data:
 }
 
 /* write file */
-static rt_err_t zwrite_file(rt_uint8_t *buf,rt_uint16_t size, struct zfile *zf)
+static int zwrite_file(uint8_t *buf,uint16_t size, struct zfile *zf)
 {
     return (write(zf->fd,buf,size));
 }
@@ -379,7 +378,7 @@ static rt_err_t zwrite_file(rt_uint8_t *buf,rt_uint16_t size, struct zfile *zf)
 /* ack bibi */
 static void zrec_ack_bibi(void)
 {
-    rt_uint8_t i;
+    uint8_t i;
 
     zput_pos(0L);
     for (i=0;i<3;i++)
