@@ -14,10 +14,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/_default_fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "zdef.h"
 
+#define RT_ERROR EINVAL
 
 void zr_start(char *path);
 static int zrec_init(uint8_t *rxbuf, struct zfile *zf);
@@ -77,7 +80,8 @@ void zr_start(char *path)
     }
     free(zf);
     /* waiting,clear console buffer */
-    rt_thread_delay(RT_TICK_PER_SECOND/2);
+    usleep(500 * 1000);
+    // rt_thread_delay(RT_TICK_PER_SECOND/2);
     while(1)
     {
        n=rt_device_read(shell->device, 0, &ch, 1);
@@ -186,7 +190,7 @@ static int zrec_files(struct zfile *zf)
 /* receive file */
 static int zrec_file(uint8_t *rxbuf, struct zfile *zf)
 {
-    int res = - RT_ERROR;
+    int res = -EINVAL;
     uint16_t err_cnt = 0;
 
     do
@@ -254,8 +258,8 @@ static int zget_file_info(char *name, struct zfile *zf)
     char *p;
     char *full_path,*ptr;
     uint16_t i,len;
-    int res  = -RT_ERROR;
-    struct statfs buf;
+    int res  = -EINVAL;
+    // struct statfs buf;
     struct stat finfo;
 
     if (zf->fname == NULL)              /* extract file path  */
@@ -270,7 +274,7 @@ static int zget_file_info(char *name, struct zfile *zf)
         zsend_can();
         printf("\b\b\bfull_path: out of memory\n");
         free(full_path);
-        return -RT_ERROR;
+        return -EINVAL;
     }
     memset(full_path,0,len);
 
@@ -278,7 +282,7 @@ static int zget_file_info(char *name, struct zfile *zf)
          full_path[i] = *ptr++;
     full_path[len-strlen(name)-2] = '/';
     /* check if is a directory */
-    if ((zf->fd=open(full_path, DFS_O_DIRECTORY,0)) < 0)
+    if ((zf->fd=open(full_path, O_RDONLY)) < 0)
     {
         zsend_can();
         printf("\b\b\bcan not open file:%s\r\n",zf->fname+1);
@@ -311,14 +315,15 @@ static int zget_file_info(char *name, struct zfile *zf)
         return -RT_ERROR;
     }
 #else
-    buf = buf;
+
+    // buf = buf;
 #endif
     zf->bytes_received   = 0L;
-    if ((zf->fd = open(zf->fname,DFS_O_CREAT|DFS_O_WRONLY,0)) < 0)   /* create or replace exist file */
+    if ((zf->fd = open(zf->fname, O_CREAT | O_WRONLY,S_IRWXU|S_IRWXG|S_IRWXO)) < 0)   /* create or replace exist file */
     {
         zsend_can();
         printf("\b\b\bcan not create file:%s \r\n",zf->fname);
-        return -RT_ERROR;
+        return -ENXIO;
     }
 
     return 0;
@@ -327,10 +332,15 @@ static int zget_file_info(char *name, struct zfile *zf)
 /* receive file data,continously, no ack */
 static int zrec_file_data(uint8_t *buf, struct zfile *zf)
 {
-    int res = -RT_ERROR;
+    int res = -EINVAL;
 
 more_data:
     res = zget_data(buf,RX_BUFFER_SIZE);
+    if (res < 0)
+    {
+        zsend_break(Attn);
+        return res;
+    }
     switch(res)
     {
     case GOTCRCW:                          /* zack received */
@@ -361,9 +371,9 @@ more_data:
          return res;
     case TIMEOUT:
          return res;
-    case -RT_ERROR:
-         zsend_break(Attn);
-         return res;
+    // case -RT_ERROR:
+    //      zsend_break(Attn);
+    //      return res;
     default:
          return res;
     }
