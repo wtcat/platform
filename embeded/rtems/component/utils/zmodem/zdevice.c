@@ -6,43 +6,40 @@
  * 2011-03-29     itspy
  */
 
-#include <rtthread.h>
-#include <finsh.h>
-#include <shell.h>
-#include <rtdef.h>
-#include <dfs.h>
+/*
+ * Copyright 2022 wtcat
+ */
 #include <unistd.h>
 #include <sys/stat.h>
-#include <sys/statfs.h>
 #include "zdef.h"
 
 
-rt_uint32_t Line_left  = 0;          /* left number of data in the read line buffer*/
-rt_uint32_t Left_sizes = 0;          /* left file sizes */
-rt_uint32_t Baudrate   = BITRATE;    /* console baudrate */
+uint32_t Line_left  = 0;          /* left number of data in the read line buffer*/
+uint32_t Left_sizes = 0;          /* left file sizes */
+uint32_t Baudrate   = BITRATE;    /* console baudrate */
 
 
 
-rt_uint32_t get_device_baud(void)
+uint32_t get_device_baud(void)
 {
     return(Baudrate);
 }
 
-rt_uint32_t get_sys_time(void)
+uint32_t get_sys_time(void)
 {
     return(0L);
 }
 
-void zsend_byte(rt_uint16_t ch)
+void zsend_byte(uint16_t ch)
 {
     rt_device_write(zmodem.device, 0, &ch,1);
 
     return;
 }
 
-void zsend_line(rt_uint16_t c)
+void zsend_line(uint16_t c)
 {
-    rt_uint16_t ch;
+    uint16_t ch;
 
     ch = (c & 0377);
     rt_device_write(zmodem.device, 0, &ch, 1);
@@ -50,7 +47,7 @@ void zsend_line(rt_uint16_t c)
     return;
 }
 
-rt_int16_t zread_line(rt_uint16_t timeout)
+int16_t zread_line(uint16_t timeout)
 {
     char *str;
     static char buf[10];
@@ -92,7 +89,7 @@ void zsend_break(char *cmd)
         case '\336':
              continue;
         case '\335':
-             rt_thread_delay(RT_TICK_PER_SECOND);
+             usleep(1000000); //rt_thread_delay(RT_TICK_PER_SECOND);
              continue;
         default:
              zsend_line(*cmd);

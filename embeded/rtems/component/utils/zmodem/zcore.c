@@ -5,61 +5,56 @@
  * Date           Author       Notes
  * 2011-03-29     itspy
  */
-
-#include <rtthread.h>
-#include <finsh.h>
-#include <shell.h>
-#include <rtdef.h>
-#include <dfs.h>
+#include <errno.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <sys/statfs.h>
-#include <stdio.h>
+
 #include "zdef.h"
 
 char ZF0_CMD;                    /* file conversion request */
 char ZF1_CMD;                    /* file management request */
 char ZF2_CMD;                    /* file transport request */
 char ZF3_CMD;
-rt_uint8_t   Rxframeind;         /* ZBIN ZBIN32, or ZHEX type of frame */
-rt_uint16_t  Rxcount;            /* received count*/
+uint8_t   Rxframeind;         /* ZBIN ZBIN32, or ZHEX type of frame */
+uint16_t  Rxcount;            /* received count*/
 char header_type;                /* header type */
-rt_uint8_t   rx_header[4];       /* received header */
-rt_uint8_t   tx_header[4];       /* transmitted header */
-rt_uint32_t  Rxpos;              /* received file position */
-rt_uint32_t  Txpos;              /* transmitted file position */
-rt_uint8_t   Txfcs32;            /* TURE means send binary frames with 32 bit FCS */
-rt_uint8_t   TxCRC;              /* controls 32 bit CRC being sent */
-rt_uint8_t   RxCRC;              /* indicates/controls 32 bit CRC being received */
+uint8_t   rx_header[4];       /* received header */
+uint8_t   tx_header[4];       /* transmitted header */
+uint32_t  Rxpos;              /* received file position */
+uint32_t  Txpos;              /* transmitted file position */
+uint8_t   Txfcs32;            /* TURE means send binary frames with 32 bit FCS */
+uint8_t   TxCRC;              /* controls 32 bit CRC being sent */
+uint8_t   RxCRC;              /* indicates/controls 32 bit CRC being received */
                                  /* 0 == CRC16,  1 == CRC32,  2 == CRC32 + RLE */
 char Attn[ZATTNLEN+1];           /* attention string rx sends to tx on err */
 
 void zinit_parameter(void);
-void zsend_bin_header(rt_uint8_t type, rt_uint8_t *hdr);
-void zsend_hex_header(rt_uint8_t type, rt_uint8_t *hdr);
-void zsend_bin_data(rt_uint8_t *buf, rt_int16_t len, rt_uint8_t frameend);
-static rt_int16_t zrec_data16(rt_uint8_t *buf, rt_uint16_t len);
-static rt_int16_t zrec_data32(rt_uint8_t *buf, rt_int16_t len);
-static rt_int16_t zrec_data32r(rt_uint8_t *buf, rt_int16_t len);
-rt_int16_t zget_data(rt_uint8_t *buf, rt_uint16_t len);
-rt_int16_t zget_header(rt_uint8_t *hdr);
-static rt_int16_t zget_bin_header(rt_uint8_t *hdr);
-static rt_int16_t zget_bin_fcs(rt_uint8_t *hdr);
-rt_int16_t zget_hex_header(rt_uint8_t *hdr);
-static void zsend_ascii(rt_uint8_t c);
-void zsend_zdle_char(rt_uint16_t ch);
-static rt_int16_t zget_hex(void);
-rt_int16_t zread_byte(void);
-rt_int16_t zxor_read(void);
-void zput_pos(rt_uint32_t pos);
-void zget_pos(rt_uint32_t pos);
+void zsend_bin_header(uint8_t type, uint8_t *hdr);
+void zsend_hex_header(uint8_t type, uint8_t *hdr);
+void zsend_bin_data(uint8_t *buf, int16_t len, uint8_t frameend);
+static int16_t zrec_data16(uint8_t *buf, uint16_t len);
+static int16_t zrec_data32(uint8_t *buf, int16_t len);
+static int16_t zrec_data32r(uint8_t *buf, int16_t len);
+int16_t zget_data(uint8_t *buf, uint16_t len);
+int16_t zget_header(uint8_t *hdr);
+static int16_t zget_bin_header(uint8_t *hdr);
+static int16_t zget_bin_fcs(uint8_t *hdr);
+int16_t zget_hex_header(uint8_t *hdr);
+static void zsend_ascii(uint8_t c);
+void zsend_zdle_char(uint16_t ch);
+static int16_t zget_hex(void);
+int16_t zread_byte(void);
+int16_t zxor_read(void);
+void zput_pos(uint32_t pos);
+void zget_pos(uint32_t pos);
 
 
 
 
 void zinit_parameter(void)
 {
-    rt_uint8_t i;
+    uint8_t i;
 
     ZF0_CMD  = CANFC32|CANFDX|CANOVIO;      /*  not chose CANFC32,CANRLE,although it have been supported */
     ZF1_CMD  = 0;                               /* fix header length,not support CANVHDR */
@@ -77,10 +72,10 @@ void zinit_parameter(void)
 }
 
 /* send binary header */
-void zsend_bin_header(rt_uint8_t type, rt_uint8_t *hdr)
+void zsend_bin_header(uint8_t type, uint8_t *hdr)
 {
-    rt_uint8_t i;
-    rt_uint32_t crc;
+    uint8_t i;
+    uint32_t crc;
 
     zsend_byte(ZPAD);
     zsend_byte(ZDLE);
@@ -144,10 +139,10 @@ void zsend_bin_header(rt_uint8_t type, rt_uint8_t *hdr)
 }
 
 /* send hex header */
-void zsend_hex_header(rt_uint8_t type, rt_uint8_t *hdr)
+void zsend_hex_header(uint8_t type, uint8_t *hdr)
 {
-    rt_uint8_t i;
-    rt_uint16_t crc;
+    uint8_t i;
+    uint16_t crc;
 
     zsend_line(ZPAD); zsend_line(ZPAD); zsend_line(ZDLE);
     zsend_line(ZHEX);
@@ -171,10 +166,10 @@ void zsend_hex_header(rt_uint8_t type, rt_uint8_t *hdr)
 }
 
 /* send binary data,with frameend */
-void zsend_bin_data(rt_uint8_t *buf, rt_int16_t len, rt_uint8_t frameend)
+void zsend_bin_data(uint8_t *buf, int16_t len, uint8_t frameend)
 {
-    rt_int16_t i,c,tmp;
-    rt_uint32_t crc;
+    int16_t i,c,tmp;
+    uint32_t crc;
 
     if (TxCRC == 0)         /* send binary data with 16bits crc check */
     {
@@ -272,12 +267,12 @@ void zsend_bin_data(rt_uint8_t *buf, rt_int16_t len, rt_uint8_t frameend)
 }
 
 /* receive data,with 16bits CRC check */
-static rt_int16_t zrec_data16(rt_uint8_t *buf, rt_uint16_t len)
+static int16_t zrec_data16(uint8_t *buf, uint16_t len)
 {
-    rt_int16_t c,crc_cnt;
-    rt_uint16_t crc;
-    rt_err_t res = -RT_ERROR;
-    rt_uint8_t *p,flag = 0;
+    int16_t c,crc_cnt;
+    uint16_t crc;
+    int res = -EINVAL;
+    uint8_t *p,flag = 0;
 
     p = buf;
     crc_cnt = 0;  crc = 0L;
@@ -310,9 +305,9 @@ static rt_int16_t zrec_data16(rt_uint8_t *buf, rt_uint16_t len)
                if ((crc & 0xffff))
                {
 #ifdef ZDEBUG
-                     rt_kprintf("error code: CRC16 error \r\n");
+                     printf("error code: CRC16 error \r\n");
 #endif
-                     return -RT_ERROR;
+                     return -EINVAL;
                }
                return c;
            }
@@ -325,16 +320,16 @@ static rt_int16_t zrec_data16(rt_uint8_t *buf, rt_uint16_t len)
         }
     }
 
-    return -RT_ERROR;
+    return -EINVAL;
 }
 
 /* receive data,with 32bits CRC check */
-static rt_int16_t zrec_data32(rt_uint8_t *buf, rt_int16_t len)
+static int16_t zrec_data32(uint8_t *buf, int16_t len)
 {
-    rt_int16_t c,crc_cnt;
-    rt_uint32_t crc;
-    rt_err_t res = -RT_ERROR;
-    rt_uint8_t *p,flag = 0;
+    int16_t c,crc_cnt;
+    uint32_t crc;
+    int res = -EINVAL;
+    uint8_t *p,flag = 0;
 
     crc_cnt = 0;   crc = 0xffffffffL;
     Rxcount = 0;
@@ -365,9 +360,9 @@ static rt_int16_t zrec_data32(rt_uint8_t *buf, rt_int16_t len)
                if ((crc & 0xDEBB20E3))
                {
 #ifdef ZDEBUG
-                     rt_kprintf("error code: CRC32 error \r\n");
+                     printf("error code: CRC32 error \r\n");
 #endif
-                     return -RT_ERROR;
+                     return -EINVAL;
                }
                return c;
            }
@@ -380,15 +375,15 @@ static rt_int16_t zrec_data32(rt_uint8_t *buf, rt_int16_t len)
         }
     }
 
-    return -RT_ERROR;
+    return -EINVAL;
 }
 /* receive data,with RLE encoded,32bits CRC check */
-static rt_int16_t zrec_data32r(rt_uint8_t *buf, rt_int16_t len)
+static int16_t zrec_data32r(uint8_t *buf, int16_t len)
 {
-    rt_int16_t c,crc_cnt;
-    rt_uint32_t crc;
-    rt_err_t res = -RT_ERROR;
-    rt_uint8_t *p,flag = 0;
+    int16_t c,crc_cnt;
+    uint32_t crc;
+    int res = -EINVAL;
+    uint8_t *p,flag = 0;
 
     crc_cnt = 0; crc = 0xffffffffL;
     Rxcount = 0;
@@ -420,9 +415,9 @@ static rt_int16_t zrec_data32r(rt_uint8_t *buf, rt_int16_t len)
                if ((crc & 0xDEBB20E3))
                {
 #ifdef ZDEBUG
-                     rt_kprintf("error code: CRC32 error \r\n");
+                     printf("error code: CRC32 error \r\n");
 #endif
-                     return -RT_ERROR;
+                     return -EINVAL;
                }
                return c;
            }
@@ -472,11 +467,11 @@ spaces:
 
     }
 end:
-    return -RT_ERROR;
+    return -EINVAL;
 }
-rt_int16_t zget_data(rt_uint8_t *buf, rt_uint16_t len)
+int16_t zget_data(uint8_t *buf, uint16_t len)
 {
-    rt_int16_t res = -RT_ERROR;
+    int16_t res = -EINVAL;
 
     if (RxCRC == 0)
     {
@@ -494,11 +489,11 @@ rt_int16_t zget_data(rt_uint8_t *buf, rt_uint16_t len)
     return res;
 }
 /* get type and cmd of header, fix lenght */
-rt_int16_t zget_header(rt_uint8_t *hdr)
+int16_t zget_header(uint8_t *hdr)
 {
-    rt_int16_t c,prev_char;
-    rt_uint32_t bit;
-    rt_uint16_t get_can,step_out;
+    int16_t c,prev_char;
+    uint32_t bit;
+    uint16_t get_can,step_out;
 
     bit = get_device_baud();                 /* get console baud rate */
     Rxframeind = header_type = 0;
@@ -520,7 +515,7 @@ rt_int16_t zget_header(rt_uint8_t *hdr)
              if (prev_char == CAN) break;
              if (prev_char == ZCRCW)
              {
-                 c = -RT_ERROR; goto end;
+                 c = -EINVAL; goto end;
              }
              goto end;
         case ZCRCW:
@@ -596,10 +591,10 @@ end:
 }
 
 /* receive a binary header */
-static rt_int16_t zget_bin_header(rt_uint8_t *hdr)
+static int16_t zget_bin_header(uint8_t *hdr)
 {
-    rt_int16_t res, i;
-    rt_uint16_t crc;
+    int16_t res, i;
+    uint16_t crc;
 
     if ((res = zread_byte()) & ~0377)
         return res;
@@ -621,18 +616,18 @@ static rt_int16_t zget_bin_header(rt_uint8_t *hdr)
     crc = updcrc16(res, crc);
     if (crc & 0xFFFF)
     {
-        rt_kprintf("CRC error\n");
-        return -RT_ERROR;
+        printf("CRC error\n");
+        return -EINVAL;
     }
 
     return header_type;
 }
 
 /* receive a binary header,with 32bits FCS */
-static rt_int16_t zget_bin_fcs(rt_uint8_t *hdr)
+static int16_t zget_bin_fcs(uint8_t *hdr)
 {
-    rt_int16_t res, i;
-    rt_uint32_t crc;
+    int16_t res, i;
+    uint32_t crc;
 
     if ((res = zread_byte()) & ~0377)
         return res;
@@ -658,9 +653,9 @@ static rt_int16_t zget_bin_fcs(rt_uint8_t *hdr)
     if (crc != 0xDEBB20E3)
     {
 #ifdef ZDEBUG
-        rt_kprintf("CRC error\n");
+        printf("CRC error\n");
 #endif
-        return -RT_ERROR;
+        return -EINVAL;
     }
 
     return header_type;
@@ -668,10 +663,10 @@ static rt_int16_t zget_bin_fcs(rt_uint8_t *hdr)
 
 
 /* receive a hex style header (type and position) */
-rt_int16_t zget_hex_header(rt_uint8_t *hdr)
+int16_t zget_hex_header(uint8_t *hdr)
 {
-    rt_int16_t res,i;
-    rt_uint16_t crc;
+    int16_t res,i;
+    uint16_t crc;
 
     if ((res = zget_hex()) < 0)
         return res;
@@ -694,9 +689,9 @@ rt_int16_t zget_hex_header(rt_uint8_t *hdr)
     if (crc & 0xFFFF)
     {
 #ifdef ZDEBUG
-        rt_kprintf("error code : CRC error\r\n");
+        printf("error code : CRC error\r\n");
 #endif
-        return -RT_ERROR;
+        return -EINVAL;
     }
     res = zread_line(100);
     if (res < 0)
@@ -709,7 +704,7 @@ rt_int16_t zget_hex_header(rt_uint8_t *hdr)
 }
 
 /* convert to ascii */
-static void zsend_ascii(rt_uint8_t c)
+static void zsend_ascii(uint8_t c)
 {
     const char hex[] = "0123456789abcdef";
 
@@ -722,9 +717,9 @@ static void zsend_ascii(rt_uint8_t c)
 /*
  * aend character c with ZMODEM escape sequence encoding.
  */
-void zsend_zdle_char(rt_uint16_t ch)
+void zsend_zdle_char(uint16_t ch)
 {
-    rt_uint16_t res;
+    uint16_t res;
 
     res = ch & 0377;
     switch (res)
@@ -751,9 +746,9 @@ void zsend_zdle_char(rt_uint16_t ch)
 }
 
 /* decode two lower case hex digits into an 8 bit byte value */
-static rt_int16_t zget_hex(void)
+static int16_t zget_hex(void)
 {
-    rt_int16_t res,n;
+    int16_t res,n;
 
     if ((res = zxor_read()) < 0)
         return res;
@@ -761,14 +756,14 @@ static rt_int16_t zget_hex(void)
     if (n > 9)
         n -= ('a' - ':');
     if (n & ~0x0f)
-        return -RT_ERROR;
+        return -EINVAL;
     if ((res = zxor_read()) < 0)
         return res;
     res -= '0';
     if (res > 9)
         res -= ('a' - ':');
     if (res & ~0x0f)
-        return -RT_ERROR;
+        return -EINVAL;
     res += (n<<4);
 
     return res;
@@ -779,7 +774,7 @@ static rt_int16_t zget_hex(void)
  * read a byte, checking for ZMODEM escape encoding
  *  including CAN*5 which represents a quick abort
  */
-rt_int16_t zread_byte(void)
+int16_t zread_byte(void)
 {
     register int res;
 
@@ -832,16 +827,16 @@ again2:
          break;
     }
 
-    return -RT_ERROR;
+    return -EINVAL;
 }
 
 /*
  * @read a character from the modem line with timeout.
  * @eat parity, XON and XOFF characters.
  */
-rt_int16_t zxor_read(void)
+int16_t zxor_read(void)
 {
-    rt_int16_t res;
+    int16_t res;
 
     for (;;)
     {
@@ -862,7 +857,7 @@ rt_int16_t zxor_read(void)
 }
 
 /* put file posistion into the header*/
-void zput_pos(rt_uint32_t pos)
+void zput_pos(uint32_t pos)
 {
     tx_header[ZP0] = pos;
     tx_header[ZP1] = pos>>8;
@@ -873,7 +868,7 @@ void zput_pos(rt_uint32_t pos)
 }
 
 /* Recover a long integer from a header */
-void zget_pos(rt_uint32_t pos)
+void zget_pos(uint32_t pos)
 {
     Rxpos = (rx_header[ZP3] & 0377);
     Rxpos = (Rxpos << 8) | (rx_header[ZP2] & 0377);

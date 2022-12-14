@@ -1,7 +1,7 @@
 #ifndef __ZDEF_H__
 #define __ZDEF_H__
 
-#include <rtthread.h>
+#include <stdint.h>
 #include "crc.h"
 #define ZPAD      '*'   /* 052 padding character begins frames */
 #define ZDLE      030   /* ctrl-X ZMODEM escape - `ala BISYNC DLE */
@@ -120,16 +120,16 @@
 extern char Attn[ZATTNLEN+1];   /* Attention string rx sends to tx on err */
 
 /* globals used by ZMODEM functions */
-extern rt_uint8_t  Rxframeind;     /* ZBIN ZBIN32, or ZHEX type of frame */
+extern uint8_t  Rxframeind;     /* ZBIN ZBIN32, or ZHEX type of frame */
 extern char header_type;           /* type of header received */
-extern rt_uint8_t  rx_header[4];   /* received header */
-extern rt_uint8_t  tx_header[4];   /* transmitted header */
-extern rt_uint8_t  Txfcs32;        /* TRUE means send binary frames with 32 bit FCS */
-extern rt_uint16_t Rxcount;        /* count of data bytes received */
-extern rt_uint16_t Rxtimeout;      /* tenths of seconds to wait for something */
-extern rt_uint32_t Rxpos;          /* received file position */
-extern rt_uint32_t Txpos;          /* transmitted file position */
-extern rt_uint8_t  Txfcs32;        /* TURE means send binary frames with 32 bit FCS */
+extern uint8_t  rx_header[4];   /* received header */
+extern uint8_t  tx_header[4];   /* transmitted header */
+extern uint8_t  Txfcs32;        /* TRUE means send binary frames with 32 bit FCS */
+extern uint16_t Rxcount;        /* count of data bytes received */
+extern uint16_t Rxtimeout;      /* tenths of seconds to wait for something */
+extern uint32_t Rxpos;          /* received file position */
+extern uint32_t Txpos;          /* transmitted file position */
+extern uint8_t  Txfcs32;        /* TURE means send binary frames with 32 bit FCS */
 
 /* ward Christensen / CP/M parameters - Don't change these! */
 #define ENQ     005
@@ -165,9 +165,9 @@ extern char ZF0_CMD;              /* local ZMODEM file conversion request */
 extern char ZF1_CMD;              /* local ZMODEM file management request */
 extern char ZF2_CMD;              /* local ZMODEM file management request */
 extern char ZF3_CMD;              /* local ZMODEM file management request */
-extern rt_uint32_t Baudrate ;
-extern rt_uint32_t Left_bytes;
-extern rt_uint32_t Left_sizes;
+extern uint32_t Baudrate ;
+extern uint32_t Left_bytes;
+extern uint32_t Left_sizes;
 
 
 struct zmodemf
@@ -180,13 +180,13 @@ extern struct zmodemf zmodem;
 struct zfile
 {
     char *fname;
-    rt_int32_t   fd;
-    rt_uint32_t  ctime;
-    rt_uint32_t  mode;
-    rt_uint32_t  bytes_total;
-    rt_uint32_t  bytes_sent;
-    rt_uint32_t  bytes_received;
-    rt_uint32_t  file_end;
+    int   fd;
+    uint32_t  ctime;
+    uint32_t  mode;
+    uint32_t  bytes_total;
+    uint32_t  bytes_sent;
+    uint32_t  bytes_received;
+    uint32_t  file_end;
 
 };
 extern struct finsh_shell* shell;
@@ -199,18 +199,18 @@ extern void zr_start(char *path);
 
 /* zcore.c */
 extern void zinit_parameter(void);
-extern rt_int16_t zget_header(rt_uint8_t *hdr);
-extern void zsend_bin_header(rt_uint8_t type, rt_uint8_t *hdr);
-extern void zsend_hex_header(rt_uint8_t type, rt_uint8_t *hdr);
-extern rt_int16_t zget_data(rt_uint8_t *buf, rt_uint16_t len);
-extern void zsend_bin_data(rt_uint8_t *buf, rt_int16_t len, rt_uint8_t frameend);
-extern void zput_pos(rt_uint32_t pos);
-extern void zget_pos(rt_uint32_t pos);
+extern int16_t zget_header(uint8_t *hdr);
+extern void zsend_bin_header(uint8_t type, uint8_t *hdr);
+extern void zsend_hex_header(uint8_t type, uint8_t *hdr);
+extern int16_t zget_data(uint8_t *buf, uint16_t len);
+extern void zsend_bin_data(uint8_t *buf, int16_t len, uint8_t frameend);
+extern void zput_pos(uint32_t pos);
+extern void zget_pos(uint32_t pos);
 /* zdevice.c */
-extern rt_uint32_t get_device_baud(void);
-extern void zsend_byte(rt_uint16_t c);
-extern void zsend_line(rt_uint16_t c);
-extern rt_int16_t zread_line(rt_uint16_t timeout);
+extern uint32_t get_device_baud(void);
+extern void zsend_byte(uint16_t c);
+extern void zsend_line(uint16_t c);
+extern int16_t zread_line(uint16_t timeout);
 extern void zsend_break(char *cmd);
 extern void zsend_can(void);
 
