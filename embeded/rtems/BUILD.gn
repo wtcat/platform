@@ -33,21 +33,14 @@ executable("rtems") {
     "//embeded/rootfs",
     "//embeded/rtems/component",
     "//embeded/rtems/bsps/shared",
-    "//embeded/rtems/bsps/${target_cpu}/${target_board}:board"
+    "//embeded/rtems/bsps/${target_cpu}/${target_board}:board",
+    "//embeded/thirdparty"
   ]
   configs += [
     "//gn/config:backtrace"
   ]
   if (use_shell) {
     deps += ["//embeded/rtems/shell"]
-  }
-  if (use_gui) {
-    deps +=["//embeded/rtems/component/lvgl"]
-  }
-  if (use_testsuite) {
-    deps += [
-      "//embeded/thirdparty/googletest"
-    ]
   }
   if (use_libbsd) {
     defines += [
@@ -70,10 +63,6 @@ executable("rtems") {
   }
   if (use_devicetree) {
     defines +=["CONFIGURE_FDT"]
-  }
-
-  if (use_libmodbus) {
-    deps += [ "//embeded/thirdparty/libmodbus" ]
   }
 }
 

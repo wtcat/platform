@@ -1,0 +1,19 @@
+# Thirdparty component
+import("//gn/toolchain/rtems/rtems.gni")
+import("//gn/common.gni")
+
+group("thirdparty") {
+    deps = []
+    if (use_gui) {
+        deps += [ "//embeded/rtems/component/lvgl" ]
+    }
+    if (use_libmodbus) {
+        deps += [ "//embeded/thirdparty/libmodbus" ]
+    }
+    if (use_libzmodem) {
+        deps += [ "//embeded/thirdparty/libzmodem" ]
+    }
+    if (use_testsuite) {
+        deps += [ "//embeded/thirdparty/googletest" ]
+    }
+}

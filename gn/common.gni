@@ -21,6 +21,9 @@ declare_args() {
   #Enable libmodbus 
   use_libmodbus = false
 
+  #Enable zmodem file transfer protocol
+  use_libzmodem = false
+
   #Enable unit testcase
   use_testsuite = false
 }

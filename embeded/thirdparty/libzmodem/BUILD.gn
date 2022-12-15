@@ -1,0 +1,24 @@
+# Google testsuite
+
+component("libzmodem") {
+    include_dirs = ["src/"]
+    cflags = [
+        "-Wno-implicit-fallthrough",
+        "-Wno-unused-variable",
+        "-Wno-unused-parameter"
+    ]
+    sources = [
+        "src/zm.c",
+        "src/log.c",
+        "src/lrz.c",
+        # "src/tcp.c",
+        "src/zreadline.c",
+        "src/protname.c",
+        "src/timing.c",
+        "src/crctab.c",
+        # "src/msz.c",
+        "src/rbsb.c",
+        "src/lsz.c",
+        # "src/mrz.c"
+    ]
+}
