@@ -1,16 +1,16 @@
 # Google testsuite
 
 component("googletest") {
+    include_dirs = ["."]
     sources = [
-        "//embeded/thirdparty/googletest/src/gtest-all.cc",
-        "//embeded/thirdparty/googletest/src/gtest_main.cc"
+        "src/gtest-all.cc",
+        "src/gtest_main.cc"
     ]
-    configs = [":gtest_config"]
+    configs = [":googletest_config"]
 }
 
-config("gtest_config") {
+config("googletest_config") {
     include_dirs = [
-        "//embeded/thirdparty/googletest/include",
-        "//embeded/thirdparty/googletest"
+        "include",
     ]
 }

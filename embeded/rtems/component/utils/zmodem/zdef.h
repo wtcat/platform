@@ -172,8 +172,9 @@ extern uint32_t Left_sizes;
 
 struct zmodemf
 {
-    struct rt_semaphore zsem;
-    rt_device_t device;
+    // struct rt_semaphore zsem;
+    // rt_device_t device;
+    int devfd;
 };
 extern struct zmodemf zmodem;
 

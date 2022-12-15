@@ -32,8 +32,7 @@ uint32_t get_sys_time(void)
 
 void zsend_byte(uint16_t ch)
 {
-    rt_device_write(zmodem.device, 0, &ch,1);
-
+    write(zmodem.devfd, &ch, 1);
     return;
 }
 
@@ -42,7 +41,7 @@ void zsend_line(uint16_t c)
     uint16_t ch;
 
     ch = (c & 0377);
-    rt_device_write(zmodem.device, 0, &ch, 1);
+    zsend_byte(ch);//rt_device_write(zmodem.device, 0, &ch, 1);
 
     return;
 }
@@ -61,7 +60,8 @@ int16_t zread_line(uint16_t timeout)
     timeout/=5;
     while (1)
     {
-        Line_left = rt_device_read(shell->device, 0, buf, 1);
+        Line_left = read(zmodem.devfd, buf, 1);
+        // Line_left = rt_device_read(shell->device, 0, buf, 1);
         if (Line_left)
         {
              Line_left = Line_left;

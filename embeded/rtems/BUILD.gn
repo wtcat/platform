@@ -46,8 +46,7 @@ executable("rtems") {
   }
   if (use_testsuite) {
     deps += [
-      "//embeded/thirdparty/googletest",
-      "//embeded/rtems/testsuite"
+      "//embeded/thirdparty/googletest"
     ]
   }
   if (use_libbsd) {
