@@ -20,7 +20,7 @@
 
   originally written by Michael D. Black, mblack@csihq.com
 */
-
+#include "zm_namespace.h"
 #include "zglobal.h"
 
 #include "timing.h"

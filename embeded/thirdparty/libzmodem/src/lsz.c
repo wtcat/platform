@@ -22,6 +22,7 @@
 
   originally written by Chuck Forsberg
 */
+#include "zm_namespace.h"
 #include "zglobal.h"
 
 /* char *getenv(); */

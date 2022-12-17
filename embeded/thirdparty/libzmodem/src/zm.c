@@ -31,7 +31,7 @@
         zm_set_header_payload_bytes(a,b,c,d) store a,b,c,d as position/flag data in Txhdr
         long zm_reclaim_header() recover position offset from header
  */
-
+#include "zm_namespace.h"
 #include "zglobal.h"
 
 #include <stdio.h>

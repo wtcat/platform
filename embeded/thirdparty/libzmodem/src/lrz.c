@@ -22,7 +22,7 @@
 
   originally written by Chuck Forsberg
 */
-
+#include "zm_namespace.h"
 #include "zglobal.h"
 
 #define SS_NORMAL 0

@@ -13,7 +13,7 @@ component("libzmodem") {
         "src/lrz.c",
         # "src/tcp.c",
         "src/zreadline.c",
-        "src/protname.c",
+        # "src/protname.c",
         "src/timing.c",
         "src/crctab.c",
         # "src/msz.c",

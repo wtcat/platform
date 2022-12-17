@@ -27,6 +27,7 @@
  *  Rev 05-05-1988
  *  ============== (not quite, but originated there :-). -- uwe
  */
+#include "zm_namespace.h"
 #include "zglobal.h"
 
 #include <stdio.h>
