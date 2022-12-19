@@ -24,6 +24,9 @@ declare_args() {
   #Enable zmodem file transfer protocol
   use_libzmodem = false
 
+  #Enable dsp library
+  use_libdsp = false
+
   #Enable unit testcase
   use_testsuite = false
 }

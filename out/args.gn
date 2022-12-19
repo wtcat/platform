@@ -15,6 +15,7 @@ use_testsuite = true
 use_libzmodem = true
 # uboot_ldaddr = 2148548608
 use_libbsd = true
+use_libdsp = true
 # use_gdbserver= true
 # use_backtrace = true
 # use_fntrace = true
