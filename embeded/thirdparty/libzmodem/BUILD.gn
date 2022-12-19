@@ -11,14 +11,11 @@ component("libzmodem") {
         "src/zm.c",
         "src/log.c",
         "src/lrz.c",
-        # "src/tcp.c",
         "src/zreadline.c",
-        # "src/protname.c",
         "src/timing.c",
         "src/crctab.c",
-        # "src/msz.c",
         "src/rbsb.c",
         "src/lsz.c",
-        # "src/mrz.c"
+        "zm_shell.c"
     ]
 }

@@ -1,0 +1,30 @@
+# 
+component("libdsp") {
+  defines = [ 
+    "CONFIG_LIBDSP_PRECISION=1",
+    "CONFIG_LIBDSP_FOC_VABC=1",
+    "OK=0"
+  ]
+  cflags = [
+    "-Wno-unused-parameter"
+  ]
+  sources = [ 
+    "lib_foc.c",
+    "lib_pid_b16.c",
+    "lib_pmsm_model_b16.c",
+    "lib_observer_b16.c",
+    "lib_pmsm_model.c",
+    "lib_transform_b16.c",
+    "lib_svm.c",
+    "lib_misc.c",
+    "lib_misc_b16.c",
+    "lib_observer.c",
+    "lib_transform.c",
+    "lib_motor.c",
+    "lib_svm_b16.c",
+    "lib_motor_b16.c",
+    "lib_pid.c",
+    "lib_foc_b16.c",
+  ]  
+}
+

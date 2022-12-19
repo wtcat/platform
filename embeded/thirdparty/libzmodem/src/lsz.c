@@ -594,6 +594,7 @@ sz_transmit_file(sz_t *sz, const char *oname, const char *remotename)
 
 	/* Here we make a log message the transmission of a single
 	 * file. */
+#ifndef __rtems__
 	long bps;
 	double d=timing(0,NULL);
 	if (d==0) /* can happen if timing() uses time() */
@@ -601,6 +602,7 @@ sz_transmit_file(sz_t *sz, const char *oname, const char *remotename)
 	bps=zi.bytes_sent/d;
 	log_debug(_("Bytes Sent:%7ld   BPS:%-8ld"),
 		  (long) zi.bytes_sent,bps);
+#endif
 	if (sz->complete_cb)
 	  sz->complete_cb(zi.fname, 0, zi.bytes_sent, zi.modtime);
 

@@ -1,4 +1,9 @@
+# 
+import("//gn/common.gni")
 
-component("lib") {
-    sources = []
+group("lib") {
+    deps = []
+    if (use_libdsp) {
+        deps = [ "//embeded/rtems/component/lib/libdsp" ] 
+    }
 }

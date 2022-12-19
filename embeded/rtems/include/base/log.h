@@ -74,17 +74,9 @@ extern struct printer __log_printer[];
 })
 
 #else /* _MSC_VER */
-static inline int __pr_generic(struct printer *printer, int level, 
-    const char *fmt, ...) {
-    if (level <= CONFIG_LOGLEVEL) {
-        va_list ap;
-        va_start(ap, fmt);
-        int len = printer->format(printer->context, fmt, ap);
-        va_end(ap);
-        return len;
-    }
-    return 0;
-}
+#define __pr_generic(printer, level, fmt, ...) \
+    (CONFIG_LOGLEVEL >= (level))? \
+	    virt_format((printer), pr_fmt(fmt), ##__VA_ARGS__): 0
 #endif /* !_MSC_VER */
 
 /**

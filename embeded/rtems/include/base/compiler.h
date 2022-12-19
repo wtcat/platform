@@ -2,6 +2,7 @@
 #ifndef BASE_COMPILER_H_
 #define BASE_COMPILER_H_
 
+#include <stdint.h>
 #include "base/toolchain/compiler_types.h"
 
 #ifndef ASM

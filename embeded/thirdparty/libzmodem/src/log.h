@@ -9,6 +9,7 @@
 #ifndef LOG_H
 #define LOG_H
 
+#ifndef __rtems__
 #include <stdio.h>
 #include <stdarg.h>
 
@@ -35,5 +36,23 @@ void log_set_nodisplay(int enable);
 
 void log_log(int level, const char *file, int line, const char *fmt, ...);
 void log_display(const char *file, int line, const char *fmt, ...);
+#else
 
-#endif
+#define log_trace(...) (void)0
+#define log_debug(...) (void)0
+#define log_info(...)  (void)0
+#define log_warn(...)  (void)0
+#define log_error(...) (void)0
+#define log_fatal(...) (void)0
+#define display(...)   (void)0
+
+#define log_set_udata(...)      (void)0     
+#define log_set_lock(...)       (void)0
+#define log_set_fp(...)         (void)0
+#define log_set_level(...)      (void)0
+#define log_set_quiet(...)      (void)0
+#define log_set_nodisplay(...)  (void)0
+
+
+#endif /* __rtems__ */
+#endif /* LOG_H */

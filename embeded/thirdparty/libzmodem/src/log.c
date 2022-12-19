@@ -21,6 +21,7 @@
  * IN THE SOFTWARE.
  */
 
+#ifndef __rtems__
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -31,7 +32,9 @@
 
 static struct {
   void *udata;
+#ifndef __rtems__
   log_LockFn lock;
+#endif
   FILE *fp;
   int level;
   int quiet;
@@ -172,3 +175,4 @@ void log_display(const char *file, int line, const char *fmt, ...) {
   /* Release lock */
   unlock();
 }
+#endif /* __rtems__*/

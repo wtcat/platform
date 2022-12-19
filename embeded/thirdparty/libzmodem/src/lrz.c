@@ -323,6 +323,7 @@ rz_receive(rz_t *rz)
 			if (rz_receive_sectors(rz, &zi)==ERROR)
 				goto fubar;
 
+#ifndef __rtems__
 			double d;
 			long bps;
 			d=timing(0,NULL);
@@ -333,6 +334,7 @@ rz_receive(rz_t *rz)
 			log_info(
 				_("\rBytes received: %7ld/%7ld   BPS:%-6ld"),
 				(long) zi.bytes_received, (long) zi.bytes_total, bps);
+#endif
 		}
 	}
 	return OK;
@@ -1095,6 +1097,7 @@ rz_receive_files(rz_t *rz, struct zm_fileinfo *zi)
 		switch (c) {
 		case ZEOF:
 		{
+#ifndef __rtems__
 			double d;
 			long bps;
 			d=timing(0,NULL);
@@ -1103,6 +1106,7 @@ rz_receive_files(rz_t *rz, struct zm_fileinfo *zi)
 			bps=(zi->bytes_received-zi->bytes_skipped)/d;
 			log_info(_("Bytes received: %7ld/%7ld   BPS:%-6ld"),
 				(long) zi->bytes_received, (long) zi->bytes_total, bps);
+#endif
 		}
 			/* FALL THROUGH */
 		case ZSKIP:
