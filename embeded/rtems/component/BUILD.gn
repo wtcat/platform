@@ -7,7 +7,8 @@ component("component") {
         "workqueue.c",
         "crc.c",
         "ring_buffer.c",
-        "plog.c"
+        "plog.c",
+        "observer.c"
     ]
     if (use_fntrace) {
         sources += ["callpath.c"]

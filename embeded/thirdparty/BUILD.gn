@@ -10,9 +10,9 @@ group("thirdparty") {
     if (use_libmodbus) {
         deps += [ "//embeded/thirdparty/libmodbus" ]
     }
-    if (use_libzmodem) {
-        deps += [ "//embeded/thirdparty/libzmodem" ]
-    }
+    # if (use_libzmodem) {
+    #     deps += [ "//embeded/thirdparty/libzmodem" ]
+    # }
     if (use_testsuite) {
         deps += [ "//embeded/thirdparty/googletest" ]
     }
