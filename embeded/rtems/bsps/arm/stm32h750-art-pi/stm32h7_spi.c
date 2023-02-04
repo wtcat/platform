@@ -256,6 +256,7 @@ static void __isr stm32h7_spi_isr(void *arg) {
 			stm32h7_spi_read_rxfifo(spi, reg, true);
         goto _end;
     }
+    reg->IFCR |= ier;
     return;
 
 _end:
