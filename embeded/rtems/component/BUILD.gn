@@ -3,7 +3,7 @@ import("//gn/toolchain/rtems/rtems.gni")
 
 component("component") {
     sources = [
-        "timer_ii.c",
+        "timer_list.c",
         "workqueue.c",
         "crc.c",
         "ring_buffer.c",

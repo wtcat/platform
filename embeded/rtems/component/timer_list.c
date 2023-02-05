@@ -1,11 +1,11 @@
 /*
  * CopyRight 2022 wtcat
  */
-#include "base/timer_ii.h"
+#include "base/timer_list.h"
 #include "base/sections.h"
 
 static inline 
-Per_CPU_Control * __fastcode timer_ii_lock(struct timer_ii *timer,
+Per_CPU_Control * __fastcode timer_ii_lock(struct timer_list *timer,
 	ISR_lock_Context *lock_context) {
 	Per_CPU_Control *cpu;
 	_ISR_lock_ISR_disable(lock_context);
@@ -21,14 +21,14 @@ static inline void __fastcode timer_ii_unlock(Per_CPU_Control *cpu,
 }
 
 static inline int __fastcode timer_ii_add_locked(Per_CPU_Control *cpu, 
-	struct timer_ii *timer, uint32_t expires) {
+	struct timer_list *timer, uint32_t expires) {
 	_Watchdog_Insert(&cpu->Watchdog.Header[PER_CPU_WATCHDOG_TICKS],
 		&timer->timer, cpu->Watchdog.ticks + expires);
 	return 0;
 }
 
 static inline int __fastcode timer_ii_remove_locked(Per_CPU_Control *cpu, 
-	struct timer_ii *timer) {
+	struct timer_list *timer) {
 	if (_Watchdog_Is_scheduled(&timer->timer)) {
 		_Watchdog_Remove(&cpu->Watchdog.Header[PER_CPU_WATCHDOG_TICKS], 
 			&timer->timer);
@@ -37,12 +37,12 @@ static inline int __fastcode timer_ii_remove_locked(Per_CPU_Control *cpu,
 	return 0;
 }
 
-void __fastcode timer_ii_init(struct timer_ii *timer, void (*adaptor)(struct timer_ii *)) {
+void __fastcode timer_init(struct timer_list *timer, void (*adaptor)(struct timer_list *)) {
 	_Watchdog_Preinitialize(&timer->timer, _Per_CPU_Get_snapshot());
 	_Watchdog_Initialize(&timer->timer, (Watchdog_Service_routine_entry)adaptor);
 }
 
-int __fastcode timer_ii_add(struct timer_ii *timer, uint32_t expires) {
+int __fastcode timer_add(struct timer_list *timer, uint32_t expires) {
 	ISR_lock_Context lock_context;
 	int ret;
 	Per_CPU_Control *cpu = timer_ii_lock(timer, &lock_context);
@@ -52,7 +52,7 @@ int __fastcode timer_ii_add(struct timer_ii *timer, uint32_t expires) {
 	return ret;
 }
 
-int __fastcode timer_ii_mod(struct timer_ii *timer, uint32_t expires) {
+int __fastcode timer_mod(struct timer_list *timer, uint32_t expires) {
 	ISR_lock_Context lock_context;
 	int ret;
 	Per_CPU_Control *cpu = timer_ii_lock(timer, &lock_context);
@@ -63,7 +63,7 @@ int __fastcode timer_ii_mod(struct timer_ii *timer, uint32_t expires) {
 	return ret;	
 }
 
-int __fastcode timer_ii_remove(struct timer_ii *timer) {
+int __fastcode timer_del(struct timer_list *timer) {
 	ISR_lock_Context lock_context;
 	int ret;
 	Per_CPU_Control *cpu = timer_ii_lock(timer, &lock_context);
@@ -73,7 +73,7 @@ int __fastcode timer_ii_remove(struct timer_ii *timer) {
 	return ret;
 }
 
-bool __fastcode timer_ii_is_pending(struct timer_ii *timer) {
+bool __fastcode timer_is_pending(struct timer_list *timer) {
 	ISR_lock_Context lock_context;
 	bool pending;
 	Per_CPU_Control *cpu = timer_ii_lock(timer, &lock_context);

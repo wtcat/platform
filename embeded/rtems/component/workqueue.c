@@ -100,7 +100,7 @@ static void __fastcode schedule_worker(rtems_task_argument arg) {
     }
 }
 
-static void __fastcode schedule_delayed_timer_cb(struct timer_ii *timer) {
+static void __fastcode schedule_delayed_timer_cb(struct timer_list *timer) {
 	struct delayed_work_struct *work = RTEMS_CONTAINER_OF(timer, 
 		struct delayed_work_struct, timer);
 	schedule_work_to_queue(work->wq, &work->work);
@@ -157,7 +157,7 @@ int __fastcode schedule_delayed_work_to_queue(struct workqueue *wq,
         rtems_chain_append_unprotected(&wq->entries, &work->work.node);
     } else {
         work->wq = wq;
-        ret = timer_ii_mod(&work->timer, ticks);
+        ret = timer_mod(&work->timer, ticks);
         goto _err;
     }
     rtems_interrupt_lock_release(&wq->lock, &lock_context);
@@ -172,7 +172,7 @@ int cancel_queue_delayed_work(struct workqueue *wq,
     struct delayed_work_struct *work, bool wait) {
     _Assert(wq != NULL);
     _Assert(work != NULL);
-    if (timer_ii_remove(&work->timer))
+    if (timer_del(&work->timer))
         return 0;
     return cancel_queue_work(wq, &work->work, wait);
 }
@@ -186,7 +186,7 @@ void work_init(struct work_struct *work,
 void delayed_work_init(struct delayed_work_struct *work,
     void (*handler)(struct work_struct *)) {
     work_init(&work->work, handler);
-    timer_ii_init(&work->timer, schedule_delayed_timer_cb);
+    timer_init(&work->timer, schedule_delayed_timer_cb);
 }
 
 int workqueue_create(struct workqueue *wq, int cpu_index, uint32_t prio, 

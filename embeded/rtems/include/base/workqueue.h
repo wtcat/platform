@@ -7,7 +7,7 @@
 #include <rtems.h>
 #include <rtems/scheduler.h>
 
-#include "base/timer_ii.h"
+#include "base/timer_list.h"
 
 #ifdef __cplusplus
 extern "C"{
@@ -36,7 +36,7 @@ struct work_struct {
 
 struct delayed_work_struct {
     struct work_struct work;
-    struct timer_ii timer;
+    struct timer_list timer;
     struct workqueue *wq;
 };
 
