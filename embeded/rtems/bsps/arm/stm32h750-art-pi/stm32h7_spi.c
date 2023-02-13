@@ -1,6 +1,8 @@
 /*
  * Copyright 2022 wtcat
  */
+#define pr_fmt(fmt) "<spi>: "fmt
+#define CONFIG_LOGLEVEL  LOGLEVEL_DEBUG//LOGLEVEL_INFO
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,6 +23,8 @@
 #include "drivers/spi.h"
 #include "drivers/gpio.h"
 #include "drivers/ofw_platform_bus.h"
+
+#include "base/log.h"
 
 #define SPI_DEBUG
 
@@ -45,16 +49,17 @@ struct stm32h7_spi {
     int error;
     int cs_num;
     bool cur_usedma;
+
+    size_t (*wr_dr)(SPI_TypeDef *reg, const void *buffer);
+    size_t (*rd_dr)(SPI_TypeDef *reg, void *buffer);
 };
+
+/* STM32H7_SPI_CR2 bit fields */
+#define STM32H7_SPI_CR2_TSIZE_SHIFT	0
+#define STM32H7_SPI_CR2_TSIZE		GENMASK(15, 0)
 
 #define STM32H7_FIFO_SIZE 16U
 #define DIV_ROUND_UP(x, y) howmany(x, y)
-
-#ifdef SPI_DEBUG
-#define devdbg(fmt, ...) printk(fmt, ##__VA_ARGS__)
-#else
-#define devdbg(...)
-#endif
 
 static const uint32_t div_table[] = {
     LL_SPI_BAUDRATEPRESCALER_DIV2,
@@ -67,6 +72,31 @@ static const uint32_t div_table[] = {
     LL_SPI_BAUDRATEPRESCALER_DIV128,
     LL_SPI_BAUDRATEPRESCALER_DIV256
 };
+
+static inline size_t stm32h7_spi_wr32(SPI_TypeDef *reg, const void *buffer) {
+    reg->TXDR = *(uint32_t *)buffer;
+    return sizeof(uint32_t);
+} 
+static inline size_t stm32h7_spi_wr16(SPI_TypeDef *reg, const void *buffer) {
+    reg->TXDR = *(uint16_t *)buffer;
+    return sizeof(uint16_t);
+}
+static inline size_t stm32h7_spi_wr8(SPI_TypeDef *reg, const void *buffer) {
+    reg->TXDR = *(uint8_t *)buffer;
+    return sizeof(uint8_t);
+}
+static inline size_t stm32h7_spi_rd32(SPI_TypeDef *reg, void *buffer) {
+    *(uint32_t *)buffer = (uint32_t)reg->RXDR;
+    return sizeof(uint32_t);
+}
+static inline size_t stm32h7_spi_rd16(SPI_TypeDef *reg, void *buffer) {
+    *(uint16_t *)buffer = (uint16_t)reg->RXDR;
+    return sizeof(uint16_t);
+}
+static inline size_t stm32h7_spi_rd8(SPI_TypeDef *reg, void *buffer) {
+    *(uint8_t *)buffer = (uint8_t)reg->RXDR;
+    return sizeof(uint8_t);
+} 
 
 static int stm32h7_spi_prepare_mbr(struct stm32h7_spi *spi, uint32_t speed_hz,
     uint32_t min_div, uint32_t max_div) {
@@ -83,7 +113,7 @@ static int stm32h7_spi_prepare_mbr(struct stm32h7_spi *spi, uint32_t speed_hz,
 	 * However, we need to ensure the following calculations.
 	 */
 	if ((div < min_div) || (div > max_div)) {
-        devdbg("%s: invalid spi bus clock-rate\n", __func__);
+        pr_dbg("%s: invalid spi bus clock-rate\n", __func__);
 		return div_table[2];
     }
 
@@ -93,7 +123,7 @@ static int stm32h7_spi_prepare_mbr(struct stm32h7_spi *spi, uint32_t speed_hz,
 	else
 		mbrdiv = fls(div) - 1;
 	spi->cur_speed = spi->bus.max_speed_hz / (1 << mbrdiv);
-    devdbg("%s: current clock-rate is %d div(%d)\n", __func__, 
+    pr_dbg("%s: current clock-rate is %d div(%d)\n", __func__, 
         spi->cur_speed, mbrdiv);
 	return div_table[mbrdiv];
 }
@@ -123,7 +153,7 @@ static int stm32h7_spi_get_clksrc(const char *devname, uint32_t *clksrc) {
 
 static inline void stm32h7_spi_set_cs(struct stm32h7_spi *spi, int cs) {
     if (!(spi->cs_bitmap & BIT(cs))) {
-        devdbg("%s: spi select chip (cs = %d)\n", __func__, cs);
+        pr_dbg("%s: spi select chip (cs = %d)\n", __func__, cs);
         spi->cs_bitmap |= BIT(cs);
         gpiod_pin_assert(&spi->cs_gpios[cs]);
     }
@@ -131,7 +161,7 @@ static inline void stm32h7_spi_set_cs(struct stm32h7_spi *spi, int cs) {
 
 static inline void stm32h7_spi_clr_cs(struct stm32h7_spi *spi, int cs) {
     if (spi->cs_bitmap & BIT(cs)) {
-        devdbg("%s: spi deselect chip (cs = %d)\n", __func__, cs);
+        pr_dbg("%s: spi deselect chip (cs = %d)\n", __func__, cs);
         spi->cs_bitmap &= ~BIT(cs);
         gpiod_pin_deassert(&spi->cs_gpios[cs]);
     }
@@ -142,6 +172,7 @@ static void stm32h7_spi_clear_all_cs(struct stm32h7_spi *spi) {
     while (bitmap) {
         int cs = __ffs(bitmap);
         bitmap &= ~BIT(cs);
+        pr_dbg("%s: spi deselect chip (cs = %d)\n", __func__, cs);
         gpiod_pin_deassert(&spi->cs_gpios[cs]);
     }
 }
@@ -157,53 +188,25 @@ static void __fastcode stm32h7_spi_write_txfifo(struct stm32h7_spi *spi,
     SPI_TypeDef *reg) {
 	while (spi->tx_len > 0 && (reg->SR & SPI_SR_TXP)) {
 		uint32_t offs = spi->cur_xferlen - spi->tx_len;
-
-		if (spi->tx_len >= sizeof(uint32_t)) {
-            reg->TXDR = *(const uint32_t *)(spi->tx_buf + offs);
-			spi->tx_len -= sizeof(uint32_t);
-		} else if (spi->tx_len >= sizeof(uint16_t)) {
-            reg->TXDR = *(const uint16_t *)(spi->tx_buf + offs);
-			spi->tx_len -= sizeof(uint16_t);
-		} else {
-            reg->TXDR = *(const uint8_t *)(spi->tx_buf + offs);
-			spi->tx_len -= sizeof(uint8_t);
-		}
-	}
-	devdbg("%s: %d bytes left\n", __func__, spi->tx_len);
+        spi->tx_len -= spi->wr_dr(spi->reg, spi->tx_buf + offs);
+    }
+	pr_dbg("%s: %d bytes left\n", __func__, spi->tx_len);
 }
 
 static void __fastcode stm32h7_spi_read_rxfifo(struct stm32h7_spi *spi, 
     SPI_TypeDef *reg, bool flush) {
     uint32_t sr = reg->SR;
     uint32_t rxplvl = (sr & SPI_SR_RXPLVL_Msk) >> SPI_SR_RXPLVL_Pos;
-    int bpw = spi->bus.bits_per_word;
     
 	while (spi->rx_len > 0 && 
         ((sr & SPI_SR_RXP) || (flush && ((sr & SPI_SR_RXWNE) || rxplvl > 0)))) {
 		uint32_t offs = spi->cur_xferlen - spi->rx_len;
-
-		if ((spi->rx_len >= sizeof(uint32_t)) ||
-            (flush && (sr & SPI_SR_RXWNE))) {
-			uint32_t *rx_buf32 = (uint32_t *)(spi->rx_buf + offs);
-			*rx_buf32 = reg->RXDR;
-			spi->rx_len -= sizeof(uint32_t);
-
-		} else if (spi->rx_len >= sizeof(uint16_t) ||
-            (flush && (rxplvl >= 2 || bpw > 8))) {
-			uint16_t *rx_buf16 = (uint16_t *)(spi->rx_buf + offs);
-			*rx_buf16 = (uint16_t)reg->RXDR;
-			spi->rx_len -= sizeof(uint16_t);
-
-		} else {
-			uint8_t *rx_buf8 = (uint8_t *)(spi->rx_buf + offs);
-			*rx_buf8 = (uint8_t)reg->RXDR;
-			spi->rx_len -= sizeof(uint8_t);
-		}
+        spi->rx_len -= spi->rd_dr(spi->reg, spi->rx_buf + offs);
         sr = reg->SR;
         rxplvl = (sr & SPI_SR_RXPLVL_Msk) >> SPI_SR_RXPLVL_Pos;
 	}
 
-	devdbg("%s: %d bytes left\n", __func__, spi->rx_len);
+	pr_dbg("%s: %d bytes left\n", __func__, spi->rx_len);
 }
 
 static void __fastcode stm32h7_spi_disable(struct stm32h7_spi *spi, SPI_TypeDef *reg) {
@@ -217,6 +220,7 @@ static void __fastcode stm32h7_spi_disable(struct stm32h7_spi *spi, SPI_TypeDef 
             dma_chan_stop(spi->rx);
     }
     reg->CR1 &= ~SPI_CR1_SPE;
+    RTEMS_COMPILER_MEMORY_BARRIER();
     reg->CFG1 &= ~(SPI_CFG1_RXDMAEN | SPI_CFG1_TXDMAEN);
 
     /* Disable interrupts and clear status flags */
@@ -237,21 +241,21 @@ static void __isr stm32h7_spi_isr(void *arg) {
     sr &= ier;
     /* SPI bus error */
     if (sr & (SPI_SR_MODF | SPI_SR_OVR | SPI_SR_TIFRE | SPI_SR_UDR)) {
-        printk("%s: SPI bus error (%d)\n", __func__, sr);
+        pr_warn("%s: SPI bus error (%d)\n", __func__, sr);
         goto _end;
     }
     if (sr & SPI_SR_RXP) {
-        devdbg("%s: SPI_SR_RXP\n", __func__);
+        pr_dbg("%s: SPI_SR_RXP\n", __func__);
 		if (!spi->cur_usedma && (spi->rx_buf && spi->rx_len > 0))
 			stm32h7_spi_read_rxfifo(spi, reg, false);
     }
     if (sr & SPI_SR_TXP) {
-        devdbg("%s: SPI_SR_TXP: (tx_len: %d)\n", __func__, spi->tx_len);
+        pr_dbg("%s: SPI_SR_TXP: (tx_len: %d) TSIZE(%d)\n", __func__, spi->tx_len, reg->CR2 & 0xFFFF);
 		if (!spi->cur_usedma && (spi->tx_buf && spi->tx_len > 0))
 			stm32h7_spi_write_txfifo(spi, reg);
     }
     if (sr & SPI_SR_EOT) {
-        devdbg("%s: SPI_SR_EOT: (rx_len: %d)\n", __func__, spi->rx_len);
+        pr_dbg("%s: SPI_SR_EOT: (rx_len: %d)\n", __func__, spi->rx_len);
 		if (!spi->cur_usedma && (spi->rx_buf && spi->rx_len > 0))
 			stm32h7_spi_read_rxfifo(spi, reg, true);
         goto _end;
@@ -262,6 +266,14 @@ static void __isr stm32h7_spi_isr(void *arg) {
 _end:
     stm32h7_spi_disable(spi, reg);
     rtems_event_transient_send(spi->thread);
+}
+
+static void dma_complete_cb(struct drvmgr_dev *dev, void *user_data, 
+	uint32_t channel, int status) {
+    (void) dev;
+    (void) user_data;
+    (void) channel;
+    pr_info("> spi dma_complete_cb (%d)<\n", status);
 }
 
 static int stm32h7_spi_dma_configure(struct stm32h7_spi *spi, int bits_per_word) {
@@ -277,7 +289,7 @@ static int stm32h7_spi_dma_configure(struct stm32h7_spi *spi, int bits_per_word)
         config->source_data_size = bits_per_word >> 3;
         config->source_burst_length = 1;
         config->channel_priority = 0;
-        config->dma_callback = NULL;
+        config->dma_callback = dma_complete_cb;
         config->user_data = NULL;
         config->head_block = &txblk;
         config->block_count = 1;
@@ -290,7 +302,7 @@ static int stm32h7_spi_dma_configure(struct stm32h7_spi *spi, int bits_per_word)
         txblk.fifo_mode_control = 1;
         ret = dma_configure(tx->dev, tx->channel, &tx->config);
         if (ret) {
-            printk("Configure UART(%s) DMA-TX failed: %d\n", spi->dev->name, ret);
+            pr_err("Configure UART(%s) DMA-TX failed: %d\n", spi->dev->name, ret);
             goto _free_chan;
         }
     }
@@ -319,7 +331,7 @@ static int stm32h7_spi_dma_configure(struct stm32h7_spi *spi, int bits_per_word)
         rxblk.fifo_mode_control = 1;
         ret = dma_configure(rx->dev, rx->channel, &rx->config);
         if (ret) {
-            printk("Configure UART(%s) DMA-RX failed: %d\n", spi->dev->name, ret);
+            pr_err("Configure UART(%s) DMA-RX failed: %d\n", spi->dev->name, ret);
             goto _free_chan;
         }
     }
@@ -357,7 +369,7 @@ static void stm32h7_spi_fthlvsize_update(SPI_TypeDef *reg, int cur_bpw,
     LL_SPI_SetFIFOThreshold(reg, fthlv - 1);
     LL_SPI_SetTransferSize(reg, nb_words);
 
-    devdbg("%s: transfer of %d bytes (%d data frames) and fifo threshold(%u)\n",
+    pr_dbg("%s: transfer of %d bytes (%d data frames) and fifo threshold(%u)\n",
         __func__, len, nb_words, fthlv);
 }
 
@@ -395,21 +407,27 @@ static int stm32h7_spi_configure(struct stm32h7_spi *spi,
         ll_struct.ClockPhase = LL_SPI_PHASE_2EDGE;
         break;
     default:
-        printk("%s: Invalid clock phase\n", __func__);
+        pr_err("%s: Invalid clock phase\n", __func__);
         return -EINVAL;
     }
     switch (wordbits) {
     case 8:
         ll_struct.DataWidth = LL_SPI_DATAWIDTH_8BIT;
+        spi->rd_dr = stm32h7_spi_rd8;
+        spi->wr_dr = stm32h7_spi_wr8;
         break;
     case 16:
         ll_struct.DataWidth = LL_SPI_DATAWIDTH_16BIT;
+        spi->rd_dr = stm32h7_spi_rd16;
+        spi->wr_dr = stm32h7_spi_wr16;
         break;
     case 32:
         ll_struct.DataWidth = LL_SPI_DATAWIDTH_32BIT;
+        spi->rd_dr = stm32h7_spi_rd32;
+        spi->wr_dr = stm32h7_spi_wr32;
         break;
     default:
-        printk("%s: Invalid databit width (%d)\n", __func__, wordbits);
+        pr_err("%s: Invalid databit width (%d)\n", __func__, wordbits);
         return -EINVAL;
     }
 
@@ -420,7 +438,8 @@ static int stm32h7_spi_configure(struct stm32h7_spi *spi,
 
     ll_struct.BaudRate = stm32h7_spi_prepare_mbr(spi, speed_hz, 2, 256);
     LL_SPI_Init(spi->reg, &ll_struct);
-    stm32h7_spi_dma_configure(spi, wordbits);
+    if (spi->cur_usedma)
+        stm32h7_spi_dma_configure(spi, wordbits);
     return 0;
 }
 
@@ -456,11 +475,12 @@ static int stm32h7_spi_transmit_one_dma(struct stm32h7_spi *spi) {
     SPI_TypeDef *reg = spi->reg;
     int ret = -EINVAL;
 
+    reg->IER = 0;
     if (spi->rx_buf && spi->rx) {
         ret = dma_chan_reload(spi->rx, (dma_addr_t)&reg->RXDR, 
             (dma_addr_t)spi->rx_buf, spi->cur_xferlen);
         if (ret) {
-            printk("%s: start rx-dma failed(%d)\n", __func__, ret);
+            pr_err("%s: start rx-dma failed(%d)\n", __func__, ret);
             goto _irq_xmit;
         }
         LL_SPI_EnableDMAReq_RX(reg);
@@ -469,7 +489,7 @@ static int stm32h7_spi_transmit_one_dma(struct stm32h7_spi *spi) {
        ret = dma_chan_reload(spi->rx, (dma_addr_t)spi->tx_buf, 
             (dma_addr_t)&reg->TXDR, spi->cur_xferlen);
         if (ret) {
-            printk("%s: start rx-dma failed(%d)\n", __func__, ret);
+            pr_err("%s: start rx-dma failed(%d)\n", __func__, ret);
             goto _irq_xmit;
         }
         LL_SPI_EnableDMAReq_TX(reg);
@@ -478,7 +498,7 @@ static int stm32h7_spi_transmit_one_dma(struct stm32h7_spi *spi) {
         goto _irq_xmit;
 
     /* Enable spi error interrupt */
-    reg->IER |= SPI_IER_OVRIE | SPI_IT_UDR | SPI_IER_TIFREIE | SPI_IER_MODFIE;
+    reg->IER |= SPI_IER_EOTIE | SPI_IER_TXTFIE | SPI_IER_OVRIE | SPI_IER_MODFIE;
 
     /* Enable SPI */
     LL_SPI_Enable(reg);
@@ -486,7 +506,7 @@ static int stm32h7_spi_transmit_one_dma(struct stm32h7_spi *spi) {
     return ret;
 
 _irq_xmit:
-    devdbg("%s: DMA issue: fall back to irq transfer\n", __func__);
+    pr_dbg("%s: DMA issue: fall back to irq transfer\n", __func__);
     reg->CFG1 = ~(SPI_CFG1_RXDMAEN | SPI_CFG1_TXDMAEN);
     spi->cur_usedma = false;
     return stm32h7_spi_transmit_one_irq(spi);
@@ -494,6 +514,8 @@ _irq_xmit:
 
 static int stm32h7_spi_transmit_one(struct stm32h7_spi *spi, spi_bus *bus, 
     const spi_ioc_transfer *msg) {
+    rtems_status_code sc;
+    rtems_interval timeout;
     int err;
 
     /* Copy paramters */
@@ -511,7 +533,7 @@ static int stm32h7_spi_transmit_one(struct stm32h7_spi *spi, spi_bus *bus,
         err = stm32h7_spi_configure(spi, msg->speed_hz, msg->mode, 
             msg->bits_per_word);
         if (err) {
-            printk("%s: configure %s failed(%d)\n", __func__, spi->dev->name, err);
+            pr_err("%s: configure %s failed(%d)\n", __func__, spi->dev->name, err);
             return err;
         }
         bus->speed_hz = msg->speed_hz;
@@ -519,10 +541,11 @@ static int stm32h7_spi_transmit_one(struct stm32h7_spi *spi, spi_bus *bus,
         bus->bits_per_word = msg->bits_per_word;
     }
 
+    timeout = (msg->len * 8000) / spi->cur_speed + 1000;
     stm32h7_spi_fthlvsize_update(spi->reg, bus->bits_per_word, 
         spi->cur_xferlen);
 
-	devdbg("%s: dma %s\n", __func__, (spi->cur_usedma) ? "enabled" : "disabled");
+	pr_dbg("%s: dma %s\n", __func__, (spi->cur_usedma) ? "enabled" : "disabled");
     stm32h7_spi_set_cs(spi, msg->cs);
     if (spi->cur_usedma)
         err = stm32h7_spi_transmit_one_dma(spi);
@@ -532,8 +555,12 @@ static int stm32h7_spi_transmit_one(struct stm32h7_spi *spi, spi_bus *bus,
         goto _out;
     
     /* Wait transfer complete */
-    rtems_event_transient_receive(RTEMS_WAIT|RTEMS_EVENT_ALL, 
-    RTEMS_NO_TIMEOUT);
+    sc = rtems_event_transient_receive(RTEMS_WAIT|RTEMS_EVENT_ALL, 
+        RTEMS_MILLISECONDS_TO_TICKS(timeout));
+    if (sc != RTEMS_SUCCESSFUL) {
+        pr_err("spi transfer timeout\n");
+    }
+    
 _out:
     if (msg->cs_change)
         stm32h7_spi_clr_cs(spi, msg->cs);
@@ -567,7 +594,6 @@ static int stm32h7_spi_transfer(spi_bus *bus, const spi_ioc_transfer *msgs,
         curr_msg++;
         n--;
     };
-    stm32h7_spi_clear_all_cs(spi);
     return err;
 }
 
@@ -623,7 +649,7 @@ static int stm32_spi_preprobe(struct drvmgr_dev *dev) {
     spi->dev = dev;
     devp->devops = &spi->bus;
     dev->priv = spi;
-    devdbg("%s: %s reg<0x%x> irq<%d>\n", __func__, dev->name, reg.start, irq);
+    pr_dbg("%s: %s reg<0x%x> irq<%d>\n", __func__, dev->name, reg.start, irq);
     return ofw_platform_bus_device_register(dev, &stm32h7_spi_bus, 
     DRVMGR_BUS_TYPE_SPI);
 }
@@ -635,13 +661,13 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
     int ret = -EINVAL;
 
     if (stm32h7_spi_get_clksrc(dev->name, &clksrc)) {
-        printk("%s: Invalid device name (%s)\n", __func__, dev->name);
+        pr_err("%s: Invalid device name (%s)\n", __func__, dev->name);
         return -EINVAL;
     }
     //TODO: Allocate muli-gpios
     spi->cs_gpios = ofw_cs_gpios_request(devp->np, 0, &spi->cs_num);
     if (!spi->cs_gpios) {
-        printk("%s: reqeust gpio_cs failed!\n", __func__);
+        pr_err("%s: reqeust gpio_cs failed!\n", __func__);
         return -ENOSTR;
     }
     _Assert(spi->cs_num < 32);
@@ -649,14 +675,14 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
     spi->clk = ofw_clock_request(devp->np, NULL, (pcell_t *)&spi->clkid, 
         sizeof(spi->clkid));
     if (!spi->clk) {
-        printk("%s: reqeust clock failed!\n", __func__);
+        pr_err("%s: reqeust clock failed!\n", __func__);
         ret = -ENODEV;
         goto _free_cs;
     }
     ret = drvmgr_interrupt_register(dev, IRQF_HARD(spi->irq), dev->name, 
 		stm32h7_spi_isr, spi);
     if (ret) {
-        printk("%s register IRQ(%d) failed\n", dev->name, spi->irq);
+        pr_err("%s register IRQ(%d) failed\n", dev->name, spi->irq);
         goto _free;
     }
 
@@ -668,18 +694,18 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
     spi->bus.bits_per_word = 8;
     spi->bus.mode = SPI_MODE_0;
     spi->bus.max_speed_hz = LL_RCC_GetSPIClockFreq(clksrc) / 2;
-    spi->bus.speed_hz = 1000000;
+    spi->bus.speed_hz = 8000000;
     spi->bus.cs = UINT8_MAX;
 	ret = spi_bus_register(&spi->bus, dev->name);
 	if (ret) {
 		drvmgr_interrupt_unregister(dev, IRQF_HARD(spi->irq), 
             stm32h7_spi_isr, spi);
-        printk("%s: install interrupt failed!\n", __func__);
+        pr_err("%s: install interrupt failed!\n", __func__);
         goto _free_cs;
     }
     /* Enable clock */
     clk_enable(spi->clk, &spi->clkid);
-    devdbg("%s: spi bus max-frequency (%u)\n", __func__, spi->bus.max_speed_hz);
+    pr_dbg("%s: spi bus max-frequency (%u)\n", __func__, spi->bus.max_speed_hz);
 	return 0;
 
 _free_cs:
@@ -733,3 +759,103 @@ OFW_PLATFORM_DRIVER(stm32h7_spi) = {
 	},
     .ids = id_table
 };
+
+//TODO: just only for debug
+#include <unistd.h>
+#include <fcntl.h>
+#include "shell/shell_utils.h"
+
+static int spi_writeread(const void *tx_buf, 
+    size_t tx_len, void *rx_buf, size_t rx_len) {
+    struct drvmgr_dev *master;
+    spi_ioc_transfer msgs[] = {
+        {
+            .len = (uint16_t)tx_len,
+            .tx_buf = tx_buf,
+            .rx_buf = NULL,
+            .cs_change = false,
+            .cs = 0,
+            .bits_per_word = 8,
+            .mode = SPI_MODE_0,
+            .speed_hz = 4000000,
+            .delay_usecs = 0
+        },{
+            .len = (uint16_t)rx_len,
+            .tx_buf = NULL,
+            .rx_buf = rx_buf,
+            .cs_change = true,
+            .cs = 0,
+            .bits_per_word = 8,
+            .mode = SPI_MODE_0,
+            .speed_hz = 4000000,
+            .delay_usecs = 0
+        }
+    };
+    master = drvmgr_dev_by_name("/dev/spi1");
+    if (!master)
+        return -ENODEV;
+
+    return spi_master_transfer(master, msgs, 2);
+}
+
+static int shell_cmd_flashid(int argc, char **argv) {
+    (void) argv;
+    if (argc > 1)
+        return -EINVAL;
+    
+    uint8_t cmd[] = {0x90, 0, 0, 0};
+    uint32_t id = 0;
+
+    if (spi_writeread(cmd, sizeof(cmd), &id, 2) > 0) 
+        printf("<flash ID>: 0x%x\n", id);
+    
+    return 0;
+}
+
+static int shell_cmd_spiwrite(int argc, char **argv) {
+    struct drvmgr_dev *master;
+    char *tx_buf;
+    size_t tx_len;
+
+    if (argc < 2) 
+        return -EINVAL;
+
+    master = drvmgr_dev_by_name("/dev/spi1");
+    if (!master)
+        return -ENODEV;
+    tx_buf = argv[1];
+    tx_len = strlen(tx_buf);
+    if (!tx_len) {
+        npr_err(ulog, "(%s)Invalid length\n", tx_buf);
+        return -EINVAL;
+    }
+    spi_ioc_transfer msgs[] = {
+        {
+            .len = (uint16_t)tx_len,
+            .tx_buf = tx_buf,
+            .rx_buf = NULL,
+            .cs_change = true,
+            .cs = 0,
+            .bits_per_word = 8,
+            .mode = SPI_MODE_0,
+            .speed_hz = 100000,
+            .delay_usecs = 0
+        }
+    };
+    return spi_master_transfer(master, msgs, 1);
+}
+
+SHELL_CMDS_DEFINE(spidev_cmds,
+	{
+		.name = "spiwr",
+		.usage = " SPI bus device test",
+		.topic = "misc",
+		.command = shell_cmd_spiwrite
+	},
+    {
+		.name = "flashid",
+		.usage = " Read flash id",
+		.topic = "misc",
+		.command = shell_cmd_flashid
+    }
+);
