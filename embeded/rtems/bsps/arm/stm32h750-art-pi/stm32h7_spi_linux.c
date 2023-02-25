@@ -251,7 +251,7 @@ struct stm32_spi {
 	SPI_TypeDef *base;
     rtems_id thread;
 	uint32_t clk_rate;
-	spinlock_t lock; /* prevent I/O concurrent access */
+	char lock; /* prevent I/O concurrent access */
 	unsigned int fifo_size;
     struct drvmgr_dev *clk;
     int clkid;
@@ -278,6 +278,9 @@ struct stm32_spi {
 #define MTX_LOCK(_l) 
 #define MTX_UNLOCK(_l)
 #define MTX_INIT(_L)
+
+#define spin_lock_irqsave(_lock, _flag) (void)(_flag)
+#define spin_unlock_irqrestore(_lock, _flag) (void)(_flag)
 
 #define dev_dbg(dev, fmt, ...)  pr_dbg(fmt, ##__VA_ARGS__)
 #define dev_info(dev, fmt, ...) pr_info(fmt, ##__VA_ARGS__)
@@ -461,12 +464,12 @@ static void stm32h7_spi_write_txfifo(struct stm32_spi *spi)
 			STM32H7_SPI_SR_TXP)) {
 		uint32_t offs = spi->cur_xferlen - spi->tx_len;
 
-		if (spi->tx_len >= sizeof(uint32_t)) {
+		if (spi->tx_len >= (int)sizeof(uint32_t)) {
 			const uint32_t *tx_buf32 = (const uint32_t *)(spi->tx_buf + offs);
 
 			writel_relaxed(*tx_buf32, spi->base + STM32H7_SPI_TXDR);
 			spi->tx_len -= sizeof(uint32_t);
-		} else if (spi->tx_len >= sizeof(uint16_t)) {
+		} else if (spi->tx_len >= (int)sizeof(uint16_t)) {
 			const uint16_t *tx_buf16 = (const uint16_t *)(spi->tx_buf + offs);
 
 			writew_relaxed(*tx_buf16, spi->base + STM32H7_SPI_TXDR);
@@ -501,13 +504,13 @@ static void stm32h7_spi_read_rxfifo(struct stm32_spi *spi, bool flush)
 		(flush && ((sr & STM32H7_SPI_SR_RXWNE) || (rxplvl > 0))))) {
 		uint32_t offs = spi->cur_xferlen - spi->rx_len;
 
-		if ((spi->rx_len >= sizeof(uint32_t)) ||
+		if ((spi->rx_len >= (int)sizeof(uint32_t)) ||
 		    (flush && (sr & STM32H7_SPI_SR_RXWNE))) {
 			uint32_t *rx_buf32 = (uint32_t *)(spi->rx_buf + offs);
 
 			*rx_buf32 = readl_relaxed(spi->base + STM32H7_SPI_RXDR);
 			spi->rx_len -= sizeof(uint32_t);
-		} else if ((spi->rx_len >= sizeof(uint16_t)) ||
+		} else if ((spi->rx_len >= (int)sizeof(uint16_t)) ||
 			   (flush && (rxplvl >= 2 || spi->cur_bpw > 8))) {
 			uint16_t *rx_buf16 = (uint16_t *)(spi->rx_buf + offs);
 
