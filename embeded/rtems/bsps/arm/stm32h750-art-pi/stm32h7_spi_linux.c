@@ -1,6 +1,7 @@
 /*
  * Copyright 2022 wtcat
  */
+#include "rtems/bsps/arm/include/io.h"
 #define pr_fmt(fmt) "<spi>: "fmt
 #define CONFIG_LOGLEVEL  LOGLEVEL_DEBUG//LOGLEVEL_INFO
 #include <stdint.h>
@@ -10,6 +11,7 @@
 
 #include <rtems.h>
 #include <rtems/malloc.h>
+#include <rtems/counter.h>
 
 #include "stm32/stm32_com.h"
 #include "stm32h7xx_ll_spi.h"
@@ -279,12 +281,29 @@ struct stm32_spi {
 #define MTX_UNLOCK(_l)
 #define MTX_INIT(_L)
 
+#define	DIV_ROUND_UP(x, n)	howmany(x, n)
 #define spin_lock_irqsave(_lock, _flag) (void)(_flag)
 #define spin_unlock_irqrestore(_lock, _flag) (void)(_flag)
 
 #define dev_dbg(dev, fmt, ...)  pr_dbg(fmt, ##__VA_ARGS__)
 #define dev_info(dev, fmt, ...) pr_info(fmt, ##__VA_ARGS__)
 #define dev_err(dev, fmt, ...)  pr_err(fmt, ##__VA_ARGS__)
+
+
+#define readl_relaxed_poll_timeout_atomic(reg_base, var, cond, delay_us, max_time) ({\
+	int __remain = max_time; \
+	int __ret; \
+	(var) = readl_relaxed(reg_base); \
+	while (cond) {\
+		if (__remain <= 0) \
+			break; \
+		rtems_counter_delay_nanoseconds(delay_us * 1000); \
+		__remain -= delay_us; \
+		(var) = readl_relaxed(reg_base); \
+	} \
+	__ret = __remain > 0; \
+	__ret; })
+	
 
 
 static const struct stm32_spi_regspec stm32h7_spi_regspec = {
