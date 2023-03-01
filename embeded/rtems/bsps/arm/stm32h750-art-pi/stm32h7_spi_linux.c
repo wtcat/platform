@@ -1,7 +1,8 @@
 /*
  * Copyright 2022 wtcat
  */
-#include "rtems/bsps/arm/include/io.h"
+#include "rtems/rtems/event.h"
+#include "rtems/score/basedefs.h"
 #define pr_fmt(fmt) "<spi>: "fmt
 #define CONFIG_LOGLEVEL  LOGLEVEL_DEBUG//LOGLEVEL_INFO
 #include <stdint.h>
@@ -12,6 +13,7 @@
 #include <rtems.h>
 #include <rtems/malloc.h>
 #include <rtems/counter.h>
+#include <dev/spi/spi.h>
 
 #include "stm32/stm32_com.h"
 #include "stm32h7xx_ll_spi.h"
@@ -287,6 +289,7 @@ struct stm32_spi {
 
 #define dev_dbg(dev, fmt, ...)  pr_dbg(fmt, ##__VA_ARGS__)
 #define dev_info(dev, fmt, ...) pr_info(fmt, ##__VA_ARGS__)
+#define dev_warn(dev, fmt, ...) pr_warn(fmt, ##__VA_ARGS__)
 #define dev_err(dev, fmt, ...)  pr_err(fmt, ##__VA_ARGS__)
 
 
@@ -611,9 +614,9 @@ static void stm32h7_spi_disable(struct stm32_spi *spi)
 		stm32h7_spi_read_rxfifo(spi, true);
 
 	if (spi->cur_usedma && spi->dma_tx)
-		dmaengine_terminate_all(spi->dma_tx);
+		dma_stop(spi->dma_tx);
 	if (spi->cur_usedma && spi->dma_rx)
-		dmaengine_terminate_all(spi->dma_rx);
+		dma_stop(spi->dma_rx);
 
 	stm32_spi_clr_bits(spi, STM32H7_SPI_CR1, STM32H7_SPI_CR1_SPE);
 
@@ -636,12 +639,10 @@ static void stm32h7_spi_disable(struct stm32_spi *spi)
  * If driver has fifo and the current transfer size is greater than fifo size,
  * use DMA. Otherwise use DMA for transfer longer than defined DMA min bytes.
  */
-static bool stm32_spi_can_dma(struct spi_master *master,
-			      struct spi_device *spi_dev,
-			      struct spi_transfer *transfer)
+static bool stm32_spi_can_dma(struct stm32_spi *spi,
+			      struct spi_ioc_transfer *transfer)
 {
 	unsigned int dma_size;
-	struct stm32_spi *spi = spi_master_get_devdata(master);
 
 	if (spi->cfg->has_fifo)
 		dma_size = spi->fifo_size;
@@ -661,8 +662,7 @@ static bool stm32_spi_can_dma(struct spi_master *master,
  */
 static void stm32h7_spi_irq_thread(void *dev_id)
 {
-	struct spi_master *master = dev_id;
-	struct stm32_spi *spi = spi_master_get_devdata(master);
+	struct stm32_spi *spi = (struct stm32_spi *)dev_id;
 	uint32_t sr, ier, mask;
 	unsigned long flags;
 	bool end = false;
@@ -687,10 +687,12 @@ static void stm32h7_spi_irq_thread(void *dev_id)
 		dev_dbg(spi->dev, "spurious IT (sr=0x%08x, ier=0x%08x)\n",
 			sr, ier);
 		spin_unlock_irqrestore(&spi->lock, flags);
-		return IRQ_NONE;
+		return;
 	}
 
 	if (sr & STM32H7_SPI_SR_SUSP) {
+		dev_err(spi->dev, "spi communication is suspended\n");
+#if 0
 		static DEFINE_RATELIMIT_STATE(rs,
 					      DEFAULT_RATELIMIT_INTERVAL * 10,
 					      1);
@@ -704,6 +706,7 @@ static void stm32h7_spi_irq_thread(void *dev_id)
 		 */
 		if (spi->cur_usedma)
 			end = true;
+#endif
 	}
 
 	if (sr & STM32H7_SPI_SR_MODF) {
@@ -743,7 +746,7 @@ static void stm32h7_spi_irq_thread(void *dev_id)
 
 	if (end) {
 		stm32h7_spi_disable(spi);
-		spi_finalize_current_transfer(master);
+		rtems_event_transient_send(spi->thread);
 	}
 
 }
@@ -753,19 +756,19 @@ static void stm32h7_spi_irq_thread(void *dev_id)
  * @master: controller master interface
  * @msg: pointer to spi message
  */
-static int stm32_spi_prepare_msg(struct spi_master *master,
-				 struct spi_message *msg)
+static int stm32_spi_prepare_msg(struct spi_bus *spi_dev,
+				 struct spi_ioc_transfer *msg)
 {
-	struct stm32_spi *spi = spi_master_get_devdata(master);
-	struct spi_device *spi_dev = msg->spi;
-	struct device_node *np = spi_dev->dev.of_node;
+	struct stm32_spi *spi = RTEMS_CONTAINER_OF(spi_dev, struct stm32_spi, bus);
+	// struct device_node *np = spi_dev->dev.of_node;
 	unsigned long flags;
 	uint32_t clrb = 0, setb = 0;
+	(void)msg;
 
 	/* SPI slave device may need time between data frames */
 	spi->cur_midi = 0;
-	if (np && !of_property_read_u32(np, "st,spi-midi-ns", &spi->cur_midi))
-		dev_dbg(spi->dev, "%dns inter-data idleness\n", spi->cur_midi);
+	// if (np && !of_property_read_u32(np, "st,spi-midi-ns", &spi->cur_midi))
+	// 	dev_dbg(spi->dev, "%dns inter-data idleness\n", spi->cur_midi);
 
 	if (spi_dev->mode & SPI_CPOL)
 		setb |= spi->cfg->regs->cpol.mask;
@@ -834,6 +837,93 @@ static void stm32h7_spi_dma_cb(void *data)
  * @dma_conf: pointer to the dma_slave_config structure
  * @dir: direction of the dma transfer
  */
+static int stm32h7_spi_dma_configure(struct stm32_spi *spi, void *buf, 
+	size_t len, bool tx) {
+	uint32_t maxburst;
+    int ret;
+
+	if (spi->cfg->has_fifo) {
+		/* Valid for DMA Half or Full Fifo threshold */
+		if (spi->cur_fthlv == 2)
+			maxburst = 1;
+		else
+			maxburst = spi->cur_fthlv;
+	} else {
+		maxburst = 1;
+	}
+
+    if (spi->dma_tx) {
+        struct dma_config *config = &spi->dma_tx->config;
+        struct dma_chan *tx = spi->dma_tx;
+        struct dma_block_config txblk = {0};
+
+        config->channel_direction = MEMORY_TO_PERIPHERAL;
+        config->dest_data_size = spi->cur_bpw >> 3;
+        config->dest_burst_length = maxburst;
+        config->source_data_size = spi->cur_bpw >> 3;
+        config->source_burst_length = maxburst;
+        config->channel_priority = 0;
+        config->dma_callback = dma_complete_cb;
+        config->user_data = NULL;
+        config->head_block = &txblk;
+        config->block_count = 1;
+
+        txblk.block_size = 1;
+        txblk.source_address = (dma_addr_t)0;
+        txblk.source_addr_adj = DMA_ADDR_ADJ_INCREMENT;
+        txblk.dest_address = (dma_addr_t)&spi->base->TXDR;
+        txblk.dest_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
+        txblk.fifo_mode_control = 1;
+        ret = dma_configure(tx->dev, tx->channel, &tx->config);
+        if (ret) {
+            pr_err("Configure UART(%s) DMA-TX failed: %d\n", spi->dev->name, ret);
+            goto _free_chan;
+        }
+		dev_dbg(spi->dev, "Tx DMA config buswidth=%d, maxburst=%d\n",
+			spi->cur_bpw, maxburst);
+    }
+    if (spi->dma_rx) {
+        struct dma_config *config = &spi->dma_rx->config;
+        struct dma_chan *rx = spi->dma_rx;
+        struct dma_block_config rxblk = {0};
+
+        config->channel_direction = PERIPHERAL_TO_MEMORY;
+        config->dest_data_size = spi->cur_bpw >> 3;
+        config->dest_burst_length = 1;
+        config->source_data_size = spi->cur_bpw >> 3;
+        config->source_burst_length = 1;
+        config->complete_callback_en = 1;
+        config->channel_priority = 1;
+        config->dma_callback = NULL;
+        config->user_data = NULL;
+        config->head_block = &rxblk;
+        config->block_count = 1;
+
+        rxblk.block_size = 0;
+        rxblk.source_address = (dma_addr_t)&spi->base->RXDR;
+        rxblk.source_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
+        rxblk.dest_address = (dma_addr_t)0;
+        rxblk.dest_addr_adj = DMA_ADDR_ADJ_INCREMENT;
+        rxblk.fifo_mode_control = 1;
+        ret = dma_configure(rx->dev, rx->channel, &rx->config);
+        if (ret) {
+            pr_err("Configure UART(%s) DMA-RX failed: %d\n", spi->dev->name, ret);
+            goto _free_chan;
+        }
+		dev_dbg(spi->dev, "Rx DMA config buswidth=%d, maxburst=%d\n",
+			spi->cur_bpw, maxburst);
+    }
+    return 0;
+
+_free_chan:
+    if (spi->dma_tx) 
+        dma_stop(spi->dma_rx->dev, spi->dma_rx->channel);
+    if (spi->dma_tx) 
+        dma_stop(spi->dma_tx->dev, spi->dma_tx->channel);
+
+    return ret;
+}
+
 static void stm32_spi_dma_config(struct stm32_spi *spi,
 				 struct dma_slave_config *dma_conf,
 				 enum dma_transfer_direction dir)
@@ -1212,8 +1302,8 @@ static int stm32h7_spi_number_of_data(struct stm32_spi *spi, uint32_t nb_words)
  * @spi_dev: pointer to the spi device
  * @transfer: pointer to spi transfer
  */
-static int stm32_spi_transfer_one_setup(spi_bus *bus, struct stm32_spi *spi,
-					spi_ioc_transfer *transfer)
+static int stm32_spi_transfer_one_setup(struct spi_bus *bus, struct stm32_spi *spi,
+					struct spi_ioc_transfer *transfer)
 {
 	unsigned long flags;
 	unsigned int comm_type;
@@ -1288,8 +1378,8 @@ out:
  * It must return 0 if the transfer is finished or 1 if the transfer is still
  * in progress.
  */
-static int stm32_spi_transfer_one(spi_bus *bus, struct stm32_spi *spi,
-				  spi_ioc_transfer *transfer)
+static int stm32_spi_transfer_one(struct spi_bus *bus, struct stm32_spi *spi,
+				  struct spi_ioc_transfer *transfer)
 {
 	int ret;
 
@@ -1424,158 +1514,7 @@ static inline void stm32h7_spi_clr_cs(struct stm32h7_spi *spi, int cs) {
     }
 }
 
-static inline bool stm32_spi_can_dma(struct stm32h7_spi *spi,
-    const spi_ioc_transfer *msg) {
-    if (msg->len > STM32H7_FIFO_SIZE && (spi->tx && spi->rx))
-        return true;
-    return false;
-}
-
-static int stm32h7_spi_dma_configure(struct stm32h7_spi *spi, int bits_per_word) {
-    int ret;
-    if (spi->tx) {
-        struct dma_config *config = &spi->tx->config;
-        struct dma_chan *tx = spi->tx;
-        struct dma_block_config txblk = {0};
-
-        config->channel_direction = MEMORY_TO_PERIPHERAL;
-        config->dest_data_size = bits_per_word >> 3;
-        config->dest_burst_length = 1;
-        config->source_data_size = bits_per_word >> 3;
-        config->source_burst_length = 1;
-        config->channel_priority = 0;
-        config->dma_callback = dma_complete_cb;
-        config->user_data = NULL;
-        config->head_block = &txblk;
-        config->block_count = 1;
-
-        txblk.block_size = 1;
-        txblk.source_address = (dma_addr_t)0;
-        txblk.source_addr_adj = DMA_ADDR_ADJ_INCREMENT;
-        txblk.dest_address = (dma_addr_t)&spi->reg->TXDR;
-        txblk.dest_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
-        txblk.fifo_mode_control = 1;
-        ret = dma_configure(tx->dev, tx->channel, &tx->config);
-        if (ret) {
-            pr_err("Configure UART(%s) DMA-TX failed: %d\n", spi->dev->name, ret);
-            goto _free_chan;
-        }
-    }
-    if (spi->rx) {
-        struct dma_config *config = &spi->rx->config;
-        struct dma_chan *rx = spi->rx;
-        struct dma_block_config rxblk = {0};
-
-        config->channel_direction = PERIPHERAL_TO_MEMORY;
-        config->dest_data_size = bits_per_word >> 3;
-        config->dest_burst_length = 1;
-        config->source_data_size = bits_per_word >> 3;
-        config->source_burst_length = 1;
-        config->complete_callback_en = 1;
-        config->channel_priority = 1;
-        config->dma_callback = NULL;
-        config->user_data = NULL;
-        config->head_block = &rxblk;
-        config->block_count = 1;
-
-        rxblk.block_size = 0;
-        rxblk.source_address = (dma_addr_t)&spi->reg->RXDR;
-        rxblk.source_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
-        rxblk.dest_address = (dma_addr_t)0;
-        rxblk.dest_addr_adj = DMA_ADDR_ADJ_INCREMENT;
-        rxblk.fifo_mode_control = 1;
-        ret = dma_configure(rx->dev, rx->channel, &rx->config);
-        if (ret) {
-            pr_err("Configure UART(%s) DMA-RX failed: %d\n", spi->dev->name, ret);
-            goto _free_chan;
-        }
-    }
-    return 0;
-
-_free_chan:
-    if (spi->rx) {
-        dma_release_channel(spi->rx->dev, spi->rx->channel);
-        spi->rx = NULL;
-    }
-    if (spi->tx) {
-        dma_release_channel(spi->tx->dev, spi->tx->channel);
-        spi->tx = NULL;
-    }
-    return ret;
-}
-
-static int stm32h7_spi_configure(struct stm32h7_spi *spi,
-    uint32_t speed_hz, uint32_t mode, uint8_t wordbits) {
-    LL_SPI_InitTypeDef ll_struct;
-
-    LL_SPI_StructInit(&ll_struct);
-    if (mode & SPI_3WIRE) {
-        if (!spi->tx_buf)
-            ll_struct.TransferDirection = LL_SPI_HALF_DUPLEX_RX;
-        else
-            ll_struct.TransferDirection = LL_SPI_HALF_DUPLEX_TX;
-    } else {
-        if (!spi->tx_buf)
-            ll_struct.TransferDirection = LL_SPI_SIMPLEX_RX;
-        else if (!spi->rx_buf)
-            ll_struct.TransferDirection = LL_SPI_SIMPLEX_TX;
-    }
-    switch (mode & SPI_MODE_3) {
-    case SPI_MODE_0:
-        ll_struct.ClockPolarity = LL_SPI_POLARITY_LOW;
-        ll_struct.ClockPhase = LL_SPI_PHASE_1EDGE;
-        break;
-    case SPI_MODE_1:
-        ll_struct.ClockPolarity = LL_SPI_POLARITY_LOW;
-        ll_struct.ClockPhase = LL_SPI_PHASE_2EDGE;
-        break;
-    case SPI_MODE_2:
-        ll_struct.ClockPolarity = LL_SPI_POLARITY_HIGH;
-        ll_struct.ClockPhase = LL_SPI_PHASE_1EDGE;
-        break;
-    case SPI_MODE_3:
-        ll_struct.ClockPolarity = LL_SPI_POLARITY_HIGH;
-        ll_struct.ClockPhase = LL_SPI_PHASE_2EDGE;
-        break;
-    default:
-        pr_err("%s: Invalid clock phase\n", __func__);
-        return -EINVAL;
-    }
-    switch (wordbits) {
-    case 8:
-        ll_struct.DataWidth = LL_SPI_DATAWIDTH_8BIT;
-        spi->rd_dr = stm32h7_spi_rd8;
-        spi->wr_dr = stm32h7_spi_wr8;
-        break;
-    case 16:
-        ll_struct.DataWidth = LL_SPI_DATAWIDTH_16BIT;
-        spi->rd_dr = stm32h7_spi_rd16;
-        spi->wr_dr = stm32h7_spi_wr16;
-        break;
-    case 32:
-        ll_struct.DataWidth = LL_SPI_DATAWIDTH_32BIT;
-        spi->rd_dr = stm32h7_spi_rd32;
-        spi->wr_dr = stm32h7_spi_wr32;
-        break;
-    default:
-        pr_err("%s: Invalid databit width (%d)\n", __func__, wordbits);
-        return -EINVAL;
-    }
-
-    ll_struct.Mode = LL_SPI_MODE_MASTER;
-    ll_struct.NSS = LL_SPI_NSS_SOFT;
-    if (mode & SPI_LSB_FIRST)
-        ll_struct.BitOrder = LL_SPI_LSB_FIRST;
-
-    ll_struct.BaudRate = stm32h7_spi_prepare_mbr(spi, speed_hz, 2, 256);
-    LL_SPI_Init(spi->reg, &ll_struct);
-    if (spi->cur_usedma)
-        stm32h7_spi_dma_configure(spi, wordbits);
-    return 0;
-}
-
-
-static int stm32h7_spi_transmit_one(struct stm32h7_spi *spi, spi_bus *bus, 
+static int stm32h7_spi_transmit_one(struct stm32h7_spi *spi, struct spi_bus *bus, 
     const spi_ioc_transfer *msg) {
     rtems_status_code sc;
     rtems_interval timeout;
