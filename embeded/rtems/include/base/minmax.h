@@ -2,6 +2,8 @@
 #ifndef BASE_MINMAX_H_
 #define BASE_MINMAX_H_
 
+#include "base/compiler.h"
+
 #define __is_constexpr(x) __builtin_constant_p(x)
 
 /*

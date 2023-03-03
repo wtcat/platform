@@ -1,6 +1,7 @@
 /*
  * Copyright 2022 wtcat
  */
+#include "rtems/rtems/status.h"
 #define pr_fmt(fmt) "<spi>: "fmt
 #define CONFIG_LOGLEVEL  LOGLEVEL_DEBUG//LOGLEVEL_INFO
 #include <stdint.h>
@@ -325,6 +326,17 @@ static const struct stm32_spi_regspec stm32h7_spi_regspec = {
 	.rx = { STM32H7_SPI_RXDR },
 	.tx = { STM32H7_SPI_TXDR },
 };
+
+static inline void stm32_spi_set_cs(struct stm32_spi *spi, int cs) {
+	pr_dbg("%s: spi select chip (cs = %d)\n", __func__, cs);
+	gpiod_pin_assert(&spi->cs_gpios[cs]);
+    
+}
+
+static inline void stm32_spi_clr_cs(struct stm32_spi *spi, int cs) {
+	pr_dbg("%s: spi deselect chip (cs = %d)\n", __func__, cs);
+	gpiod_pin_deassert(&spi->cs_gpios[cs]);
+}
 
 static inline void stm32_spi_set_bits(struct stm32_spi *spi,
 				      uint32_t offset, uint32_t bits)
@@ -831,6 +843,7 @@ static void stm32h7_spi_dma_cb(struct drvmgr_dev *dev, void *user_data,
 
 	/* Now wait for EOT, or SUSP or OVR in case of error */
 }
+
 /**
  * stm32_spi_dma_config - configure dma slave channel depending on current
  *			  transfer bits_per_word.
@@ -1296,6 +1309,7 @@ out:
 static int stm32_spi_transfer_one(struct spi_bus *bus, struct stm32_spi *spi,
 				  struct spi_ioc_transfer *transfer)
 {
+	rtems_status_code sc;
 	int ret;
 
 	spi->tx_buf = transfer->tx_buf;
@@ -1303,7 +1317,7 @@ static int stm32_spi_transfer_one(struct spi_bus *bus, struct stm32_spi *spi,
 	spi->tx_len = spi->tx_buf ? transfer->len : 0;
 	spi->rx_len = spi->rx_buf ? transfer->len : 0;
 
-	spi->cur_usedma = stm32_spi_can_dma(spi);
+	spi->cur_usedma = stm32_spi_can_dma(spi, transfer);
 
 	ret = stm32_spi_transfer_one_setup(bus, spi, transfer);
 	if (ret) {
@@ -1311,10 +1325,24 @@ static int stm32_spi_transfer_one(struct spi_bus *bus, struct stm32_spi *spi,
 		return ret;
 	}
 
+	stm32_spi_set_cs(spi, transfer->cs);
 	if (spi->cur_usedma)
-		return stm32_spi_transfer_one_dma(spi, transfer);
+		ret = stm32_spi_transfer_one_dma(spi, transfer);
 	else
-		return spi->cfg->transfer_one_irq(spi);
+		ret = spi->cfg->transfer_one_irq(spi);
+
+	if (ret == 0) { 
+		/* Wait transfer complete */
+		uint32_t timeout = (transfer->len * 8000) / spi->cur_speed + 1000;
+		sc = rtems_event_transient_receive(RTEMS_WAIT|RTEMS_EVENT_ALL, 
+			RTEMS_MILLISECONDS_TO_TICKS(timeout));
+		if (sc != RTEMS_SUCCESSFUL) {
+			pr_err("spi transfer timeout\n");
+			return  rtems_status_code_to_errno(sc);
+		}
+	}
+	stm32_spi_clr_cs(spi, transfer->cs);
+	return 0;
 }
 
 /**
@@ -1413,87 +1441,6 @@ static int stm32h7_spi_get_clksrc(const char *devname, uint32_t *clksrc) {
     return 0;
 }
 
-static inline void stm32h7_spi_set_cs(struct stm32_spi *spi, int cs) {
-    if (!(spi->cs_bitmap & BIT(cs))) {
-        pr_dbg("%s: spi select chip (cs = %d)\n", __func__, cs);
-        spi->cs_bitmap |= BIT(cs);
-        gpiod_pin_assert(&spi->cs_gpios[cs]);
-    }
-}
-
-static inline void stm32h7_spi_clr_cs(struct stm32_spi *spi, int cs) {
-    if (spi->cs_bitmap & BIT(cs)) {
-        pr_dbg("%s: spi deselect chip (cs = %d)\n", __func__, cs);
-        spi->cs_bitmap &= ~BIT(cs);
-        gpiod_pin_deassert(&spi->cs_gpios[cs]);
-    }
-}
-
-static int stm32h7_spi_transmit_one(struct stm32_spi *spi, struct spi_bus *bus, 
-    const spi_ioc_transfer *msg) {
-    rtems_status_code sc;
-    rtems_interval timeout;
-    int err;
-
-    /* Copy paramters */
-    spi->cur_xferlen = msg->len;
-	spi->tx_buf = msg->tx_buf;
-	spi->rx_buf = msg->rx_buf;
-	spi->tx_len = spi->tx_buf ? msg->len : 0;
-	spi->rx_len = spi->rx_buf ? msg->len : 0;
-    spi->cur_usedma = stm32_spi_can_dma(spi, msg);
-
-    /* Update SPI-BUS configuration */
-    if (msg->speed_hz != bus->speed_hz || 
-        msg->mode != bus->mode || 
-        msg->bits_per_word != bus->bits_per_word) {
-        err = stm32h7_spi_configure(spi, msg->speed_hz, msg->mode, 
-            msg->bits_per_word);
-        if (err) {
-            pr_err("%s: configure %s failed(%d)\n", __func__, spi->dev->name, err);
-            return err;
-        }
-        bus->speed_hz = msg->speed_hz;
-        bus->mode = msg->mode;
-        bus->bits_per_word = msg->bits_per_word;
-    }
-
-    timeout = (msg->len * 8000) / spi->cur_speed + 1000;
-    stm32h7_spi_fthlvsize_update(spi->reg, bus->bits_per_word, 
-        spi->cur_xferlen);
-
-    stm32h7_spi_set_cs(spi, msg->cs);
-    if (spi->cur_usedma)
-        err = stm32h7_spi_transmit_one_dma(spi);
-    else
-        err = stm32h7_spi_transmit_one_irq(spi);
-    if (err)
-        goto _out;
-    
-    /* Wait transfer complete */
-    sc = rtems_event_transient_receive(RTEMS_WAIT|RTEMS_EVENT_ALL, 
-        RTEMS_MILLISECONDS_TO_TICKS(timeout));
-    if (sc != RTEMS_SUCCESSFUL) {
-        pr_err("spi transfer timeout\n");
-    }
-    
-_out:
-    if (msg->cs_change)
-        stm32h7_spi_clr_cs(spi, msg->cs);
-    return err;
-}
-
-static int stm32h7_spi_setup(spi_bus *bus) {
-    struct stm32h7_spi *spi = (struct stm32h7_spi *)bus;
-    if (bus->max_speed_hz < bus->speed_hz)
-        return -EINVAL;
-    if (bus->bits_per_word % 8)
-        return -EINVAL;
-
-    return stm32h7_spi_configure(spi, bus->max_speed_hz, 
-        bus->mode, bus->bits_per_word);
-}
-
 static int stm32h7_spi_transfer(spi_bus *bus, const spi_ioc_transfer *msgs, 
     uint32_t n) {
     struct stm32h7_spi *spi = (struct stm32h7_spi *)bus;
@@ -1504,7 +1451,7 @@ static int stm32h7_spi_transfer(spi_bus *bus, const spi_ioc_transfer *msgs,
     spi->thread = rtems_task_self();
     while (n > 0) {
         _Assert(curr_msg->len < UINT16_MAX);
-        err = stm32h7_spi_transmit_one(spi, bus, curr_msg);
+        err = stm32_spi_transfer_one(bus, spi, curr_msg);
         if (err)
             break;
         curr_msg++;

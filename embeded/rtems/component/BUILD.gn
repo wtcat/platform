@@ -8,7 +8,8 @@ component("component") {
         "crc.c",
         "ring_buffer.c",
         "plog.c",
-        "observer.c"
+        "observer.c",
+        "kfifo.c"
     ]
     if (use_fntrace) {
         sources += ["callpath.c"]
