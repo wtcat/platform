@@ -1,7 +1,6 @@
 /*
  * Copyright 2022 wtcat
  */
-#include "rtems/rtems/status.h"
 #define pr_fmt(fmt) "<spi>: "fmt
 #define CONFIG_LOGLEVEL  LOGLEVEL_DEBUG//LOGLEVEL_INFO
 #include <stdint.h>
@@ -13,6 +12,7 @@
 #include <rtems/malloc.h>
 #include <rtems/counter.h>
 #include <dev/spi/spi.h>
+#include <bsp/irq-generic.h>
 
 #include "stm32/stm32_com.h"
 #include "stm32h7xx_ll_spi.h"
@@ -32,6 +32,8 @@
 
 #define SPI_DEBUG
 
+#define SPI_BPW_RANGE_MASK(min, max) \
+	GENMASK((max) - 1, (min) - 1)
 
 /* STM32H7 SPI registers */
 #define STM32H7_SPI_CR1			0x00
@@ -156,8 +158,8 @@ struct stm32_spi_reg {
  * @cpha: clock phase register and phase bit
  * @lsb_first: LSB transmitted first register and bit
  * @br: baud rate register and bitfields
- * @rx: SPI RX data register
- * @tx: SPI TX data register
+ * @dma_rx: SPI RX data register
+ * @dma_tx: SPI TX data register
  */
 struct stm32_spi_regspec {
 	const struct stm32_spi_reg en;
@@ -167,8 +169,8 @@ struct stm32_spi_regspec {
 	const struct stm32_spi_reg cpha;
 	const struct stm32_spi_reg lsb_first;
 	const struct stm32_spi_reg br;
-	const struct stm32_spi_reg rx;
-	const struct stm32_spi_reg tx;
+	const struct stm32_spi_reg dma_rx;
+	const struct stm32_spi_reg dma_tx;
 };
 
 struct stm32_spi;
@@ -249,6 +251,7 @@ struct stm32_spi_cfg {
  */
 struct stm32_spi {
     spi_bus bus;
+	rtems_interrupt_server_request req;
     struct drvmgr_dev *dev;
 	const struct stm32_spi_cfg *cfg;
 	SPI_TypeDef *base;
@@ -268,6 +271,7 @@ struct stm32_spi {
 	unsigned int cur_xferlen;
 	bool cur_usedma;
 
+	int cs_num;
     struct gpio_pin *cs_gpios;
 	const void *tx_buf;
 	void *rx_buf;
@@ -323,8 +327,8 @@ static const struct stm32_spi_regspec stm32h7_spi_regspec = {
 	.br = { STM32H7_SPI_CFG1, STM32H7_SPI_CFG1_MBR,
 		STM32H7_SPI_CFG1_MBR_SHIFT },
 
-	.rx = { STM32H7_SPI_RXDR },
-	.tx = { STM32H7_SPI_TXDR },
+	.dma_rx = { STM32H7_SPI_RXDR },
+	.dma_tx = { STM32H7_SPI_TXDR },
 };
 
 static inline void stm32_spi_set_cs(struct stm32_spi *spi, int cs) {
@@ -376,7 +380,6 @@ static int stm32h7_spi_get_fifo_size(struct stm32_spi *spi)
 
 	return count;
 }
-
 
 /**
  * stm32h7_spi_get_bpw_mask - Return bits per word mask
@@ -624,9 +627,9 @@ static void stm32h7_spi_disable(struct stm32_spi *spi)
 		stm32h7_spi_read_rxfifo(spi, true);
 
 	if (spi->cur_usedma && spi->dma_tx)
-		dma_stop(spi->dma_tx);
+		dma_chan_stop(spi->dma_tx);
 	if (spi->cur_usedma && spi->dma_rx)
-		dma_stop(spi->dma_rx);
+		dma_chan_stop(spi->dma_rx);
 
 	stm32_spi_clr_bits(spi, STM32H7_SPI_CR1, STM32H7_SPI_CR1_SPE);
 
@@ -761,13 +764,19 @@ static void stm32h7_spi_irq_thread(void *dev_id)
 
 }
 
+static void stm32_spi_isr(void *arg) 
+{
+	struct stm32_spi *spi = arg;
+	rtems_interrupt_server_request_submit(&spi->req);
+}
+
 /**
  * stm32_spi_prepare_msg - set up the controller to transfer a single message
  * @master: controller master interface
  * @msg: pointer to spi message
  */
 static int stm32_spi_prepare_msg(struct spi_bus *spi_dev,
-				 struct spi_ioc_transfer *msg)
+				 const struct spi_ioc_transfer *msg)
 {
 	struct stm32_spi *spi = RTEMS_CONTAINER_OF(spi_dev, struct stm32_spi, bus);
 	// struct device_node *np = spi_dev->dev.of_node;
@@ -851,7 +860,7 @@ static void stm32h7_spi_dma_cb(struct drvmgr_dev *dev, void *user_data,
  * @dma_conf: pointer to the dma_slave_config structure
  * @dir: direction of the dma transfer
  */
-static int stm32h7_spi_dma_configure(struct stm32_spi *spi, bool tx) {
+static int stm32h7_spi_dma_configure(struct stm32_spi *spi, bool dma_tx) {
 	static int dummy;
 	uint32_t maxburst;
     int ret;
@@ -866,9 +875,9 @@ static int stm32h7_spi_dma_configure(struct stm32_spi *spi, bool tx) {
 		maxburst = 1;
 	}
 
-    if (tx && spi->dma_tx) {
+    if (dma_tx && spi->dma_tx) {
         struct dma_config *config = &spi->dma_tx->config;
-        struct dma_chan *tx = spi->dma_tx;
+        struct dma_chan *dma_tx = spi->dma_tx;
         struct dma_block_config txblk = {0};
 
         config->channel_direction = MEMORY_TO_PERIPHERAL;
@@ -890,7 +899,7 @@ static int stm32h7_spi_dma_configure(struct stm32_spi *spi, bool tx) {
         txblk.dest_address = (dma_addr_t)&spi->base->TXDR;
         txblk.dest_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
         txblk.fifo_mode_control = 1;
-        ret = dma_configure(tx->dev, tx->channel, &tx->config);
+        ret = dma_configure(dma_tx->dev, dma_tx->channel, &dma_tx->config);
         if (ret) {
             pr_err("Configure UART(%s) DMA-TX failed: %d\n", spi->dev->name, ret);
             goto _free_chan;
@@ -898,9 +907,9 @@ static int stm32h7_spi_dma_configure(struct stm32_spi *spi, bool tx) {
 		dev_dbg(spi->dev, "Tx DMA config buswidth=%d, maxburst=%d\n",
 			spi->cur_bpw, maxburst);
     }
-    if (!tx && spi->dma_rx) {
+    if (!dma_tx && spi->dma_rx) {
         struct dma_config *config = &spi->dma_rx->config;
-        struct dma_chan *rx = spi->dma_rx;
+        struct dma_chan *dma_rx = spi->dma_rx;
         struct dma_block_config rxblk = {0};
 
         config->channel_direction = PERIPHERAL_TO_MEMORY;
@@ -923,7 +932,7 @@ static int stm32h7_spi_dma_configure(struct stm32_spi *spi, bool tx) {
         rxblk.dest_address = (dma_addr_t)&dummy;
         rxblk.dest_addr_adj = DMA_ADDR_ADJ_INCREMENT;
         rxblk.fifo_mode_control = 1;
-        ret = dma_configure(rx->dev, rx->channel, &rx->config);
+        ret = dma_configure(dma_rx->dev, dma_rx->channel, &dma_rx->config);
         if (ret) {
             pr_err("Configure UART(%s) DMA-RX failed: %d\n", spi->dev->name, ret);
             goto _free_chan;
@@ -1238,6 +1247,7 @@ static int stm32_spi_transfer_one_setup(struct spi_bus *bus, struct stm32_spi *s
 	int nb_words, ret = 0;
 	int mbr;
 
+	(void)bus;
 	spin_lock_irqsave(&spi->lock, flags);
 
 	spi->cur_xferlen = transfer->len;
@@ -1316,9 +1326,7 @@ static int stm32_spi_transfer_one(struct spi_bus *bus, struct stm32_spi *spi,
 	spi->rx_buf = transfer->rx_buf;
 	spi->tx_len = spi->tx_buf ? transfer->len : 0;
 	spi->rx_len = spi->rx_buf ? transfer->len : 0;
-
 	spi->cur_usedma = stm32_spi_can_dma(spi, transfer);
-
 	ret = stm32_spi_transfer_one_setup(bus, spi, transfer);
 	if (ret) {
 		dev_err(spi->dev, "SPI transfer setup failed\n");
@@ -1330,7 +1338,6 @@ static int stm32_spi_transfer_one(struct spi_bus *bus, struct stm32_spi *spi,
 		ret = stm32_spi_transfer_one_dma(spi, transfer);
 	else
 		ret = spi->cfg->transfer_one_irq(spi);
-
 	if (ret == 0) { 
 		/* Wait transfer complete */
 		uint32_t timeout = (transfer->len * 8000) / spi->cur_speed + 1000;
@@ -1338,6 +1345,7 @@ static int stm32_spi_transfer_one(struct spi_bus *bus, struct stm32_spi *spi,
 			RTEMS_MILLISECONDS_TO_TICKS(timeout));
 		if (sc != RTEMS_SUCCESSFUL) {
 			pr_err("spi transfer timeout\n");
+			stm32_spi_clr_cs(spi, transfer->cs);
 			return  rtems_status_code_to_errno(sc);
 		}
 	}
@@ -1350,13 +1358,11 @@ static int stm32_spi_transfer_one(struct spi_bus *bus, struct stm32_spi *spi,
  * @master: controller master interface
  * @msg: pointer to the spi message
  */
-static int stm32_spi_unprepare_msg(struct spi_master *master,
-				   struct spi_message *msg)
+static int stm32_spi_unprepare_msg(struct stm32_spi *spi,
+				   struct spi_ioc_transfer *msg)
 {
-	struct stm32_spi *spi = spi_master_get_devdata(master);
-
+	(void) msg;
 	spi->cfg->disable(spi);
-
 	return 0;
 }
 
@@ -1441,17 +1447,17 @@ static int stm32h7_spi_get_clksrc(const char *devname, uint32_t *clksrc) {
     return 0;
 }
 
-static int stm32h7_spi_transfer(spi_bus *bus, const spi_ioc_transfer *msgs, 
+static int stm32_spi_transfer(spi_bus *bus, const struct spi_ioc_transfer *msgs, 
     uint32_t n) {
-    struct stm32h7_spi *spi = (struct stm32h7_spi *)bus;
-    const spi_ioc_transfer *curr_msg = msgs;
+    struct stm32_spi *spi = (struct stm32_spi *)bus;
+    const struct spi_ioc_transfer *curr_msg = msgs;
     int err = -EINVAL;
 
-    spi->cs_bitmap = 0;
     spi->thread = rtems_task_self();
     while (n > 0) {
         _Assert(curr_msg->len < UINT16_MAX);
-        err = stm32_spi_transfer_one(bus, spi, curr_msg);
+		//stm32_spi_prepare_msg(bus, curr_msg);
+        err = stm32_spi_transfer_one(bus, spi, (void *)curr_msg);
         if (err)
             break;
         curr_msg++;
@@ -1460,24 +1466,28 @@ static int stm32h7_spi_transfer(spi_bus *bus, const spi_ioc_transfer *msgs,
     return err;
 }
 
-static void stm32h7_spi_destroy(spi_bus *bus) {
-    struct stm32h7_spi *spi = (struct stm32h7_spi *)bus;
+static void stm32_spi_destroy(spi_bus *bus) {
+    struct stm32_spi *spi = (struct stm32_spi *)bus;
     rtems_interrupt_level level;
 
     rtems_interrupt_local_disable(level);
-    stm32h7_spi_disable(spi, spi->reg);
+    stm32h7_spi_disable(spi);
     rtems_interrupt_local_enable(level);
-    stm32h7_spi_clear_all_cs(spi);
     drvmgr_interrupt_unregister(spi->dev, IRQF_HARD(spi->irq), 
-        stm32h7_spi_isr, spi);
+        stm32_spi_isr, spi);
     clk_disable(spi->clk, &spi->clkid);
-    if (spi->tx)
-        dma_chan_release(spi->tx);
-    if (spi->rx)
-        dma_chan_release(spi->rx);
+    if (spi->dma_tx)
+        dma_chan_release(spi->dma_tx);
+    if (spi->dma_rx)
+        dma_chan_release(spi->dma_rx);
     spi_bus_destroy(bus);
     free(spi->cs_gpios);
     free(spi);
+}
+
+static int stm32_spi_setup(spi_bus *bus) {
+	(void) bus;
+	return 0;
 }
 
 static int stm32_spi_bus_unite(struct drvmgr_drv *drv, struct drvmgr_dev *dev) {
@@ -1495,7 +1505,7 @@ static int stm32_spi_preprobe(struct drvmgr_dev *dev) {
     struct dev_private *devp = device_get_private(dev);
     rtems_ofw_memory_area reg;
     rtems_vector_number irq;
-    struct stm32h7_spi *spi;
+    struct stm32_spi *spi;
     int ret;
 
     ret = rtems_ofw_get_reg(devp->np, &reg, sizeof(reg));
@@ -1504,10 +1514,11 @@ static int stm32_spi_preprobe(struct drvmgr_dev *dev) {
     ret = rtems_ofw_get_interrupts(devp->np, &irq, sizeof(irq));
     if (ret < 0) 
         return -ENOSTR;
-    spi = rtems_calloc(1, sizeof(struct stm32h7_spi));
-    if (spi == NULL) 
-        return -ENOMEM;
-    spi->reg = (void *)reg.start;
+    spi = rtems_calloc(1, sizeof(struct stm32_spi));
+	if (spi == NULL) 
+		return -ENOMEM;
+	spi->cfg = device_match_data(dev);
+    spi->base = (void *)reg.start;
     spi->irq = (int)irq;
     spi->dev = dev;
     devp->devops = &spi->bus;
@@ -1519,7 +1530,7 @@ static int stm32_spi_preprobe(struct drvmgr_dev *dev) {
 
 static int stm32_spi_probe(struct drvmgr_dev *dev) {
     struct dev_private *devp = device_get_private(dev);
-    struct stm32h7_spi *spi = dev->priv;
+    struct stm32_spi *spi = dev->priv;
     uint32_t clksrc = 0;
     int ret = -EINVAL;
 
@@ -1543,16 +1554,19 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
         goto _free_cs;
     }
     ret = drvmgr_interrupt_register(dev, IRQF_HARD(spi->irq), dev->name, 
-		stm32h7_spi_isr, spi);
+		stm32_spi_isr, spi);
     if (ret) {
         pr_err("%s register IRQ(%d) failed\n", dev->name, spi->irq);
         goto _free;
     }
 
+	rtems_interrupt_server_request_initialize(0, &spi->req, 
+		stm32h7_spi_irq_thread, spi);
+	rtems_interrupt_server_request_set_vector(&spi->req, spi->irq);
     spi_bus_init(&spi->bus);
-	spi->bus.transfer = stm32h7_spi_transfer;
-    spi->bus.setup = stm32h7_spi_setup;
-    spi->bus.destroy = stm32h7_spi_destroy;
+	spi->bus.transfer = stm32_spi_transfer;
+    spi->bus.setup = stm32_spi_setup;
+    spi->bus.destroy = stm32_spi_destroy;
     spi->bus.lsb_first = false;
     spi->bus.bits_per_word = 8;
     spi->bus.mode = SPI_MODE_0;
@@ -1562,7 +1576,7 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
 	ret = spi_bus_register(&spi->bus, dev->name);
 	if (ret) {
 		drvmgr_interrupt_unregister(dev, IRQF_HARD(spi->irq), 
-            stm32h7_spi_isr, spi);
+            stm32_spi_isr, spi);
         pr_err("%s: install interrupt failed!\n", __func__);
         goto _free_cs;
     }
@@ -1580,22 +1594,22 @@ _free:
 
 static int stm32h7_spi_extprobe(struct drvmgr_dev *dev) {
     struct dev_private *devp = device_get_private(dev);
-    struct stm32h7_spi *spi = dev->priv;
+    struct stm32_spi *spi = dev->priv;
     pcell_t specs[3];
   
     if (pinctrl_simple_set("/dev/pinctrl", dev)) 
         rtems_panic("%s: %s configure pins failed\n", __func__, 
             dev->name);
  
-    spi->tx = ofw_dma_chan_request(devp->np, "tx", 
+    spi->dma_tx = ofw_dma_chan_request(devp->np, "dma_tx", 
         specs, sizeof(specs));
-    if (spi->tx) 
-        spi->tx->config.dma_slot = specs[0];
+    if (spi->dma_tx) 
+        spi->dma_tx->config.dma_slot = specs[0];
 
-    spi->rx = ofw_dma_chan_request(devp->np, "rx", 
+    spi->dma_rx = ofw_dma_chan_request(devp->np, "dma_rx", 
         specs, sizeof(specs));
-    if (spi->rx) 
-        spi->rx->config.dma_slot = specs[0];
+    if (spi->dma_rx) 
+        spi->dma_rx->config.dma_slot = specs[0];
 
     return 0;
 }
@@ -1609,11 +1623,11 @@ static struct drvmgr_drv_ops stm32h7_spi_driver = {
 };
 
 static const struct dev_id id_table[] = {
-    {.compatible = "st,stm32h7-spi", NULL},
+    {.compatible = "st,stm32h7-spi", (void *)&stm32h7_spi_cfg},
     {NULL, NULL}
 };
 
-OFW_PLATFORM_DRIVER(stm32h7_spi) = {
+OFW_PLATFORM_DRIVER(stm32_spi) = {
 	.drv = {
 		.drv_id   = DRIVER_SPI_ID,
 		.name     = "spi",
