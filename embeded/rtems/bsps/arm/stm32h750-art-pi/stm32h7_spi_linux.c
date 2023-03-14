@@ -280,6 +280,8 @@ struct stm32_spi {
 	struct dma_chan *dma_tx;
 	struct dma_chan *dma_rx;
 	dma_addr_t phys_addr;
+
+	uint32_t curr_mode;
 };
 
 #define MTX_LOCK(_l) 
@@ -776,50 +778,52 @@ static void stm32_spi_isr(void *arg)
  * @msg: pointer to spi message
  */
 static int stm32_spi_prepare_msg(struct spi_bus *spi_dev,
-				 const struct spi_ioc_transfer *msg)
+				 bool force)
 {
 	struct stm32_spi *spi = RTEMS_CONTAINER_OF(spi_dev, struct stm32_spi, bus);
-	// struct device_node *np = spi_dev->dev.of_node;
 	unsigned long flags;
-	uint32_t clrb = 0, setb = 0;
-	(void)msg;
 
-	/* SPI slave device may need time between data frames */
-	spi->cur_midi = 0;
-	// if (np && !of_property_read_u32(np, "st,spi-midi-ns", &spi->cur_midi))
-	// 	dev_dbg(spi->dev, "%dns inter-data idleness\n", spi->cur_midi);
+	if (force || (spi_dev->mode & SPI_MODE_3) != spi->curr_mode) {
+		uint32_t clrb = 0, setb = 0;
+		spi->curr_mode = spi_dev->mode;
 
-	if (spi_dev->mode & SPI_CPOL)
-		setb |= spi->cfg->regs->cpol.mask;
-	else
-		clrb |= spi->cfg->regs->cpol.mask;
+		/* SPI slave device may need time between data frames */
+		spi->cur_midi = 0;
+		// if (np && !of_property_read_u32(np, "st,spi-midi-ns", &spi->cur_midi))
+		// 	dev_dbg(spi->dev, "%dns inter-data idleness\n", spi->cur_midi);
 
-	if (spi_dev->mode & SPI_CPHA)
-		setb |= spi->cfg->regs->cpha.mask;
-	else
-		clrb |= spi->cfg->regs->cpha.mask;
+		if (spi_dev->mode & SPI_CPOL)
+			setb |= spi->cfg->regs->cpol.mask;
+		else
+			clrb |= spi->cfg->regs->cpol.mask;
 
-	if (spi_dev->mode & SPI_LSB_FIRST)
-		setb |= spi->cfg->regs->lsb_first.mask;
-	else
-		clrb |= spi->cfg->regs->lsb_first.mask;
+		if (spi_dev->mode & SPI_CPHA)
+			setb |= spi->cfg->regs->cpha.mask;
+		else
+			clrb |= spi->cfg->regs->cpha.mask;
 
-	dev_dbg(spi->dev, "cpol=%d cpha=%d lsb_first=%d cs_high=%d\n",
-		spi_dev->mode & SPI_CPOL,
-		spi_dev->mode & SPI_CPHA,
-		spi_dev->mode & SPI_LSB_FIRST,
-		spi_dev->mode & SPI_CS_HIGH);
+		if (spi_dev->mode & SPI_LSB_FIRST)
+			setb |= spi->cfg->regs->lsb_first.mask;
+		else
+			clrb |= spi->cfg->regs->lsb_first.mask;
 
-	spin_lock_irqsave(&spi->lock, flags);
+		dev_dbg(spi->dev, "cpol=%d cpha=%d lsb_first=%d cs_high=%d\n",
+			spi_dev->mode & SPI_CPOL,
+			spi_dev->mode & SPI_CPHA,
+			spi_dev->mode & SPI_LSB_FIRST,
+			spi_dev->mode & SPI_CS_HIGH);
 
-	/* CPOL, CPHA and LSB FIRST bits have common register */
-	if (clrb || setb)
-		writel_relaxed(
-			(readl_relaxed(spi->base + spi->cfg->regs->cpol.reg) &
-			 ~clrb) | setb,
-			spi->base + spi->cfg->regs->cpol.reg);
+		spin_lock_irqsave(&spi->lock, flags);
 
-	spin_unlock_irqrestore(&spi->lock, flags);
+		/* CPOL, CPHA and LSB FIRST bits have common register */
+		if (clrb || setb)
+			writel_relaxed(
+				(readl_relaxed(spi->base + spi->cfg->regs->cpol.reg) &
+				~clrb) | setb,
+				spi->base + spi->cfg->regs->cpol.reg);
+
+		spin_unlock_irqrestore(&spi->lock, flags);
+	}
 
 	return 0;
 }
@@ -1358,12 +1362,10 @@ static int stm32_spi_transfer_one(struct spi_bus *bus, struct stm32_spi *spi,
  * @master: controller master interface
  * @msg: pointer to the spi message
  */
-static int stm32_spi_unprepare_msg(struct stm32_spi *spi,
-				   struct spi_ioc_transfer *msg)
+static void stm32_spi_unprepare_msg(struct spi_bus *spi_dev)
 {
-	(void) msg;
+	struct stm32_spi *spi = RTEMS_CONTAINER_OF(spi_dev, struct stm32_spi, bus);
 	spi->cfg->disable(spi);
-	return 0;
 }
 
 /**
@@ -1456,13 +1458,14 @@ static int stm32_spi_transfer(spi_bus *bus, const struct spi_ioc_transfer *msgs,
     spi->thread = rtems_task_self();
     while (n > 0) {
         _Assert(curr_msg->len < UINT16_MAX);
-		//stm32_spi_prepare_msg(bus, curr_msg);
+		stm32_spi_prepare_msg(bus, false);
         err = stm32_spi_transfer_one(bus, spi, (void *)curr_msg);
         if (err)
             break;
         curr_msg++;
         n--;
     };
+	stm32_spi_unprepare_msg(bus);
     return err;
 }
 
@@ -1582,6 +1585,7 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
     }
     /* Enable clock */
     clk_enable(spi->clk, &spi->clkid);
+	stm32_spi_prepare_msg(&spi->bus, false);
     pr_dbg("%s: spi bus max-frequency (%u)\n", __func__, spi->bus.max_speed_hz);
 	return 0;
 
