@@ -436,8 +436,11 @@ static int stm32_spi_prepare_mbr(struct stm32_spi *spi, uint32_t speed_hz,
 	 * no need to check it there.
 	 * However, we need to ensure the following calculations.
 	 */
-	if ((div < min_div) || (div > max_div))
+	if ((div < min_div) || (div > max_div)) {
+		pr_err("%s div(%d) is invalid. min_div(%d) max_div(%d) speed_hz(%d) clkrate(%u)\n", 
+			div, min_div, max_div, speed_hz, spi->clk_rate);
 		return -EINVAL;
+	}
 
 	/* Determine the first power of 2 greater than or equal to div */
 	if (div & (div - 1))
@@ -1264,6 +1267,7 @@ static int stm32_spi_transfer_one_setup(struct spi_bus *bus, struct stm32_spi *s
 				    spi->cfg->baud_rate_div_min,
 				    spi->cfg->baud_rate_div_max);
 	if (mbr < 0) {
+		pr_err("mbr(%d) is invalid(%d)\n", mbr);
 		ret = mbr;
 		goto out;
 	}
@@ -1273,8 +1277,10 @@ static int stm32_spi_transfer_one_setup(struct spi_bus *bus, struct stm32_spi *s
 
 	comm_type = stm32_spi_communication_type(transfer->mode, transfer);
 	ret = spi->cfg->set_mode(spi, comm_type);
-	if (ret < 0)
+	if (ret < 0) {
+		pr_err("set mode failed with error(%d)\n", ret);
 		goto out;
+	}
 
 	spi->cur_comm = comm_type;
 
@@ -1333,7 +1339,7 @@ static int stm32_spi_transfer_one(struct spi_bus *bus, struct stm32_spi *spi,
 	spi->cur_usedma = stm32_spi_can_dma(spi, transfer);
 	ret = stm32_spi_transfer_one_setup(bus, spi, transfer);
 	if (ret) {
-		dev_err(spi->dev, "SPI transfer setup failed\n");
+		dev_err(spi->dev, "SPI transfer setup failed(%d)\n", ret);
 		return ret;
 	}
 
@@ -1576,6 +1582,7 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
     spi->bus.max_speed_hz = LL_RCC_GetSPIClockFreq(clksrc) / 2;
     spi->bus.speed_hz = 8000000;
     spi->bus.cs = UINT8_MAX;
+	spi->clk_rate = spi->bus.max_speed_hz;
 	ret = spi_bus_register(&spi->bus, dev->name);
 	if (ret) {
 		drvmgr_interrupt_unregister(dev, IRQF_HARD(spi->irq), 
@@ -1585,7 +1592,15 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
     }
     /* Enable clock */
     clk_enable(spi->clk, &spi->clkid);
-	stm32_spi_prepare_msg(&spi->bus, false);
+	spi->fifo_size = spi->cfg->get_fifo_size(spi);
+	if (!spi->fifo_size)
+		spi->fifo_size = 16;
+	ret = spi->cfg->config(spi);
+	if (ret) {
+		dev_err(&pdev->dev, "controller configuration failed: %d\n", ret);
+		return ret;	
+	}
+	stm32_spi_prepare_msg(&spi->bus, true);
     pr_dbg("%s: spi bus max-frequency (%u)\n", __func__, spi->bus.max_speed_hz);
 	return 0;
 

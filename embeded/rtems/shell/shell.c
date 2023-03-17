@@ -21,7 +21,7 @@ void _shell_init(void) {
 	rtems_status_code sc;
 
     sc = rtems_shell_init(
-		"shel", 
+		"root", 
 		CONFIGURE_SHELL_STKSIZE, 
 		CONFIGURE_SHELL_PRIO,
 		"/dev/console", 
