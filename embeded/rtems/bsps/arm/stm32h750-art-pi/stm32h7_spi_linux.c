@@ -254,7 +254,7 @@ struct stm32_spi {
 	rtems_interrupt_server_request req;
     struct drvmgr_dev *dev;
 	const struct stm32_spi_cfg *cfg;
-	SPI_TypeDef *base;
+	void *base;
     rtems_id thread;
 	uint32_t clk_rate;
 	char lock; /* prevent I/O concurrent access */
@@ -332,6 +332,22 @@ static const struct stm32_spi_regspec stm32h7_spi_regspec = {
 	.dma_rx = { STM32H7_SPI_RXDR },
 	.dma_tx = { STM32H7_SPI_TXDR },
 };
+
+static void stm32h7_dump_regs(struct stm32_spi *spi) {
+	SPI_TypeDef *reg = (SPI_TypeDef *)spi->base;
+	pr_dbg("## Register dump:\n");
+	pr_dbg("\tCR1     = 0x%x\n", reg->CR1);
+	pr_dbg("\tCR2     = 0x%x\n", reg->CR2);
+	pr_dbg("\tCFG1    = 0x%x\n", reg->CFG1);
+	pr_dbg("\tCFG2    = 0x%x\n", reg->CFG2);
+	pr_dbg("\tIER     = 0x%x\n", reg->IER);
+	pr_dbg("\tSR      = 0x%x\n", reg->SR);
+	pr_dbg("\tCRCPOLY = 0x%x\n", reg->CRCPOLY);
+	pr_dbg("\tTXCRC   = 0x%x\n", reg->TXCRC);
+	pr_dbg("\tRXCRC   = 0x%x\n", reg->RXCRC);
+	pr_dbg("\tUDRDR   = 0x%x\n", reg->UDRDR);
+	pr_dbg("\tI2SCFGR = 0x%x\n", reg->I2SCFGR);
+}
 
 static inline void stm32_spi_set_cs(struct stm32_spi *spi, int cs) {
 	pr_dbg("%s: spi select chip (cs = %d)\n", __func__, cs);
@@ -425,6 +441,8 @@ static int stm32_spi_prepare_mbr(struct stm32_spi *spi, uint32_t speed_hz,
 				 uint32_t min_div, uint32_t max_div)
 {
 	uint32_t div, mbrdiv;
+
+	pr_dbg("spi request frequecy: %d\n", speed_hz);
 
 	/* Ensure spi->clk_rate is even */
 	div = DIV_ROUND_UP(spi->clk_rate & ~0x1, speed_hz);
@@ -765,6 +783,7 @@ static void stm32h7_spi_irq_thread(void *dev_id)
 	if (end) {
 		stm32h7_spi_disable(spi);
 		rtems_event_transient_send(spi->thread);
+		pr_dbg("transfer completed\n");
 	}
 
 }
@@ -773,6 +792,7 @@ static void stm32_spi_isr(void *arg)
 {
 	struct stm32_spi *spi = arg;
 	rtems_interrupt_server_request_submit(&spi->req);
+	pr_dbg("spi hardware interrupt ocurred\n");
 }
 
 /**
@@ -903,7 +923,7 @@ static int stm32h7_spi_dma_configure(struct stm32_spi *spi, bool dma_tx) {
         txblk.block_size = sizeof(dummy);
         txblk.source_address = (dma_addr_t)&dummy;
         txblk.source_addr_adj = DMA_ADDR_ADJ_INCREMENT;
-        txblk.dest_address = (dma_addr_t)&spi->base->TXDR;
+        txblk.dest_address = (dma_addr_t)(spi->base + STM32H7_SPI_TXDR);
         txblk.dest_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
         txblk.fifo_mode_control = 1;
         ret = dma_configure(dma_tx->dev, dma_tx->channel, &dma_tx->config);
@@ -934,7 +954,7 @@ static int stm32h7_spi_dma_configure(struct stm32_spi *spi, bool dma_tx) {
         config->block_count = 1;
 
         rxblk.block_size = sizeof(dummy);
-        rxblk.source_address = (dma_addr_t)&spi->base->RXDR;
+        rxblk.source_address = (dma_addr_t)(spi->base + STM32H7_SPI_RXDR);
         rxblk.source_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
         rxblk.dest_address = (dma_addr_t)&dummy;
         rxblk.dest_addr_adj = DMA_ADDR_ADJ_INCREMENT;
@@ -997,7 +1017,7 @@ static int stm32h7_spi_transfer_one_irq(struct stm32_spi *spi)
 
 	spin_unlock_irqrestore(&spi->lock, flags);
 
-	return 1;
+	return 0;
 }
 
 /**
@@ -1040,7 +1060,7 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
 		err = stm32h7_spi_dma_configure(spi, false);
 		if (err)
 			goto dma_desc_error;
-		err = dma_chan_reload(spi->dma_rx, (dma_addr_t)&spi->base->RXDR, 
+		err = dma_chan_reload(spi->dma_rx, (dma_addr_t)(spi->base + STM32H7_SPI_RXDR),
 			(dma_addr_t)xfer->rx_buf, xfer->len);
 		if (err)
 			goto dma_desc_error;
@@ -1051,7 +1071,7 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
 		if (err)
 			goto dma_desc_error;
 		err = dma_chan_reload(spi->dma_tx, (dma_addr_t)xfer->tx_buf, 
-			(dma_addr_t)&spi->base->TXDR, xfer->len);
+			(dma_addr_t)(spi->base + STM32H7_SPI_TXDR), xfer->len);
 		if (err)
 			goto dma_desc_error;
 
@@ -1062,7 +1082,7 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
 
 	spi->cfg->transfer_one_dma_start(spi);
 	spin_unlock_irqrestore(&spi->lock, flags);
-	return 1;
+	return 0;
 
 dma_desc_error:
 	stm32_spi_clr_bits(spi, spi->cfg->regs->dma_rx_en.reg,
@@ -1348,6 +1368,7 @@ static int stm32_spi_transfer_one(struct spi_bus *bus, struct stm32_spi *spi,
 		ret = stm32_spi_transfer_one_dma(spi, transfer);
 	else
 		ret = spi->cfg->transfer_one_irq(spi);
+	// stm32h7_dump_regs(spi);
 	if (ret == 0) { 
 		/* Wait transfer complete */
 		uint32_t timeout = (transfer->len * 8000) / spi->cur_speed + 1000;
@@ -1360,7 +1381,7 @@ static int stm32_spi_transfer_one(struct spi_bus *bus, struct stm32_spi *spi,
 		}
 	}
 	stm32_spi_clr_cs(spi, transfer->cs);
-	return 0;
+	return ret;
 }
 
 /**
@@ -1562,6 +1583,10 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
         ret = -ENODEV;
         goto _free_cs;
     }
+
+	rtems_interrupt_server_request_initialize(0, &spi->req, 
+		stm32h7_spi_irq_thread, spi);
+	rtems_interrupt_server_request_set_vector(&spi->req, spi->irq);
     ret = drvmgr_interrupt_register(dev, IRQF_HARD(spi->irq), dev->name, 
 		stm32_spi_isr, spi);
     if (ret) {
@@ -1569,9 +1594,6 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
         goto _free;
     }
 
-	rtems_interrupt_server_request_initialize(0, &spi->req, 
-		stm32h7_spi_irq_thread, spi);
-	rtems_interrupt_server_request_set_vector(&spi->req, spi->irq);
     spi_bus_init(&spi->bus);
 	spi->bus.transfer = stm32_spi_transfer;
     spi->bus.setup = stm32_spi_setup;
@@ -1734,7 +1756,7 @@ static int shell_cmd_spiwrite(int argc, char **argv) {
             .cs = 0,
             .bits_per_word = 8,
             .mode = SPI_MODE_0,
-            .speed_hz = 100000,
+            .speed_hz = 8000000,
             .delay_usecs = 0
         }
     };
