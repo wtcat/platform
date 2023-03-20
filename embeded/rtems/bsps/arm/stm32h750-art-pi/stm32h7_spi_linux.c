@@ -1,6 +1,7 @@
 /*
  * Copyright 2022 wtcat
  */
+#include <sys/errno.h>
 #define pr_fmt(fmt) "<spi>: "fmt
 #define CONFIG_LOGLEVEL  LOGLEVEL_DEBUG//LOGLEVEL_INFO
 #include <stdint.h>
@@ -251,7 +252,6 @@ struct stm32_spi_cfg {
  */
 struct stm32_spi {
     spi_bus bus;
-	rtems_interrupt_server_request req;
     struct drvmgr_dev *dev;
 	const struct stm32_spi_cfg *cfg;
 	void *base;
@@ -303,13 +303,15 @@ struct stm32_spi {
 	int __ret; \
 	(var) = readl_relaxed(reg_base); \
 	while (cond) {\
-		if (__remain <= 0) \
+		if (__remain <= 0) {\
+			(var) = readl_relaxed(reg_base); \
 			break; \
+		} \
 		rtems_counter_delay_nanoseconds(delay_us * 1000); \
 		__remain -= delay_us; \
 		(var) = readl_relaxed(reg_base); \
 	} \
-	__ret = __remain > 0; \
+	__ret = (cond)? 0: -ETIMEDOUT; \
 	__ret; })
 	
 
@@ -786,13 +788,6 @@ static void stm32h7_spi_irq_thread(void *dev_id)
 		pr_dbg("transfer completed\n");
 	}
 
-}
-
-static void stm32_spi_isr(void *arg) 
-{
-	struct stm32_spi *spi = arg;
-	rtems_interrupt_server_request_submit(&spi->req);
-	pr_dbg("spi hardware interrupt ocurred\n");
 }
 
 /**
@@ -1504,7 +1499,7 @@ static void stm32_spi_destroy(spi_bus *bus) {
     stm32h7_spi_disable(spi);
     rtems_interrupt_local_enable(level);
     drvmgr_interrupt_unregister(spi->dev, IRQF_HARD(spi->irq), 
-        stm32_spi_isr, spi);
+        stm32h7_spi_irq_thread, spi);
     clk_disable(spi->clk, &spi->clkid);
     if (spi->dma_tx)
         dma_chan_release(spi->dma_tx);
@@ -1584,11 +1579,8 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
         goto _free_cs;
     }
 
-	rtems_interrupt_server_request_initialize(0, &spi->req, 
-		stm32h7_spi_irq_thread, spi);
-	rtems_interrupt_server_request_set_vector(&spi->req, spi->irq);
     ret = drvmgr_interrupt_register(dev, IRQF_HARD(spi->irq), dev->name, 
-		stm32_spi_isr, spi);
+		stm32h7_spi_irq_thread, spi);
     if (ret) {
         pr_err("%s register IRQ(%d) failed\n", dev->name, spi->irq);
         goto _free;
@@ -1608,7 +1600,7 @@ static int stm32_spi_probe(struct drvmgr_dev *dev) {
 	ret = spi_bus_register(&spi->bus, dev->name);
 	if (ret) {
 		drvmgr_interrupt_unregister(dev, IRQF_HARD(spi->irq), 
-            stm32_spi_isr, spi);
+            stm32h7_spi_irq_thread, spi);
         pr_err("%s: install interrupt failed!\n", __func__);
         goto _free_cs;
     }
