@@ -1,7 +1,6 @@
 /*
  * Copyright 2022 wtcat
  */
-#include <sys/errno.h>
 #define pr_fmt(fmt) "<spi>: "fmt
 #define CONFIG_LOGLEVEL  LOGLEVEL_DEBUG//LOGLEVEL_INFO
 #include <stdint.h>
@@ -872,6 +871,7 @@ static void stm32h7_spi_dma_cb(struct drvmgr_dev *dev, void *user_data,
 	if (!(sr & STM32H7_SPI_SR_EOT))
 		dev_warn(spi->dev, "DMA error (sr=0x%08x)\n", sr);
 
+	dev_dbg(spi->dev, "spi dma transfer completed\n");
 	/* Now wait for EOT, or SUSP or OVR in case of error */
 }
 
@@ -1023,6 +1023,7 @@ static int stm32h7_spi_transfer_one_irq(struct stm32_spi *spi)
 static void stm32h7_spi_transfer_one_dma_start(struct stm32_spi *spi)
 {
 	/* Enable the interrupts relative to the end of transfer */
+	pr_dbg("starting dma transfer\n");
 	stm32_spi_set_bits(spi, STM32H7_SPI_IER, STM32H7_SPI_IER_EOTIE |
 						 STM32H7_SPI_IER_TXTFIE |
 						 STM32H7_SPI_IER_OVRIE |
@@ -1067,8 +1068,10 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
 			goto dma_desc_error;
 		err = dma_chan_reload(spi->dma_tx, (dma_addr_t)xfer->tx_buf, 
 			(dma_addr_t)(spi->base + STM32H7_SPI_TXDR), xfer->len);
-		if (err)
+		if (err) {
+			pr_err("dma start failed(%d)\n", err);
 			goto dma_desc_error;
+		}
 
 		/* Enable Tx DMA request */
 		stm32_spi_set_bits(spi, spi->cfg->regs->dma_tx_en.reg,
@@ -1716,8 +1719,8 @@ static int shell_cmd_flashid(int argc, char **argv) {
     uint8_t cmd[] = {0x90, 0, 0, 0};
     uint32_t id = 0;
 
-    if (spi_writeread(cmd, sizeof(cmd), &id, 2) > 0) 
-        printf("<flash ID>: 0x%x\n", id);
+    spi_writeread(cmd, sizeof(cmd), &id, 2);
+    printf("<flash ID>: 0x%x\n", id);
     
     return 0;
 }
